@@ -1839,7 +1839,14 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadConfig(): AiEngineConfig {
         if (!configFile.exists()) return AiEngineConfig()
         return try {
-            json.decodeFromString<AiEngineConfig>(configFile.readText())
+            val loaded = json.decodeFromString<AiEngineConfig>(configFile.readText())
+            if (loaded.otaManifestUrl.contains("githubusercontent.com/manue/")) {
+                val fixed = loaded.copy(otaManifestUrl = OtaUpdateManager.DEFAULT_MANIFEST_URL)
+                saveConfig(fixed)
+                fixed
+            } else {
+                loaded
+            }
         } catch (_: Throwable) {
             AiEngineConfig()
         }
@@ -2213,7 +2220,12 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun checkForUpdates(silent: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { it.copy(isCheckingUpdate = true, updateStatusMessage = "Verifica aggiornamenti in corso...") }
-            val url = _uiState.value.aiConfig.otaManifestUrl.ifBlank { OtaUpdateManager.DEFAULT_MANIFEST_URL }
+            val rawUrl = _uiState.value.aiConfig.otaManifestUrl
+            val url = if (rawUrl.contains("githubusercontent.com/manue/")) {
+                OtaUpdateManager.DEFAULT_MANIFEST_URL
+            } else {
+                rawUrl.ifBlank { OtaUpdateManager.DEFAULT_MANIFEST_URL }
+            }
             val result = otaUpdateManager.checkForUpdate(manifestUrl = url)
             when (result.status) {
                 UpdateCheckStatus.UPDATE_AVAILABLE -> {
