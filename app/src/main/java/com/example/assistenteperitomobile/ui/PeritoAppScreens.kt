@@ -125,6 +125,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Folder
@@ -896,6 +897,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             ModalBottomSheet(
                 onDismissRequest = { showAttachSheet = false },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                dragHandle = { AppleSheetDragHandle() },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 containerColor = DavezAlabaster
             ) {
@@ -931,6 +933,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
                 onDismissRequest = { showInAppCameraSheet = false },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 sheetGesturesEnabled = false,
+                dragHandle = { AppleSheetDragHandle(tint = Color.White.copy(alpha = 0.4f)) },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 containerColor = Color(0xFF141110)
             ) {
@@ -965,8 +968,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             ModalBottomSheet(
                 onDismissRequest = { showArchiveSheet = false },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                sheetGesturesEnabled = false,
-                dragHandle = null,
+                dragHandle = { AppleSheetDragHandle() },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 containerColor = AppleWhite
             ) {
@@ -995,8 +997,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             ModalBottomSheet(
                 onDismissRequest = { showAiSettingsSheet = false },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                sheetGesturesEnabled = false,
-                dragHandle = null,
+                dragHandle = { AppleSheetDragHandle() },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 containerColor = AppleWhite
             ) {
@@ -1027,6 +1028,30 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
                 onContinueWithOldVersion = { viewModel.dismissUpdateDialog() }
             )
         }
+    }
+}
+
+// =============================================================================
+// APPLE SHEET DRAG HANDLE (APPLE HIG SPEC)
+// Standard iOS Modal grabber pill (36x5dp, continuous rounded corners)
+// =============================================================================
+@Composable
+fun AppleSheetDragHandle(tint: Color = AppleLabelTertiary.copy(alpha = 0.35f)) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(5.dp)
+                .background(
+                    color = tint,
+                    shape = RoundedCornerShape(2.5.dp)
+                )
+        )
     }
 }
 
@@ -1576,16 +1601,16 @@ fun PeritoStudioTopBar(
                     .size(44.dp)
                     .emilPressScale(modInteraction)
                     .semantics {
-                        contentDescription = "Modelli IA"
+                        contentDescription = "Parametri e Modelli IA"
                         testTag = "top_bar_models_button"
                     }
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.Memory,
-                        contentDescription = "Modelli IA",
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Parametri e Modelli IA",
                         tint = DavezBordeaux,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -3852,8 +3877,11 @@ fun PeritoStudioMessageBubble(
                     }
 
                     Text(
-                        text = if (isUser) "$timeFormatted ✓✓" else timeFormatted,
-                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        text = timeFormatted,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            letterSpacing = (-0.2).sp
+                        ),
                         color = timeColor
                     )
                 }
@@ -4426,21 +4454,23 @@ fun PeritoStudioInlineButton(
             onClick()
         },
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         color = containerColor,
-        shadowElevation = 1.dp,
-        border = borderColor?.let { BorderStroke(0.8.dp, it) },
+        shadowElevation = 0.5.dp,
+        border = borderColor?.let { BorderStroke(0.6.dp, it) },
         modifier = modifier
             .heightIn(min = 44.dp)
-            .emilPressScale(interactionSource, pressedScale = 0.96f)
+            .emilPressScale(interactionSource, pressedScale = 0.97f)
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    letterSpacing = (-0.2).sp
+                ),
                 color = contentColor,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
