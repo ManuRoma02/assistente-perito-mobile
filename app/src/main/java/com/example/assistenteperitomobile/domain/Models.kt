@@ -190,7 +190,7 @@ data class AiEngineConfig(
     val morningBriefingEnabled: Boolean = true,
     val hasSeenModelSetupPrompt: Boolean = false,
     val syncSystemCalendar: Boolean = true,
-    val otaManifestUrl: String = "https://raw.githubusercontent.com/manue/assistente-perito-mobile/main/ota-update.json",
+    val otaManifestUrl: String = "https://raw.githubusercontent.com/ManuRoma02/assistente-perito-mobile/main/ota-update.json",
     val autoCheckUpdatesOnStart: Boolean = true,
     val studioProfile: StudioProfile = StudioProfile()
 )

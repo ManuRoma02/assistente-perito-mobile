@@ -21,7 +21,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -88,7 +89,6 @@ dependencies {
   implementation(libs.kotlinx.coroutines.play.services)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.mlkit.text.recognition)
-  implementation(libs.mediapipe.tasks.genai)
   implementation(libs.llamatik.android)
   implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.androidx.camera.core)

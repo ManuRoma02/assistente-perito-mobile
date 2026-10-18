@@ -67,6 +67,7 @@ import com.example.assistenteperitomobile.theme.AppleWhite
 import com.example.assistenteperitomobile.theme.DavezAlabaster
 import com.example.assistenteperitomobile.theme.DavezBordeaux
 import com.example.assistenteperitomobile.theme.DavezStoneBorder
+import com.example.assistenteperitomobile.theme.DavezTravertine
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -451,141 +452,169 @@ fun AgendaEventCard(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = AppleWhite,
-        border = BorderStroke(if (isToday) 1.dp else 0.5.dp, if (isToday) DavezBordeaux.copy(alpha = 0.4f) else DavezStoneBorder),
+        border = BorderStroke(if (isToday) 1.dp else 0.5.dp, if (isToday) DavezBordeaux.copy(alpha = 0.45f) else DavezStoneBorder),
         shadowElevation = if (isToday) 2.dp else 0.5.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // Orario + Data + Pulsanti Modifica ed Elimina
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Schedule,
-                        contentDescription = null,
-                        tint = if (isToday) DavezBordeaux else AppleLabelSecondary,
-                        modifier = Modifier.size(16.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Apple Calendar vertical accent pill
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(52.dp)
+                    .background(
+                        color = if (isToday) DavezBordeaux else AppleBlueDark,
+                        shape = RoundedCornerShape(2.dp)
                     )
-                    Text(
-                        text = "$startTime - $endTime",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isToday) DavezBordeaux else AppleLabelPrimary
-                    )
-                    if (!isToday) {
-                        Text(
-                            text = "($dateLabel)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AppleLabelSecondary
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IconButton(
-                        onClick = onReschedule,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Modifica orario",
-                            tint = DavezBordeaux,
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.DeleteOutline,
-                            contentDescription = "Rimuovi appuntamento",
-                            tint = AppleRed.copy(alpha = 0.8f),
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            // Titolo
-            Text(
-                text = event.titolo,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Serif
-                ),
-                color = AppleLabelPrimary
             )
 
-            // Cliente
-            if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(text = event.cliente, style = MaterialTheme.typography.bodySmall, color = AppleLabelSecondary)
-                }
-            }
+            Spacer(Modifier.width(12.dp))
 
-            // Luogo & Pulsante Google Maps
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
+                // Orario + Data + Pulsanti Modifica ed Elimina
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = AppleRed, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = event.luogo,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppleLabelPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (event.luogo.isNotBlank() && event.luogo != "Da definire") {
-                    OutlinedButton(
-                        onClick = onOpenMap,
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(0.6.dp, AppleBlueDark),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Map, contentDescription = null, tint = AppleBlueDark, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Google Maps", color = AppleBlueDark, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = if (isToday) DavezBordeaux else AppleLabelSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = "$startTime - $endTime",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                letterSpacing = (-0.2).sp
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            color = if (isToday) DavezBordeaux else AppleLabelPrimary
+                        )
+                        if (!isToday) {
+                            Text(
+                                text = "($dateLabel)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleLabelSecondary
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        IconButton(
+                            onClick = onReschedule,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Modifica orario",
+                                tint = DavezBordeaux,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Rimuovi appuntamento",
+                                tint = AppleRed.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
-            }
 
-            // Promemoria automatici
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = AppleGreen, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.height(4.dp))
+
+                // Titolo
                 Text(
-                    text = "Promemoria automatici attivi (24h, 1h, 30m prima)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppleGreen,
-                    fontSize = 10.sp
+                    text = event.titolo,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Serif,
+                        letterSpacing = (-0.1).sp
+                    ),
+                    color = AppleLabelPrimary
                 )
+
+                // Cliente
+                if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(text = event.cliente, style = MaterialTheme.typography.bodySmall, color = AppleLabelSecondary)
+                    }
+                }
+
+                // Luogo & Pulsante Google Maps
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = AppleRed, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = event.luogo,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleLabelPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (event.luogo.isNotBlank() && event.luogo != "Da definire") {
+                        Surface(
+                            onClick = onOpenMap,
+                            shape = RoundedCornerShape(8.dp),
+                            color = DavezTravertine,
+                            border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.35f)),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Map, contentDescription = null, tint = AppleBlueDark, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Google Maps", color = AppleBlueDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+
+                // Promemoria automatici
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = AppleGreen, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Promemoria automatici attivi (24h, 1h, 30m prima)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppleGreen,
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }

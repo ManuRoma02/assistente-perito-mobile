@@ -1060,15 +1060,16 @@ fun UnifiedStudioBottomBar(
 
     Surface(
         color = DavezAlabaster,
-        border = BorderStroke(0.6.dp, DavezStoneBorder.copy(alpha = 0.5f)),
-        shadowElevation = 6.dp,
+        border = BorderStroke(0.6.dp, DavezStoneBorder.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        shadowElevation = 8.dp,
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // 1. POPUP SUGGERIMENTI COMANDI SLASH (/)
@@ -1156,10 +1157,11 @@ fun UnifiedStudioBottomBar(
                             },
                             interactionSource = attachInteraction,
                             shape = CircleShape,
-                            color = AppleBlueSoft,
-                            border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.20f)),
+                            color = AppleWhite,
+                            border = BorderStroke(0.8.dp, DavezStoneBorder.copy(alpha = 0.65f)),
+                            shadowElevation = 1.dp,
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(44.dp)
                                 .emilPressScale(attachInteraction)
                                 .semantics {
                                     contentDescription = "Azioni e allegati"
@@ -1182,7 +1184,7 @@ fun UnifiedStudioBottomBar(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 42.dp, max = 110.dp)
+                                .heightIn(min = 44.dp, max = 110.dp)
                                 .clip(RoundedCornerShape(22.dp))
                                 .background(AppleWhite)
                                 .border(0.8.dp, DavezStoneBorder, RoundedCornerShape(22.dp))
@@ -1191,8 +1193,11 @@ fun UnifiedStudioBottomBar(
                         ) {
                             if (inputFieldValue.text.isEmpty()) {
                                 Text(
-                                    text = "Messaggio o digita / per orari e comandi...",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = "Messaggio o digita / per comandi...",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 15.sp,
+                                        letterSpacing = (-0.2).sp
+                                    ),
                                     color = AppleLabelTertiary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -1203,8 +1208,9 @@ fun UnifiedStudioBottomBar(
                                 onValueChange = onInputFieldValueChange,
                                 textStyle = TextStyle(
                                     color = AppleLabelPrimary,
-                                    fontSize = 16.sp,
-                                    lineHeight = 21.sp
+                                    fontSize = 15.5.sp,
+                                    lineHeight = 21.sp,
+                                    letterSpacing = (-0.2).sp
                                 ),
                                 cursorBrush = SolidColor(DavezBordeaux),
                                 maxLines = 4,
@@ -1239,7 +1245,7 @@ fun UnifiedStudioBottomBar(
                             color = DavezBordeaux,
                             shadowElevation = 2.dp,
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(44.dp)
                                 .emilPressScale(sendInteraction)
                                 .semantics {
                                     contentDescription = if (hasText) "Invia messaggio" else "Detta nota vocale"
@@ -1284,7 +1290,7 @@ fun UnifiedStudioBottomBar(
                 }
             }
 
-            // 3. TASTI PER CAMBIARE SEZIONE: [ 💬 Assistente ] e [ 📅 Agenda ]
+            // 3. SEGMENTED SWITCHER SEZIONI STILE APPLE HIG: [ Assistente | Agenda ]
             // Quando la tastiera è aperta (imeBottomPx > 0), compattiamo la barra per massimizzare la vista chat
             val isKeyboardOpen = imeBottomPx > 0
             AnimatedVisibility(
@@ -1292,36 +1298,45 @@ fun UnifiedStudioBottomBar(
                 enter = fadeIn(tween(140)) + expandVertically(),
                 exit = fadeOut(tween(100)) + shrinkVertically()
             ) {
-                Row(
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFECE7E2),
+                    border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.45f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp, bottom = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(42.dp)
                 ) {
-                    StudioSectionTabPill(
-                        selected = selectedTab == MainAppTab.CHAT,
-                        label = "Assistente",
-                        icon = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
-                        badgeCount = 0,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelectTab(MainAppTab.CHAT)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        StudioSectionTabPill(
+                            selected = selectedTab == MainAppTab.CHAT,
+                            label = "Assistente",
+                            icon = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
+                            badgeCount = 0,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectTab(MainAppTab.CHAT)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
 
-                    StudioSectionTabPill(
-                        selected = selectedTab == MainAppTab.AGENDA,
-                        label = "Agenda",
-                        icon = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
-                        badgeCount = agendaCount,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelectTab(MainAppTab.AGENDA)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                        StudioSectionTabPill(
+                            selected = selectedTab == MainAppTab.AGENDA,
+                            label = "Agenda",
+                            icon = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
+                            badgeCount = agendaCount,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectTab(MainAppTab.AGENDA)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
@@ -1341,16 +1356,13 @@ fun StudioSectionTabPill(
     Surface(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) DavezBordeaux else AppleWhite.copy(alpha = 0.7f),
-        border = BorderStroke(
-            0.5.dp,
-            if (selected) DavezBordeaux else DavezStoneBorder.copy(alpha = 0.5f)
-        ),
+        shape = RoundedCornerShape(11.dp),
+        color = if (selected) AppleWhite else Color.Transparent,
+        border = if (selected) BorderStroke(0.5.dp, Color.Black.copy(alpha = 0.05f)) else null,
         shadowElevation = if (selected) 2.dp else 0.dp,
         modifier = modifier
-            .height(38.dp)
-            .emilPressScale(interactionSource)
+            .fillMaxHeight()
+            .emilPressScale(interactionSource, pressedScale = 0.97f)
     ) {
         Row(
             modifier = Modifier
@@ -1362,32 +1374,34 @@ fun StudioSectionTabPill(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (selected) AppleWhite else AppleLabelSecondary,
-                modifier = Modifier.size(17.dp)
+                tint = if (selected) DavezBordeaux else AppleLabelSecondary,
+                modifier = Modifier.size(16.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 13.sp
+                    fontSize = 13.5.sp,
+                    letterSpacing = (-0.2).sp
                 ),
-                color = if (selected) AppleWhite else AppleLabelPrimary
+                color = if (selected) DavezBordeaux else AppleLabelSecondary
             )
             if (badgeCount > 0) {
                 Spacer(Modifier.width(6.dp))
                 Surface(
                     shape = CircleShape,
-                    color = if (selected) AppleWhite else DavezBordeaux,
+                    color = if (selected) DavezBordeaux else DavezBordeaux.copy(alpha = 0.16f),
                     modifier = Modifier.size(18.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            text = badgeCount.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) DavezBordeaux else AppleWhite,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
+                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = if (selected) AppleWhite else DavezBordeaux
                         )
                     }
                 }

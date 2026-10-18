@@ -1,7 +1,6 @@
 package com.example.assistenteperitomobile.domain
 
 import android.content.Context
-import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.llamatik.library.platform.LlamaBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -37,8 +36,6 @@ class PeritoAiEngine(private val context: Context? = null) {
         isLenient = true
     }
 
-    private var llmInference: LlmInference? = null
-    private var loadedModelPath: String? = null
     private var loadedGgufPath: String? = null
 
     /**
@@ -100,46 +97,7 @@ class PeritoAiEngine(private val context: Context? = null) {
         }
     }
 
-    /**
-     * Inizializza o aggiorna il modello MediaPipe On-Device (.task / .bin) se presente sul telefono.
-     */
-    fun ensureMediaPipeLoaded(config: AiEngineConfig): Boolean {
-        if (!config.useMediaPipeOnDevice || config.mediaPipeModelPath.isBlank() || context == null) {
-            return false
-        }
-        val modelFile = File(config.mediaPipeModelPath)
-        if (!modelFile.exists() || !modelFile.isFile || modelFile.name.lowercase().endsWith(".gguf")) return false
 
-        if (llmInference != null && loadedModelPath == modelFile.absolutePath) {
-            return true
-        }
-        return try {
-            llmInference?.close()
-            llmInference = try {
-                // Attiva esplicitamente il backend GPU (Google AI Edge ML Drift: OpenCL / OpenGL ES / Vulkan)
-                val gpuOptions = LlmInference.LlmInferenceOptions.builder()
-                    .setModelPath(modelFile.absolutePath)
-                    .setMaxTokens(512)
-                    .setPreferredBackend(LlmInference.Backend.GPU)
-                    .build()
-                LlmInference.createFromOptions(context, gpuOptions)
-            } catch (_: Throwable) {
-                // Fallback automatico su DEFAULT/CPU se il driver GPU del dispositivo non supporta OpenCL
-                val fallbackOptions = LlmInference.LlmInferenceOptions.builder()
-                    .setModelPath(modelFile.absolutePath)
-                    .setMaxTokens(512)
-                    .setPreferredBackend(LlmInference.Backend.DEFAULT)
-                    .build()
-                LlmInference.createFromOptions(context, fallbackOptions)
-            }
-            loadedModelPath = modelFile.absolutePath
-            true
-        } catch (_: Throwable) {
-            llmInference = null
-            loadedModelPath = null
-            false
-        }
-    }
 
     /**
      * Interroga il Decision Model (Rizzo Flow / Jev) tramite endpoint Jev-compatible (/v1/systemone)
@@ -1259,15 +1217,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                 } else null
             }
             if (!ggufResult.isNullOrBlank()) return@withTimeoutOrNull ggufResult
-            // 2. Prova MediaPipe On-Device (.task / .bin)
-            if (ensureMediaPipeLoaded(config)) {
-                try {
-                    val res = llmInference?.generateResponse(prompt)
-                    if (!res.isNullOrBlank()) return@withTimeoutOrNull extractJsonBlock(res)
-                } catch (_: Throwable) {
-                }
-            }
-            // 3. Prova Ollama Locale / Termux / LAN se abilitato
+            // 2. Prova Ollama Locale / Termux / LAN se abilitato
             if (config.useLocalOllama && config.ollamaUrl.isNotBlank()) {
                 try {
                     val url = URL(config.ollamaUrl)
