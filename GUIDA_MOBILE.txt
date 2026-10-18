@@ -1,0 +1,39 @@
+====================================================================
+      ASSISTENTE AI PERITO EDILE MOBILE - GUIDA RAPIDA (.APK)
+====================================================================
+
+1. COSA FA L'APP SUL TELEFONO:
+   Trasforma lo smartphone Android in un assistente da cantiere autonomo e 100% privato che gestisce appuntamenti vocali, scansioni OCR e archivio perizie senza mai dipendere da un PC o dal cloud.
+
+2. DETTATURA VOCALE E CHAT AGENDA (TAB "ASSISTENTE"):
+   Premi l'icona del microfono o scrivi un messaggio (es. "Sopralluogo domani alle 10:30 in Via Roma 15 con Ing. Rossi") per inserire l'appuntamento direttamente nel Google Calendar del telefono.
+
+3. AUTO-CORREZIONE E CHIARIMENTI INTELLIGENTI:
+   Se ti correggi mentre parli ("...anzi no facciamo dopodomani alle 16:00") o dimentichi l'orario, l'assistente capisce la rettifica o ti chiede il dato mancante ricordando il resto.
+
+4. CONTROLLO CONFLITTI BIDIREZIONALE E 3 SVEGLIE AUTOMATICHE:
+   Controlla in tempo reale il calendario nativo dello smartphone (con margine di ±15 minuti), ti avvisa con i pulsanti "Sostituisci / Inserisci comunque / Annulla" se l'orario è occupato e imposta sempre 3 promemoria (24 ore, 60 minuti e 30 minuti prima).
+
+5. SCANSIONE FOTOCAMERA OCR E SBUSTAMENTO .P7M (TAB "6 CARTELLE"):
+   Scatta una foto a un documento in cantiere o importa un file PDF / busta crittografica PEC (.p7m) per estrarre il testo offline con Google ML Kit e rinominarlo secondo lo standard "ANNO-MESE-GIORNO_Cliente_Oggetto_NomeFile".
+
+6. ARCHIVIAZIONE NELLE 6 CARTELLE UFFICIALI:
+   Smista automaticamente ogni documento nelle 6 cartelle sul telefono (Atti_Tribunale, Perizie_Tecniche, Planimetrie_Computi, Fatture_Preventivi, Corrispondenza_Legale, Da_Classificare_Manualmente) con possibilità di spostarlo o condividerlo con un tocco.
+
+7. CONDIVISIONE DIRETTA DA WHATSAPP, TELEGRAM E GMAIL:
+   Da qualsiasi app del telefono (WhatsApp, Gmail, PEC, File Manager), tocca "Condividi" su un PDF, una foto o un messaggio e scegli "Assistente Perito Mobile" per archiviarlo o metterlo subito in agenda.
+
+8. RICERCA RAPIDA DEI DOCUMENTI IN MOBILITA':
+   Scrivi o detta in chat "Mandami la perizia di..." o "Cerca CTU..." per trovare all'istante il file sull'archivio del telefono e aprirlo o inviarlo al cliente.
+
+9. BRIEFING MATTUTINO (/OGGI) CON GOOGLE MAPS E FASCICOLO CLIENTE:
+   Ogni mattina alle 08:00 (o toccando il tab "Briefing /Oggi") mostra il programma della giornata con il pulsante "Avvia Navigatore Google Maps" e allega automaticamente i documenti del cliente trovati in archivio.
+
+10. MOTORE IA 100% ON-DEVICE (TAB "IA LOCALE"):
+    Elabora tutto direttamente sul processore dello smartphone (con supporto integrato per modelli neurali Google AI Edge MediaPipe .task/.bin e connessione opzionale Ollama).
+
+====================================================================
+COME INSTALLARE L'APP SUL TELEFONO:
+- Metodo 1 (Senza cavi via Telegram/WhatsApp): Inviati il file "Assistente_Perito_Mobile.apk" su Telegram sul telefono, toccalo e premi "Installa".
+- Metodo 2 (Via cavo USB): Collega il telefono al PC e fai doppio clic su "INSTALLA_SUL_TELEFONO.bat".
+====================================================================

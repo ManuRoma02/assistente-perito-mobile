@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Mario Rossi Architectural Bordeaux Gradient (#6A1628 -> #4F0B18 -> #33060E) -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="12"
+                android:startY="8"
+                android:endX="96"
+                android:endY="100"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#6A1628" />
+                <item android:offset="0.55" android:color="#4F0B18" />
+                <item android:offset="1.0" android:color="#33060E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle top-left Alabaster Chalk radial glow -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="32"
+                android:centerY="24"
+                android:gradientRadius="56"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#2EF8F4F1" />
+                <item android:offset="1.0" android:color="#004F0B18" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Architectural Blueprint Micro-Grid (davez .tech-grid) -->
+    <path
+        android:pathData="M24,0L24,108M39,0L39,108M54,0L54,108M69,0L69,108M84,0L84,108M0,24L108,24M0,39L108,39M0,54L108,54M0,69L108,69M0,84L108,84"
+        android:strokeWidth="0.45"
+        android:strokeColor="#1AF8F4F1" />
+</vector>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="perizie_archivio" path="Perizie_Archivio/" />
+    <files-path name="internal_files" path="." />
+    <cache-path name="camera_cache" path="." />
+    <external-files-path name="external_files" path="." />
+</paths>
