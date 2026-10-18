@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- RD Architectural Caliper-Camera Monogram (Safe Zone 66x66dp) -->
+    <!-- Vertical Caliper / Stadia Stem rising from D -->
+    <path
+        android:fillColor="#EFE7E2"
+        android:pathData="M56,19 L65,19 C66.2,19 67,19.8 67,21 L67,22.5 L62.5,22.5 L62.5,38 L58.5,38 L58.5,22.5 L56,22.5 Z" />
+
+    <!-- Caliper Millimeter Tick Marks -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M60.5,25 L62.5,25 M60.5,28 L62.5,28 M60.5,31 L62.5,31 M60.5,34 L62.5,34"
+        android:strokeWidth="0.9"
+        android:strokeColor="#4F0B18" />
+
+    <!-- Reversed R (Left Monogram Wing) in Alabaster Chalk (#F8F4F1) -->
+    <path
+        android:fillColor="#F8F4F1"
+        android:pathData="M52,38 L52,78 L43,78 L43,64 L36,64 L27,78 L17,78 L27.5,62 C21.5,59.5 18,54.5 18,48 C18,41.5 23,38 32,38 L52,38 Z M43,45.5 L33,45.5 C28.5,45.5 26.5,47.2 26.5,51 C26.5,54.8 28.5,56.5 33,56.5 L43,56.5 Z" />
+
+    <!-- Right D Camera Body with Circular Lens Cutout -->
+    <path
+        android:pathData="M55,38 L70,38 C82,38 90,46.5 90,58 C90,69.5 82,78 70,78 L55,78 Z M71,47 C64.9,47 60,51.9 60,58 C60,64.1 64.9,69 71,69 C77.1,69 82,64.1 82,58 C82,51.9 77.1,47 71,47 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="55"
+                android:startY="38"
+                android:endX="90"
+                android:endY="78"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#F8F4F1" />
+                <item android:offset="1.0" android:color="#E6DAD1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Camera Shutter Wedge on Top Right of D -->
+    <path
+        android:fillColor="#EFE7E2"
+        android:pathData="M78,36.5 L87,36.5 C88.1,36.5 89,37.4 89,38.5 L89,44 Z" />
+
+    <!-- Glowing AI Neural Node Inside the Camera Lens of D -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M71,58m-7.5,0a7.5,7.5 0,1 1,15 0a7.5,7.5 0,1 1,-15 0"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80F8F4F1" />
+    <path
+        android:fillColor="#F5D0A9"
+        android:pathData="M71,51.5 L72.6,56.4 L77.5,58 L72.6,59.6 L71,64.5 L69.4,59.6 L64.5,58 L69.4,56.4 Z" />
+</vector>

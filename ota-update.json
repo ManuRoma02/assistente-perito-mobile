@@ -1,0 +1,8 @@
+{
+  "latestVersionCode": 4,
+  "latestVersionName": "1.0.3",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.3/app-debug.apk",
+  "releaseNotes": "• Profilo Peritale Dedicato: Rimozione di ogni riferimento a cantiere in favore di terminologia tecnica peritale (CTU, rilievi, perizie, sopralluoghi)\n• Aggiornamenti In-App Live (OTA): download e installazione automatica dei nuovi rilasci direttamente dall'app\n• Swipe Orizzontale Fluido: Assistente a sinistra e Agenda a destra con scorrimento naturale\n• Barra Unificata: campo di scrittura con [+] e tasti sezione (Assistente / Agenda) in un unico dock\n• Sfondo Continuo Davez Alabaster (#F8F4F1) privo di stacchi cromatici\n• Programma Settimanale: visualizzazione giorno per giorno dei giorni rimanenti con badge e orari",
+  "mandatory": false,
+  "publishedAt": "2026-10-19T00:30:00Z"
+}
