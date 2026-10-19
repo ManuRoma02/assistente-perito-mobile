@@ -448,9 +448,24 @@ class ModelDownloadManager(private val context: Context) {
                 }
             }
 
-            val activeConn = connection ?: throw IllegalStateException("Impossibile connettersi a Hugging Face")
-            val responseCode = activeConn.responseCode
-            val isResume = responseCode == HttpURLConnection.HTTP_PARTIAL && existingPartBytes > 0L
+            var activeConn = connection ?: throw IllegalStateException("Impossibile connettersi a Hugging Face")
+            var responseCode = activeConn.responseCode
+
+            // Se il server risponde con HTTP 416 (Range Not Satisfiable), il file .part è corrotto o completato
+            if (responseCode == 416 && existingPartBytes > 0L) {
+                activeConn.disconnect()
+                tempFile.delete()
+                val freshConn = (URL(model.downloadUrl).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 20_000
+                    readTimeout = 45_000
+                    setRequestProperty("User-Agent", "PeritoAI-Android/2.8")
+                }
+                activeConn = freshConn
+                responseCode = activeConn.responseCode
+            }
+
+            val isResume = responseCode == HttpURLConnection.HTTP_PARTIAL && existingPartBytes > 0L && tempFile.exists()
 
             if (responseCode != HttpURLConnection.HTTP_OK && !isResume) {
                 throw IllegalStateException("Errore HTTP $responseCode durante il download da Hugging Face")

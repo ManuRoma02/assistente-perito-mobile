@@ -12,6 +12,8 @@ import androidx.core.content.ContextCompat
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.CalendarEventItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -30,6 +32,8 @@ class CalendarRepository(private val context: Context) {
         ignoreUnknownKeys = true
         prettyPrint = true
     }
+
+    private val mutex = Mutex()
 
     private val eventsFile: File
         get() = File(context.filesDir, "calendar_events.json")
@@ -121,9 +125,11 @@ class CalendarRepository(private val context: Context) {
             fascicoloId = proposed.fascicoloId
         )
 
-        val current = loadLocalEvents().toMutableList()
-        current.add(item)
-        saveLocalEvents(current.sortedBy { it.startMillis })
+        mutex.withLock {
+            val current = loadLocalEvents().toMutableList()
+            current.add(item)
+            saveLocalEvents(current.sortedBy { it.startMillis })
+        }
         item
     }
 
@@ -138,9 +144,11 @@ class CalendarRepository(private val context: Context) {
     }
 
     suspend fun deleteEvent(event: CalendarEventItem) = withContext(Dispatchers.IO) {
-        val local = loadLocalEvents().toMutableList()
-        local.removeAll { it.id == event.id || (event.systemCalendarEventId != null && it.systemCalendarEventId == event.systemCalendarEventId) }
-        saveLocalEvents(local)
+        mutex.withLock {
+            val local = loadLocalEvents().toMutableList()
+            local.removeAll { it.id == event.id || (event.systemCalendarEventId != null && it.systemCalendarEventId == event.systemCalendarEventId) }
+            saveLocalEvents(local)
+        }
 
         if (hasCalendarPermissions() && event.systemCalendarEventId != null) {
             try {
@@ -191,6 +199,27 @@ class CalendarRepository(private val context: Context) {
                 .sortedBy { it.startMillis }
         } catch (_: Throwable) {
             emptyList()
+        }
+    }
+
+    fun launchGoogleMaps(context: Context, location: String) {
+        if (location.isBlank()) return
+        val encoded = Uri.encode(location)
+        val gmmIntentUri = Uri.parse("geo:0,0?q=$encoded")
+        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(mapIntent)
+        } catch (_: Throwable) {
+            try {
+                val webUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$encoded")
+                val webIntent = Intent(Intent.ACTION_VIEW, webUri).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(webIntent)
+            } catch (_: Throwable) {
+            }
         }
     }
 

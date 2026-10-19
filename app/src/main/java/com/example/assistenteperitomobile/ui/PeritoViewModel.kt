@@ -862,6 +862,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     fascicoloId = fascicoloId ?: _uiState.value.selectedFascicoloId
                 )
             } finally {
+                runCatching { bitmap.recycle() }
                 _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
                 ReasoningBackgroundService.stopReasoning(appContext)
             }
@@ -900,25 +901,29 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 val clientLabel = targetFascicolo?.cliente ?: "Sopralluogo Peritale"
 
                 bitmaps.forEachIndexed { idx, bmp ->
-                    val out = ByteArrayOutputStream()
-                    bmp.compress(Bitmap.CompressFormat.JPEG, 88, out)
-                    val bytes = out.toByteArray()
-                    val fileName = "Sopralluogo_${timestampBase}_foto${idx + 1}.jpg"
-                    val ocr = docProcessor.performOcrOnBitmap(bmp).trim()
-                    val classification = DocumentClassificationResult(
-                        categoria = PeritoCategory.PERIZIE_TECNICHE.folderName,
-                        cliente_o_controparte = clientLabel,
-                        oggetto_sintetico = "Rilievo Fotografico Foto #${idx + 1}",
-                        data_documento = LocalDate.now().toString()
-                    )
-                    val doc = archiveRepo.saveAndArchiveDocument(
-                        bytes = bytes,
-                        originalFileName = fileName,
-                        classification = classification,
-                        extractedSnippet = ocr,
-                        fascicoloId = targetFascicoloId
-                    )
-                    archivedList.add(doc)
+                    try {
+                        val out = ByteArrayOutputStream()
+                        bmp.compress(Bitmap.CompressFormat.JPEG, 88, out)
+                        val bytes = out.toByteArray()
+                        val fileName = "Sopralluogo_${timestampBase}_foto${idx + 1}.jpg"
+                        val ocr = docProcessor.performOcrOnBitmap(bmp).trim()
+                        val classification = DocumentClassificationResult(
+                            categoria = PeritoCategory.PERIZIE_TECNICHE.folderName,
+                            cliente_o_controparte = clientLabel,
+                            oggetto_sintetico = "Rilievo Fotografico Foto #${idx + 1}",
+                            data_documento = LocalDate.now().toString()
+                        )
+                        val doc = archiveRepo.saveAndArchiveDocument(
+                            bytes = bytes,
+                            originalFileName = fileName,
+                            classification = classification,
+                            extractedSnippet = ocr,
+                            fascicoloId = targetFascicoloId
+                        )
+                        archivedList.add(doc)
+                    } finally {
+                        runCatching { bmp.recycle() }
+                    }
                 }
                 refreshAllData()
                 val fascicoloBadge = if (targetFascicolo != null) " nel fascicolo **${targetFascicolo.codice}**" else ""

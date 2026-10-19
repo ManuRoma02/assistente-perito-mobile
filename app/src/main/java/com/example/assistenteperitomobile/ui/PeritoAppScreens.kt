@@ -1948,7 +1948,7 @@ fun PeritoStudioChatScreen(
                             }
                         },
                         onOpenMaps = { location ->
-                            context.startActivity(viewModel.calendarRepo.createGoogleMapsIntent(location))
+                            viewModel.calendarRepo.launchGoogleMaps(context, location)
                         }
                     )
                 }
@@ -2571,7 +2571,7 @@ fun InAppVoiceRecordingBar(
                             if (isDisposed) return
                             closeCurrentPipe()
                             // Se l'OEM non supporta EXTRA_AUDIO_SOURCE, passa automaticamente al mic condiviso
-                            if (usePipeAudioSource && (error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_CLIENT)) {
+                            if (usePipeAudioSource && (error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
                                 usePipeAudioSource = false
                             }
                             if (partialSegment.isNotBlank()) {

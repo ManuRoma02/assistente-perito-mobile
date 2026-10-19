@@ -384,4 +384,44 @@ class PeritoAiEngineTest {
         assertEquals(LocalTime.of(17, 45), negation3!!.first)
         assertNull(negation3.second)
     }
+
+    @Test
+    fun `test unpacking openai chat completion response envelope`() {
+        val openAiPayload = """
+            {
+              "id": "chatcmpl-987",
+              "object": "chat.completion",
+              "created": 1677652288,
+              "choices": [{
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "{\"has_appointment\": true, \"titolo\": \"Sopralluogo CTU\"}"
+                }
+              }]
+            }
+        """.trimIndent()
+
+        val extracted = engine.extractContentFromApiResponse(openAiPayload)
+        assertNotNull(extracted)
+        assertTrue(extracted!!.contains("\"has_appointment\": true"))
+        assertTrue(extracted.contains("\"Sopralluogo CTU\""))
+    }
+
+    @Test
+    fun `test unpacking ollama native generate response envelope`() {
+        val ollamaPayload = """
+            {
+              "model": "qwen2.5:1.5b",
+              "created_at": "2026-10-19T09:00:00Z",
+              "response": "{\"has_appointment\": false, \"motivo\": \"Nessun appuntamento\"}",
+              "done": true
+            }
+        """.trimIndent()
+
+        val extracted = engine.extractContentFromApiResponse(ollamaPayload)
+        assertNotNull(extracted)
+        assertTrue(extracted!!.contains("\"has_appointment\": false"))
+    }
 }
+

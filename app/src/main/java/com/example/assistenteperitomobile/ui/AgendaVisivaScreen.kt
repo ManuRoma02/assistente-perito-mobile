@@ -280,8 +280,7 @@ fun AgendaVisivaScreen(
                         event = ev,
                         isToday = true,
                         onOpenMap = {
-                            val intent = viewModel.calendarRepo.createGoogleMapsIntent(ev.luogo)
-                            context.startActivity(intent)
+                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) }
@@ -308,8 +307,7 @@ fun AgendaVisivaScreen(
                         event = ev,
                         isToday = false,
                         onOpenMap = {
-                            val intent = viewModel.calendarRepo.createGoogleMapsIntent(ev.luogo)
-                            context.startActivity(intent)
+                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) }
@@ -353,8 +351,7 @@ fun AgendaVisivaScreen(
                                 event = ev,
                                 isToday = false,
                                 onOpenMap = {
-                                    val intent = viewModel.calendarRepo.createGoogleMapsIntent(ev.luogo)
-                                    context.startActivity(intent)
+                                    viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                                 },
                                 onReschedule = { eventToReschedule = ev },
                                 onDelete = { viewModel.deleteCalendarEvent(ev) }
@@ -379,8 +376,7 @@ fun AgendaVisivaScreen(
                         event = ev,
                         isToday = false,
                         onOpenMap = {
-                            val intent = viewModel.calendarRepo.createGoogleMapsIntent(ev.luogo)
-                            context.startActivity(intent)
+                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) }
