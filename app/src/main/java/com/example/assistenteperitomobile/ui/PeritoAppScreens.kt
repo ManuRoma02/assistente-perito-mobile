@@ -5823,6 +5823,7 @@ fun ModelDownloadCatalogList(
     val context = LocalContext.current
     val progress = uiState.downloadProgress
     val primaryModel = viewModel.modelDownloadManager.primaryReasoningModel
+    val powerfulModel = viewModel.modelDownloadManager.powerfulReasoningModel
     val fixedModels = viewModel.modelDownloadManager.fixedTaskModels
 
     val notifPermLauncher = rememberLauncherForActivityResult(
@@ -5925,23 +5926,47 @@ fun ModelDownloadCatalogList(
             )
         }
 
-        // 1. MODELLO PRINCIPALE PER IL REASONING (Qwen 3.5 - 2B GPT-5.1 HighIQ Q4_K_M — 1.25 GB)
+        // 1. MOTORE DI REASONING ON-DEVICE / LOCALE
         Text(
-            text = "1️⃣ MODELLO PRINCIPALE PER IL REASONING",
+            text = "1️⃣ MOTORE DI REASONING (BASE 2B O POTENZIATO 4B)",
             style = MaterialTheme.typography.labelSmall,
             color = DavezBordeaux,
             fontWeight = FontWeight.Bold
         )
+        Text(
+            text = "Puoi selezionare la versione Base 2B (ultra-veloce e leggera) oppure sostituirla con la versione Potenziata 4B per deduzioni logiche e perizie complesse.",
+            style = MaterialTheme.typography.bodySmall,
+            color = AppleLabelSecondary
+        )
+
+        // Modello Base: Qwen 3.5 2B
         DownloadableModelCard(
             model = primaryModel,
             isDownloaded = uiState.downloadedModelIds.contains(primaryModel.id),
+            isActiveReasoning = uiState.aiConfig.reasoningModelId == primaryModel.id,
             isDownloading = progress.isDownloading,
             onDownload = {
                 ensureNotificationPermAndRun {
                     viewModel.startModelDownload(primaryModel)
                 }
             },
-            onDelete = { viewModel.deleteDownloadedModel(primaryModel) }
+            onDelete = { viewModel.deleteDownloadedModel(primaryModel) },
+            onSelectActive = { viewModel.selectActiveReasoningModel(primaryModel.id) }
+        )
+
+        // Modello Potenziato: Qwen 3.5 4B Instruct (con tag frob/qwen3.5-instruct:4b)
+        DownloadableModelCard(
+            model = powerfulModel,
+            isDownloaded = uiState.downloadedModelIds.contains(powerfulModel.id),
+            isActiveReasoning = uiState.aiConfig.reasoningModelId == powerfulModel.id,
+            isDownloading = progress.isDownloading,
+            onDownload = {
+                ensureNotificationPermAndRun {
+                    viewModel.startModelDownload(powerfulModel)
+                }
+            },
+            onDelete = { viewModel.deleteDownloadedModel(powerfulModel) },
+            onSelectActive = { viewModel.selectActiveReasoningModel(powerfulModel.id) }
         )
 
         Spacer(Modifier.height(4.dp))
@@ -6054,35 +6079,67 @@ fun ModelDownloadCatalogList(
 private fun DownloadableModelCard(
     model: DownloadableAiModel,
     isDownloaded: Boolean,
-    isDownloading: Boolean,
+    isActiveReasoning: Boolean = false,
+    isDownloading: Boolean = false,
     onDownload: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSelectActive: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = if (isDownloaded) AppleGreenSoft.copy(alpha = 0.45f) else AppleWhite,
+        color = when {
+            isActiveReasoning && isDownloaded -> AppleGreenSoft.copy(alpha = 0.45f)
+            isActiveReasoning -> AppleBlueSoft.copy(alpha = 0.40f)
+            isDownloaded -> AppleGreenSoft.copy(alpha = 0.25f)
+            else -> AppleWhite
+        },
         border = BorderStroke(
-            width = if (model.isPrimaryReasoning || isDownloaded) 1.5.dp else 0.8.dp,
+            width = if (isActiveReasoning) 1.8.dp else if (isDownloaded) 1.2.dp else 0.8.dp,
             color = when {
-                isDownloaded -> AppleGreen
-                model.isPrimaryReasoning -> DavezBordeaux
+                isActiveReasoning && isDownloaded -> AppleGreen
+                isActiveReasoning -> DavezBordeaux
+                isDownloaded -> AppleGreen.copy(alpha = 0.7f)
                 else -> DavezStoneBorder
             }
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = model.roleBadge,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (model.isPrimaryReasoning) DavezBordeaux else AppleLabelSecondary,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = model.roleBadge,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (model.isPrimaryReasoning) DavezBordeaux else AppleLabelSecondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (isActiveReasoning) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = DavezBordeaux
+                        ) {
+                            Text(
+                                text = "ATTIVO",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleWhite,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = AppleGroupedBg
@@ -6109,59 +6166,196 @@ private fun DownloadableModelCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = AppleLabelSecondary
             )
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!isDownloaded) {
-                    Button(
-                        onClick = onDownload,
-                        enabled = !isDownloading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (model.isPrimaryReasoning) DavezBordeaux else DavezFotografiaSlate
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+
+            // Sezione versione suggerita per Ollama / Termux / PC (es. frob/qwen3.5-instruct:4b)
+            model.suggestedOllamaTag?.let { tag ->
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = AppleGroupedBg,
+                    border = BorderStroke(0.6.dp, DavezStoneBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 44.dp)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (model.isPrimaryReasoning) {
-                                "⬇️ Scarica Modello Principale (${model.sizeLabel})"
-                            } else {
-                                "⬇️ Scarica Modello Specialistico (${model.sizeLabel})"
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🏷️ Versione suggerita:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleLabelSecondary,
+                                fontSize = 10.5.sp
+                            )
+                            Text(
+                                text = tag,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                fontWeight = FontWeight.Bold,
+                                color = DavezBordeaux,
+                                fontSize = 12.sp
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(tag))
+                                Toast.makeText(context, "Copiato: $tag", Toast.LENGTH_SHORT).show()
                             },
-                            color = AppleWhite,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copia versione",
+                                tint = DavezBordeaux,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
-                } else {
-                    Button(
-                        onClick = {},
-                        enabled = false,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp)
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (model.isPrimaryReasoning) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = if (model.isPrimaryReasoning) "✅ Reasoning Attivo" else "✅ Modello Scaricato",
-                            fontSize = 13.sp
-                        )
+                        if (!isDownloaded) {
+                            Button(
+                                onClick = onDownload,
+                                enabled = !isDownloading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = DavezBordeaux
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 44.dp)
+                            ) {
+                                Text(
+                                    text = "⬇️ Scarica (${model.sizeLabel})",
+                                    color = AppleWhite,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isActiveReasoning) AppleGreenSoft else AppleGroupedBg,
+                                border = BorderStroke(1.dp, if (isActiveReasoning) AppleGreen else DavezStoneBorder),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 44.dp)
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
+                                ) {
+                                    Text(
+                                        text = if (isActiveReasoning) "⭐ Modello Attivo in Uso" else "✅ File GGUF Scaricato",
+                                        color = if (isActiveReasoning) AppleGreen else AppleLabelPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = onDelete,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.heightIn(min = 44.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.DeleteOutline,
+                                    contentDescription = "Elimina",
+                                    tint = AppleRed,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
-                    OutlinedButton(
-                        onClick = onDelete,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.heightIn(min = 44.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.DeleteOutline,
-                            contentDescription = "Elimina",
-                            tint = AppleRed,
-                            modifier = Modifier.size(18.dp)
-                        )
+
+                    // Tasto per selezionare come modello attivo
+                    if (!isActiveReasoning && onSelectActive != null) {
+                        OutlinedButton(
+                            onClick = onSelectActive,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, DavezBordeaux),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = DavezBordeaux
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 40.dp)
+                        ) {
+                            Text(
+                                text = "⚡ Imposta come Modello Predefinito",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp
+                            )
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (!isDownloaded) {
+                        Button(
+                            onClick = onDownload,
+                            enabled = !isDownloading,
+                            colors = ButtonDefaults.buttonColors(containerColor = DavezFotografiaSlate),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 44.dp)
+                        ) {
+                            Text(
+                                text = "⬇️ Scarica (${model.sizeLabel})",
+                                color = AppleWhite,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 44.dp)
+                        ) {
+                            Text(
+                                text = "✅ Modello Scaricato",
+                                fontSize = 13.sp
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onDelete,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.heightIn(min = 44.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Elimina",
+                                tint = AppleRed,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

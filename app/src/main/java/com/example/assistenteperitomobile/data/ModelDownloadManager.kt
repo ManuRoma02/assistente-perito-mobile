@@ -35,7 +35,8 @@ data class DownloadableAiModel(
     val expectedBytes: Long,
     val fileName: String,
     val downloadUrl: String,
-    val isPrimaryReasoning: Boolean = false
+    val isPrimaryReasoning: Boolean = false,
+    val suggestedOllamaTag: String? = null
 )
 
 @Immutable
@@ -218,14 +219,34 @@ class ModelDownloadManager(private val context: Context) {
      */
     val primaryReasoningModel = DownloadableAiModel(
         id = "qwen35_2b_gpt51_highiq_q4km",
-        roleBadge = "🧠 REASONING PRINCIPALE",
+        roleBadge = "🧠 REASONING BASE (2B)",
         title = "Qwen 3.5 - 2B GPT-5.1 HighIQ (Q4_K_M)",
-        subtitle = "Modello 2B ultra-veloce 4-bit Q4_K_M (1.25 GB): estrazione appuntamenti, comprensione contestuale e risposte peritali istantanee (mradermacher/Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT-i1-GGUF)",
+        subtitle = "Modello 2B ultra-veloce 4-bit Q4_K_M (1.25 GB): estrazione appuntamenti, comprensione contestuale e risposte peritali istantanee. Minimo consumo di memoria (mradermacher/Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT-i1-GGUF)",
         sizeLabel = "1.25 GB",
         expectedBytes = 1_342_177_280L,
         fileName = "Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT.i1-Q4_K_M.gguf",
         downloadUrl = "https://huggingface.co/mradermacher/Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT-i1-GGUF/resolve/main/Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT.i1-Q4_K_M.gguf",
-        isPrimaryReasoning = true
+        isPrimaryReasoning = true,
+        suggestedOllamaTag = "qwen2.5:1.5b"
+    )
+
+    /**
+     * Modello Potenziato per il REASONING:
+     * Qwen 3.5 - 4B Instruct in quantizzazione 4-bit Q4_K_M (2.74 GB).
+     * Modello a 4 miliardi di parametri per perizie complesse, deduzioni logiche forensi e stime articolate.
+     * Versione suggerita per Ollama / GGUF: frob/qwen3.5-instruct:4b.
+     */
+    val powerfulReasoningModel = DownloadableAiModel(
+        id = "qwen35_4b_instruct_q4km",
+        roleBadge = "🚀 REASONING POTENZIATO (4B)",
+        title = "Qwen 3.5 - 4B Instruct (Potenziato)",
+        subtitle = "Versione 4B ad alta capacità logica per perizie complesse e stime articolate (2.74 GB). Suggerito sulla card: frob/qwen3.5-instruct:4b (Ollama / GGUF).",
+        sizeLabel = "2.74 GB",
+        expectedBytes = 2_942_177_280L,
+        fileName = "Qwen3.5-4B-Q4_K_M.gguf",
+        downloadUrl = "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+        isPrimaryReasoning = true,
+        suggestedOllamaTag = "frob/qwen3.5-instruct:4b"
     )
 
     val rizzoFlowModel = DownloadableAiModel(
@@ -241,22 +262,39 @@ class ModelDownloadManager(private val context: Context) {
     )
 
     /**
+     * Modelli di reasoning selezionabili dallo Studio Tecnico (Base 2B o Potenziato 4B).
+     */
+    val reasoningModels: List<DownloadableAiModel> = listOf(primaryReasoningModel, powerfulReasoningModel)
+
+    fun getActiveReasoningModel(modelId: String): DownloadableAiModel {
+        return reasoningModels.find { it.id == modelId } ?: primaryReasoningModel
+    }
+
+    /**
      * Modelli specialistici aggiuntivi opzionali scaricabili su richiesta.
      */
     val fixedTaskModels: List<DownloadableAiModel> = listOf(rizzoFlowModel)
 
     /**
-     * Modelli scaricabili dello Studio Tecnico (Reasoning Principale 2B + Decision Model Rizzo Flow 1.7B).
+     * Tutti i modelli gestiti dallo Studio Tecnico (Reasoning Base 2B + Reasoning Potenziato 4B + Decision Model 1.7B).
      */
-    val availableModels: List<DownloadableAiModel> = listOf(primaryReasoningModel, rizzoFlowModel)
+    val availableModels: List<DownloadableAiModel> = listOf(
+        primaryReasoningModel,
+        powerfulReasoningModel,
+        rizzoFlowModel
+    )
 
     fun isModelDownloaded(model: DownloadableAiModel): Boolean {
         val f = File(modelsDir, model.fileName)
         return f.exists() && f.length() > 10_000_000L
     }
 
-    fun isPrimaryReasoningDownloaded(customPath: String? = null): Boolean {
-        if (isModelDownloaded(primaryReasoningModel)) return true
+    fun isPrimaryReasoningDownloaded(customPath: String? = null, modelId: String? = null): Boolean {
+        if (!modelId.isNullOrBlank()) {
+            val m = reasoningModels.find { it.id == modelId }
+            if (m != null && isModelDownloaded(m)) return true
+        }
+        if (reasoningModels.any { isModelDownloaded(it) }) return true
         if (!customPath.isNullOrBlank()) {
             val customFile = File(customPath)
             if (customFile.exists() && customFile.isFile && customFile.length() > 10_000_000L) {

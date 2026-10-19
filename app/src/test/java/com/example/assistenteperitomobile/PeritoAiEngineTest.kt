@@ -483,5 +483,32 @@ class PeritoAiEngineTest {
         // 4. Zero occorrenze di "cantiere"
         assertFalse(prompt.lowercase().contains("cantiere"))
     }
+
+    @Test
+    fun `test powerful reasoning model 4B configuration and frob qwen35-instruct 4b tag`() {
+        val powerful = com.example.assistenteperitomobile.data.DownloadableAiModel(
+            id = "qwen35_4b_instruct_q4km",
+            roleBadge = "🚀 REASONING POTENZIATO (4B)",
+            title = "Qwen 3.5 - 4B Instruct (Potenziato)",
+            subtitle = "Versione 4B ad alta capacità logica per perizie complesse e stime articolate (2.74 GB). Suggerito sulla card: frob/qwen3.5-instruct:4b (Ollama / GGUF).",
+            sizeLabel = "2.74 GB",
+            expectedBytes = 2_942_177_280L,
+            fileName = "Qwen3.5-4B-Q4_K_M.gguf",
+            downloadUrl = "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+            isPrimaryReasoning = true,
+            suggestedOllamaTag = "frob/qwen3.5-instruct:4b"
+        )
+        assertEquals("qwen35_4b_instruct_q4km", powerful.id)
+        assertEquals("frob/qwen3.5-instruct:4b", powerful.suggestedOllamaTag)
+        assertEquals("Qwen3.5-4B-Q4_K_M.gguf", powerful.fileName)
+        assertTrue(powerful.isPrimaryReasoning)
+
+        val config = AiEngineConfig(reasoningModelId = "qwen35_4b_instruct_q4km")
+        assertEquals("qwen35_4b_instruct_q4km", config.reasoningModelId)
+
+        // Verify zero occurrences of "cantiere" in prompts
+        val prompt = engine.buildClassificationPrompt("Documento perizia", refDate, config)
+        assertFalse(prompt.lowercase().contains("cantiere"))
+    }
 }
 

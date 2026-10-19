@@ -52,8 +52,20 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         val candidateFile: File? = run {
             val modelsDir = File(ctx.filesDir, "models")
+            val target4b = File(modelsDir, "Qwen3.5-4B-Q4_K_M.gguf")
             val target2b = File(modelsDir, "Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT.i1-Q4_K_M.gguf")
+
+            // Priorità 1: Modello attivamente selezionato dall'utente
+            if (config.reasoningModelId == "qwen35_4b_instruct_q4km") {
+                if (target4b.exists() && target4b.length() > 10_000_000L) return@run target4b
+            } else {
+                if (target2b.exists() && target2b.length() > 10_000_000L) return@run target2b
+            }
+
+            // Priorità 2: Fallback intelligente su qualsiasi versione di Qwen scaricata
+            if (target4b.exists() && target4b.length() > 10_000_000L) return@run target4b
             if (target2b.exists() && target2b.length() > 10_000_000L) return@run target2b
+
             if (config.mediaPipeModelPath.isNotBlank()) {
                 val f = File(config.mediaPipeModelPath)
                 if (f.exists() && f.isFile && f.name.lowercase().endsWith(".gguf") && f.length() > 10_000_000L) {

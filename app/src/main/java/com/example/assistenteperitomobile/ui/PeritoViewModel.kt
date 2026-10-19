@@ -365,7 +365,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             lowerText.startsWith("/cerca") -> "🔍 Comando /cerca • Ricerca mirata nelle 6 Cartelle..."
             lowerText.startsWith("/elimina") || lowerText.startsWith("/cancella") -> "🗑️ Comando /elimina • Rimozione da Archivio o Agenda..."
             lowerText.contains("cerca") || lowerText.contains("mandami") -> "🔍 Ricerca semantica nelle 6 Cartelle..."
-            else -> "🧠 Qwen 3.5 2B (Q4_K_M) • Analisi impegno e controllo conflitti (±15m)..."
+            else -> "🧠 ${getActiveReasoningModelLabel()} • Analisi impegno e controllo conflitti (±15m)..."
         }
         _uiState.update {
             it.copy(
@@ -632,7 +632,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                                 ChatMessage(
                                     id = UUID.randomUUID().toString(),
                                     isUser = false,
-                                    text = "🧠 **Risposta PeritoAI (Qwen 3.5 2B Q4_K_M):**\n\n$generalAnswer"
+                                    text = "🧠 **Risposta PeritoAI (${getActiveReasoningModelLabel()}):**\n\n$generalAnswer"
                                 )
                             )
                             notifyOrStopBackgroundService("🧠 Risposta PeritoAI", generalAnswer)
@@ -1889,15 +1889,67 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun getActiveReasoningModelLabel(): String {
+        return if (_uiState.value.aiConfig.reasoningModelId == modelDownloadManager.powerfulReasoningModel.id) {
+            "Qwen 3.5 4B Potenziato"
+        } else {
+            "Qwen 3.5 2B (Q4_K_M)"
+        }
+    }
+
     /**
-     * Scarica sequenzialmente tutti i modelli mancanti della suite (1 Reasoning Principale + 2 Modelli Specialistici)
+     * Consente all'utente di selezionare/sostituire il modello di reasoning (es. passare dal 2B al 4B Potenziato
+     * o viceversa), aggiornando istantaneamente la configurazione persistente e caricando il modello nativo.
+     */
+    fun selectActiveReasoningModel(modelId: String) {
+        val targetModel = modelDownloadManager.getActiveReasoningModel(modelId)
+        val suggestedOllama = if (modelId == modelDownloadManager.powerfulReasoningModel.id) {
+            "frob/qwen3.5-instruct:4b"
+        } else {
+            "qwen3.5-fallback:latest"
+        }
+        val updatedConfig = _uiState.value.aiConfig.copy(
+            reasoningModelId = modelId,
+            ollamaModel = suggestedOllama
+        )
+        saveConfig(updatedConfig)
+        val isReady = modelDownloadManager.isPrimaryReasoningDownloaded(updatedConfig.mediaPipeModelPath, modelId)
+        _uiState.update {
+            it.copy(
+                aiConfig = updatedConfig,
+                isReasoningReady = isReady,
+                areAllModelsReady = modelDownloadManager.areAllModelsDownloaded(updatedConfig.mediaPipeModelPath),
+                statusBanner = "⭐ Modello attivo impostato su: ${targetModel.title}"
+            )
+        }
+        viewModelScope.launch(Dispatchers.Default) {
+            aiEngine.ensureGgufLoaded(updatedConfig)
+        }
+    }
+
+    fun toggleUseLocalOllama(enabled: Boolean, modelName: String? = null, url: String? = null) {
+        val updatedConfig = _uiState.value.aiConfig.copy(
+            useLocalOllama = enabled,
+            ollamaModel = modelName ?: _uiState.value.aiConfig.ollamaModel,
+            ollamaUrl = url ?: _uiState.value.aiConfig.ollamaUrl
+        )
+        saveConfig(updatedConfig)
+        _uiState.update { it.copy(aiConfig = updatedConfig) }
+    }
+
+    /**
+     * Scarica sequenzialmente tutti i modelli mancanti della suite attiva
+     * (Modello di Reasoning Selezionato + Decision Model Rizzo Flow)
      * in background con Foreground Service e Notifica Android di avanzamento.
      */
     fun downloadAllMissingModels() {
         if (_uiState.value.downloadProgress.isDownloading) return
+        val activeReasoning = modelDownloadManager.getActiveReasoningModel(_uiState.value.aiConfig.reasoningModelId)
         val targetSuite = buildList {
-            if (!modelDownloadManager.isPrimaryReasoningDownloaded(_uiState.value.aiConfig.mediaPipeModelPath)) {
-                add(modelDownloadManager.primaryReasoningModel)
+            if (!modelDownloadManager.isModelDownloaded(activeReasoning) &&
+                !modelDownloadManager.isPrimaryReasoningDownloaded(_uiState.value.aiConfig.mediaPipeModelPath, activeReasoning.id)
+            ) {
+                add(activeReasoning)
             }
             addAll(modelDownloadManager.fixedTaskModels)
         }
