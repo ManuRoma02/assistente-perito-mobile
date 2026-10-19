@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
@@ -56,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.assistenteperitomobile.domain.CalendarEventItem
+import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.theme.AppleBlueDark
 import com.example.assistenteperitomobile.theme.AppleBlueSoft
 import com.example.assistenteperitomobile.theme.AppleGreen
@@ -390,11 +392,14 @@ fun AgendaVisivaScreen(
         RescheduleAppointmentDialog(
             event = ev,
             onDismiss = { eventToReschedule = null },
-            onConfirm = { newStartIso, newEndIso ->
-                viewModel.rescheduleCalendarEvent(
+            onConfirm = { newTitle, newCategory, newStartIso, newEndIso, newNotes ->
+                viewModel.updateCalendarEvent(
                     event = ev,
+                    newTitle = newTitle,
+                    newCategory = newCategory,
                     newStartIso = newStartIso,
                     newEndIso = newEndIso,
+                    newNotes = newNotes,
                     notifyInChat = true
                 )
                 eventToReschedule = null
@@ -536,6 +541,24 @@ fun AgendaEventCard(
 
                 Spacer(Modifier.height(4.dp))
 
+                // Categoria Badge
+                val catEnum = PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = DavezBordeaux.copy(alpha = 0.10f),
+                    border = BorderStroke(0.6.dp, DavezBordeaux.copy(alpha = 0.30f))
+                ) {
+                    Text(
+                        text = "${catEnum.emoji} ${catEnum.displayName}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = DavezBordeaux,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(Modifier.height(4.dp))
+
                 // Titolo
                 Text(
                     text = event.titolo,
@@ -547,13 +570,29 @@ fun AgendaEventCard(
                     color = AppleLabelPrimary
                 )
 
-                // Cliente
-                if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
+                // Cliente (mostrato solo se specificato e diverso da titolo e categoria)
+                if (event.cliente.isNotBlank() && event.cliente != "Cliente" && !event.cliente.equals(event.titolo, ignoreCase = true) && !event.cliente.equals(event.categoria, ignoreCase = true)) {
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Person, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(text = event.cliente, style = MaterialTheme.typography.bodySmall, color = AppleLabelSecondary)
+                    }
+                }
+
+                // Note personali per il calendario (se presenti)
+                if (event.note.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.Description, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp).padding(top = 1.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = event.note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleLabelSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
 

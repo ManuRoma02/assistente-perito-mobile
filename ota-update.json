@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 8,
-  "latestVersionName": "1.0.7",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.7/app-release.apk",
-  "releaseNotes": "• Motore Reasoning Potenziato: Aggiunto supporto per Qwen 3.5 4B Instruct (2.74 GB GGUF on-device) per perizie complesse, deduzioni forensi e stime articolate\n• Card con Versione Suggerita: Visualizzazione esplicita del tag 'frob/qwen3.5-instruct:4b' per Ollama/Termux con pulsante di copia rapida in 1-tap\n• Selezione Dinamica Modello Attivo: Possibilità di alternare istantaneamente il modello predefinito tra Base 2B e Potenziato 4B con badge di stato e indicatore visivo\n• Download in Background con Notifica: Servizio di download resiliente in background e gestione automatica della cache\n• Build R8 Super-Snella: APK minificato a ~21.7 MB",
+  "latestVersionCode": 9,
+  "latestVersionName": "1.0.8",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.8/app-release.apk",
+  "releaseNotes": "• Modifica Categoria Evento in Agenda & Dialogo: Possibilità di visualizzare e cambiare la categoria dell'evento (🔍 Sopralluogo, 🏛️ Comune, ⚖️ Tribunale, 🏢 Riunione, 👤 Cliente, ☕ Personale, 📅 Altro) con chip dedicati e modifica diretta di Titolo e Note\n• Note Calendario Pulite & Discrete: Eliminata l'iniezione automatica di 'Cliente: ... / Con: ...' o dell'intero prompt vocale nella descrizione del calendario di sistema Android/Google; il campo note ora contiene esclusivamente le annotazioni esplicitamente fornite dall'utente\n• Rilevamento Intelligente Interlocutore: Esclusione delle parole istituzionali ('comune', 'catasto', 'tribunale') dall'essere erroneamente etichettate come nome del cliente sotto il titolo\n• Comandi Naturali in Chat: Possibilità di dire 'cambia la categoria in comune' o 'è in tribunale' per aggiornare istantaneamente l'evento in corso\n• Selezione Data Flessibile: Aggiunto DatePickerDialog nativo nel dialogo di modifica per scegliere qualsiasi giorno oltre a oggi e domani",
   "mandatory": false,
-  "publishedAt": "2026-10-19T11:35:00Z"
+  "publishedAt": "2026-10-19T14:40:00Z"
 }

@@ -151,6 +151,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.assistenteperitomobile.domain.MainAppTab
+import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.StudioProfile
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -4263,11 +4264,14 @@ fun PeritoStudioMessageBubble(
                 RescheduleAppointmentDialog(
                     event = ev,
                     onDismiss = { showRescheduleDialog = false },
-                    onConfirm = { newStartIso, newEndIso ->
-                        viewModel.rescheduleCalendarEvent(
+                    onConfirm = { newTitle, newCategory, newStartIso, newEndIso, newNotes ->
+                        viewModel.updateCalendarEvent(
                             event = ev,
+                            newTitle = newTitle,
+                            newCategory = newCategory,
                             newStartIso = newStartIso,
                             newEndIso = newEndIso,
+                            newNotes = newNotes,
                             notifyInChat = true
                         )
                         showRescheduleDialog = false
@@ -6514,7 +6518,7 @@ fun FirstRunModelDownloadDialog(
 fun RescheduleAppointmentDialog(
     event: CalendarEventItem,
     onDismiss: () -> Unit,
-    onConfirm: (newStartIso: String, newEndIso: String) -> Unit
+    onConfirm: (newTitle: String, newCategory: String, newStartIso: String, newEndIso: String, newNotes: String) -> Unit
 ) {
     val context = LocalContext.current
     val isoFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss") }
@@ -6537,6 +6541,11 @@ fun RescheduleAppointmentDialog(
         java.time.Duration.between(initialDt, initialEndDt).toMinutes().coerceAtLeast(15L)
     }
 
+    var selectedCategory by remember {
+        mutableStateOf(PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo }))
+    }
+    var titleText by remember { mutableStateOf(event.titolo) }
+    var notesText by remember { mutableStateOf(event.note) }
     var selectedDate by remember { mutableStateOf(initialDt.toLocalDate()) }
     var selectedTime by remember { mutableStateOf(initialDt.toLocalTime()) }
 
@@ -6553,6 +6562,19 @@ fun RescheduleAppointmentDialog(
         picker.show()
     }
 
+    val openDatePicker = {
+        val picker = android.app.DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+            },
+            selectedDate.year,
+            selectedDate.monthValue - 1,
+            selectedDate.dayOfMonth
+        )
+        picker.show()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -6561,13 +6583,13 @@ fun RescheduleAppointmentDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Schedule,
+                    imageVector = Icons.Default.Edit,
                     contentDescription = null,
                     tint = DavezBordeaux,
                     modifier = Modifier.size(22.dp)
                 )
                 Text(
-                    text = "Modifica Orario",
+                    text = "Modifica Impegno",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = AppleLabelPrimary
@@ -6581,37 +6603,105 @@ fun RescheduleAppointmentDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Info appuntamento
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = AppleSecondaryGroupedBg,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text(
-                            text = event.titolo,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AppleLabelPrimary
-                        )
-                        if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
-                            Text(
-                                text = "👤 Con: ${event.cliente}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary
-                            )
-                        }
-                        if (event.luogo.isNotBlank() && event.luogo != "Da definire") {
-                            Text(
-                                text = "📍 ${event.luogo}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary
+                // Selezione Categoria (Chip orizzontali)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Categoria:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppleLabelSecondary
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PeritoEventCategory.entries.forEach { cat ->
+                            val isSelected = selectedCategory == cat
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    val oldCat = selectedCategory
+                                    selectedCategory = cat
+                                    if (titleText.startsWith(oldCat.displayName, ignoreCase = true) ||
+                                        titleText.startsWith(oldCat.defaultPrefix, ignoreCase = true) ||
+                                        titleText.isBlank() ||
+                                        titleText == "Appuntamento"
+                                    ) {
+                                        val suffix = titleText.substringAfter(" con ", "").let { if (it.isNotBlank()) " con $it" else "" }
+                                        titleText = "${cat.defaultPrefix}$suffix"
+                                    }
+                                },
+                                label = {
+                                    Text(
+                                        text = "${cat.emoji} ${cat.displayName}",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = DavezBordeaux,
+                                    selectedLabelColor = AppleWhite,
+                                    containerColor = AppleSecondaryGroupedBg,
+                                    labelColor = AppleLabelPrimary
+                                )
                             )
                         }
                     }
                 }
 
-                // Giorno: Oggi, Domani, o Data originaria
+                // Titolo Appuntamento (modificabile)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Titolo Impegno:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppleLabelSecondary
+                    )
+                    OutlinedTextField(
+                        value = titleText,
+                        onValueChange = { titleText = it },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DavezBordeaux,
+                            unfocusedBorderColor = DavezStoneBorder,
+                            focusedLabelColor = DavezBordeaux
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // Info Interlocutore / Luogo esistenti (se presenti)
+                val hasClient = event.cliente.isNotBlank() && event.cliente != "Cliente" && !event.cliente.equals(event.titolo, ignoreCase = true) && !event.cliente.equals(event.categoria, ignoreCase = true)
+                val hasLocation = event.luogo.isNotBlank() && event.luogo != "Da definire"
+                if (hasClient || hasLocation) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = AppleSecondaryGroupedBg,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (hasClient) {
+                                Text(
+                                    text = "👤 Con: ${event.cliente}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppleLabelSecondary
+                                )
+                            }
+                            if (hasLocation) {
+                                Text(
+                                    text = "📍 ${event.luogo}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppleLabelSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Giorno: Oggi, Domani, o Data originaria / Altro giorno
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Data:",
@@ -6620,8 +6710,11 @@ fun RescheduleAppointmentDialog(
                         color = AppleLabelSecondary
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         val today = LocalDate.now()
                         val tomorrow = today.plusDays(1)
@@ -6642,10 +6735,31 @@ fun RescheduleAppointmentDialog(
                                 label = { Text(label, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = DavezBordeaux,
-                                    selectedLabelColor = AppleWhite
+                                    selectedLabelColor = AppleWhite,
+                                    containerColor = AppleSecondaryGroupedBg,
+                                    labelColor = AppleLabelPrimary
                                 )
                             )
                         }
+
+                        // Opzione Data Personalizzata (DatePicker nativo)
+                        val isCustomDate = selectedDate != today && selectedDate != tomorrow && selectedDate != originalDate
+                        FilterChip(
+                            selected = isCustomDate,
+                            onClick = openDatePicker,
+                            label = {
+                                Text(
+                                    if (isCustomDate) "📅 ${selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}" else "Altra data 📅",
+                                    fontSize = 12.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = DavezBordeaux,
+                                selectedLabelColor = AppleWhite,
+                                containerColor = AppleSecondaryGroupedBg,
+                                labelColor = AppleLabelPrimary
+                            )
+                        )
                     }
                 }
 
@@ -6726,6 +6840,32 @@ fun RescheduleAppointmentDialog(
                         }
                     }
                 }
+
+                // Note Personali per il Calendario (Opzionale)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Note per il Calendario:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppleLabelSecondary
+                    )
+                    OutlinedTextField(
+                        value = notesText,
+                        onValueChange = { notesText = it },
+                        placeholder = { Text("Nessuna nota automatica", fontSize = 12.sp, color = AppleLabelSecondary) },
+                        maxLines = 3,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DavezBordeaux,
+                            unfocusedBorderColor = DavezStoneBorder,
+                            focusedLabelColor = DavezBordeaux
+                        ),
+                        supportingText = {
+                            Text("Se vuoto, nessuna nota verrà inserita nel calendario del telefono.", fontSize = 10.5.sp, color = AppleLabelSecondary)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
@@ -6733,13 +6873,19 @@ fun RescheduleAppointmentDialog(
                 onClick = {
                     val newStart = LocalDateTime.of(selectedDate, selectedTime)
                     val newEnd = newStart.plusMinutes(durationMinutes)
-                    onConfirm(newStart.format(isoFormatter), newEnd.format(isoFormatter))
+                    onConfirm(
+                        titleText.ifBlank { selectedCategory.defaultPrefix },
+                        selectedCategory.displayName,
+                        newStart.format(isoFormatter),
+                        newEnd.format(isoFormatter),
+                        notesText.trim()
+                    )
                     onDismiss()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Salva Orario", color = AppleWhite, fontWeight = FontWeight.Bold)
+                Text("Salva Modifiche", color = AppleWhite, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
