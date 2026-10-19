@@ -39,6 +39,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -58,6 +59,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -177,6 +179,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -185,8 +188,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -265,6 +270,7 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -1084,10 +1090,19 @@ fun UnifiedStudioBottomBar(
     val isSlashMode = inputFieldValue.text.startsWith("/")
 
     Surface(
-        color = DavezAlabaster,
-        border = BorderStroke(0.6.dp, DavezStoneBorder.copy(alpha = 0.55f)),
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
-        shadowElevation = 8.dp,
+        color = Color(0xF7FAF7F4),
+        border = BorderStroke(
+            0.8.dp,
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.95f),
+                    Color.White.copy(alpha = 0.25f),
+                    DavezStoneBorder.copy(alpha = 0.45f)
+                )
+            )
+        ),
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+        shadowElevation = 10.dp,
         modifier = modifier
     ) {
         Column(
@@ -1140,7 +1155,7 @@ fun UnifiedStudioBottomBar(
                 )
             }
 
-            // 2. BARRA DI SCRITTURA CON IL [+] E MIC/SEND MORPH
+            // 2. BARRA DI SCRITTURA LIQUID GLASS CON [+] E MIC/SEND MORPH (iOS 17 SPEC)
             AnimatedContent(
                 targetState = isRecordingVoice,
                 transitionSpec = {
@@ -1173,7 +1188,7 @@ fun UnifiedStudioBottomBar(
                             .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // [+] Pulsante Azioni & Allegati Stile Apple HIG
+                        // [+] Pulsante Azioni & Allegati Stile Apple HIG Frosted Glass
                         val attachInteraction = remember { MutableInteractionSource() }
                         Surface(
                             onClick = {
@@ -1183,11 +1198,16 @@ fun UnifiedStudioBottomBar(
                             interactionSource = attachInteraction,
                             shape = CircleShape,
                             color = AppleWhite,
-                            border = BorderStroke(0.8.dp, DavezStoneBorder.copy(alpha = 0.65f)),
-                            shadowElevation = 1.dp,
+                            border = BorderStroke(
+                                0.8.dp,
+                                Brush.verticalGradient(
+                                    listOf(Color.White, DavezStoneBorder.copy(alpha = 0.65f))
+                                )
+                            ),
+                            shadowElevation = 1.5.dp,
                             modifier = Modifier
                                 .size(44.dp)
-                                .emilPressScale(attachInteraction)
+                                .emilPressScale(attachInteraction, pressedScale = 0.92f)
                                 .semantics {
                                     contentDescription = "Azioni e allegati"
                                     testTag = "chat_attach_button"
@@ -1205,14 +1225,27 @@ fun UnifiedStudioBottomBar(
 
                         Spacer(Modifier.width(8.dp))
 
-                        // Campo di testo arrotondato Pillola Apple White su Davez Alabaster
+                        // Campo di testo arrotondato Capsule Apple White su Davez Alabaster
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 44.dp, max = 110.dp)
                                 .clip(RoundedCornerShape(22.dp))
-                                .background(AppleWhite)
-                                .border(0.8.dp, DavezStoneBorder, RoundedCornerShape(22.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.White, Color(0xFFFAF8F5))
+                                    )
+                                )
+                                .border(
+                                    0.8.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.95f),
+                                            DavezStoneBorder.copy(alpha = 0.50f)
+                                        )
+                                    ),
+                                    RoundedCornerShape(22.dp)
+                                )
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
@@ -1268,10 +1301,10 @@ fun UnifiedStudioBottomBar(
                             interactionSource = sendInteraction,
                             shape = CircleShape,
                             color = DavezBordeaux,
-                            shadowElevation = 2.dp,
+                            shadowElevation = 2.5.dp,
                             modifier = Modifier
                                 .size(44.dp)
-                                .emilPressScale(sendInteraction)
+                                .emilPressScale(sendInteraction, pressedScale = 0.90f)
                                 .semantics {
                                     contentDescription = if (hasText) "Invia messaggio" else "Detta nota vocale"
                                     testTag = if (hasText) "chat_send_button" else "chat_mic_button"
@@ -1315,7 +1348,7 @@ fun UnifiedStudioBottomBar(
                 }
             }
 
-            // 3. SEGMENTED SWITCHER SEZIONI STILE APPLE HIG: [ Assistente | Agenda ]
+            // 3. SEGMENTED SWITCHER LIQUIDO CON ONDA D'ACQUA E SCHIZZO SUL MURO (iOS 17 FLUID DOCK)
             // Quando la tastiera è aperta (imeBottomPx > 0), compattiamo la barra per massimizzare la vista chat
             val isKeyboardOpen = imeBottomPx > 0
             AnimatedVisibility(
@@ -1323,111 +1356,351 @@ fun UnifiedStudioBottomBar(
                 enter = fadeIn(tween(140)) + expandVertically(),
                 exit = fadeOut(tween(100)) + shrinkVertically()
             ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFFECE7E2),
-                    border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.45f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        StudioSectionTabPill(
-                            selected = selectedTab == MainAppTab.CHAT,
-                            label = "Assistente",
-                            icon = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
-                            badgeCount = 0,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelectTab(MainAppTab.CHAT)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        StudioSectionTabPill(
-                            selected = selectedTab == MainAppTab.AGENDA,
-                            label = "Agenda",
-                            icon = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
-                            badgeCount = agendaCount,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelectTab(MainAppTab.AGENDA)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+                LiquidFluidTabDock(
+                    selectedTab = selectedTab,
+                    onSelectTab = onSelectTab,
+                    agendaCount = agendaCount
+                )
             }
         }
     }
 }
 
+// =============================================================================
+// LIQUID FLUID TAB DOCK CON ONDA D'ACQUA E SCHIZZO SUL MURO
+// Fisica del fluido: spring di avanzamento, allungamento idrodinamico (stretch),
+// impatto contro il muro (squash elastico), onda d'urto ad arco e gocce di splash!
+// =============================================================================
 @Composable
-fun StudioSectionTabPill(
-    selected: Boolean,
-    label: String,
-    icon: ImageVector,
-    badgeCount: Int,
-    onClick: () -> Unit,
+fun LiquidFluidTabDock(
+    selectedTab: MainAppTab,
+    onSelectTab: (MainAppTab) -> Unit,
+    agendaCount: Int,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
+    val haptic = LocalHapticFeedback.current
+    val targetIndex = if (selectedTab == MainAppTab.CHAT) 0 else 1
+    val pillProgress = remember { Animatable(targetIndex.toFloat()) }
+    var prevIndex by remember { mutableIntStateOf(targetIndex) }
+    val splashAnim = remember { Animatable(1f) }
+    var impactWall by remember { mutableIntStateOf(0) } // -1 = muro sinistro, +1 = muro destro
+
+    LaunchedEffect(targetIndex) {
+        if (targetIndex != prevIndex) {
+            val dir = if (targetIndex > prevIndex) 1 else -1
+            impactWall = dir
+            prevIndex = targetIndex
+
+            // Movimento fluido con fisica a molla organica
+            pillProgress.animateTo(
+                targetValue = targetIndex.toFloat(),
+                animationSpec = spring(
+                    dampingRatio = 0.66f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+
+            // Impatto contro il muro: trigger del feedback tattile e dello schizzo d'acqua
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            splashAnim.snapTo(0f)
+            splashAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing)
+            )
+        }
+    }
+
+    // Binario incassato con finitura frosted glass tenue
     Surface(
-        onClick = onClick,
-        interactionSource = interactionSource,
-        shape = RoundedCornerShape(11.dp),
-        color = if (selected) AppleWhite else Color.Transparent,
-        border = if (selected) BorderStroke(0.5.dp, Color.Black.copy(alpha = 0.05f)) else null,
-        shadowElevation = if (selected) 2.dp else 0.dp,
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFEBE6E1),
+        border = BorderStroke(
+            0.6.dp,
+            Brush.verticalGradient(
+                listOf(
+                    DavezStoneBorder.copy(alpha = 0.50f),
+                    Color.White.copy(alpha = 0.60f)
+                )
+            )
+        ),
+        shadowElevation = 0.dp,
         modifier = modifier
-            .fillMaxHeight()
-            .emilPressScale(interactionSource, pressedScale = 0.97f)
+            .fillMaxWidth()
+            .height(44.dp)
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                .padding(3.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (selected) DavezBordeaux else AppleLabelSecondary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 13.5.sp,
-                    letterSpacing = (-0.2).sp
-                ),
-                color = if (selected) DavezBordeaux else AppleLabelSecondary
-            )
-            if (badgeCount > 0) {
-                Spacer(Modifier.width(6.dp))
-                Surface(
-                    shape = CircleShape,
-                    color = if (selected) DavezBordeaux else DavezBordeaux.copy(alpha = 0.16f),
-                    modifier = Modifier.size(18.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = if (selected) AppleWhite else DavezBordeaux
+            val availableWidth = maxWidth
+            val tabWidth = availableWidth / 2
+            val currentProgress = pillProgress.value
+            val splashProgress = splashAnim.value
+
+            // Fisica idrodinamica del fluido:
+            // 1. Allungamento elastico in volo (stretch orizzontale)
+            val flightDelta = abs(currentProgress - targetIndex.toFloat())
+            val inFlightStretch = 1f + (flightDelta * 0.18f).coerceIn(0f, 0.18f)
+
+            // 2. Compressione e rimbalzo contro il muro all'impatto (squash & slosh)
+            val splashPhase = splashProgress
+            val splashWave = sin(splashPhase * PI.toFloat() * 2f) * exp(-splashPhase * 4.5f)
+            val wallSquashX = 1f - (splashWave * 0.22f)
+            val wallSquashY = 1f + (splashWave * 0.14f)
+
+            val effectiveScaleX = if (splashPhase < 1f) wallSquashX else inFlightStretch
+            val effectiveScaleY = if (splashPhase < 1f) wallSquashY else (1f / inFlightStretch)
+
+            val currentTransformOrigin = when {
+                splashPhase < 1f && impactWall == 1 -> TransformOrigin(1f, 0.5f) // Ancorato al muro destro
+                splashPhase < 1f && impactWall == -1 -> TransformOrigin(0f, 0.5f) // Ancorato al muro sinistro
+                else -> TransformOrigin.Center
+            }
+
+            // A. Pillola Liquida Apple White con ombra soffusa e riflesso superiore
+            Box(
+                modifier = Modifier
+                    .width(tabWidth)
+                    .fillMaxHeight()
+                    .graphicsLayer {
+                        translationX = (currentProgress * tabWidth.toPx())
+                        scaleX = effectiveScaleX
+                        scaleY = effectiveScaleY
+                        transformOrigin = currentTransformOrigin
+                    }
+                    .shadow(
+                        elevation = 2.5.dp,
+                        shape = RoundedCornerShape(13.dp),
+                        ambientColor = Color(0x33000000),
+                        spotColor = Color(0x22000000)
+                    )
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White,
+                                Color(0xFFFAF7F5)
+                            )
                         )
+                    )
+                    .border(
+                        width = 0.6.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.95f),
+                                Color.White.copy(alpha = 0.40f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(13.dp)
+                    )
+            ) {
+                // Onda d'acqua sinusoidale (slosh) che sbatte e risale lungo la parete del fluido
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    if (splashPhase < 1f && impactWall != 0) {
+                        val sloshOsc = sin(splashPhase * PI.toFloat() * 2.2f) * exp(-splashPhase * 3.8f)
+                        val crest = sloshOsc * size.height * 0.35f
+                        val wavePath = Path().apply {
+                            if (impactWall == 1) {
+                                // Cresta d'onda che si infrange sul muro destro
+                                moveTo(0f, size.height)
+                                lineTo(0f, size.height * 0.75f)
+                                cubicTo(
+                                    size.width * 0.35f, size.height * 0.75f - crest * 0.2f,
+                                    size.width * 0.70f, size.height * 0.55f - crest * 0.7f,
+                                    size.width, size.height * 0.35f - crest
+                                )
+                                lineTo(size.width, size.height)
+                                close()
+                            } else {
+                                // Cresta d'onda che si infrange sul muro sinistro
+                                moveTo(size.width, size.height)
+                                lineTo(size.width, size.height * 0.75f)
+                                cubicTo(
+                                    size.width * 0.65f, size.height * 0.75f - crest * 0.2f,
+                                    size.width * 0.30f, size.height * 0.55f - crest * 0.7f,
+                                    0f, size.height * 0.35f - crest
+                                )
+                                lineTo(0f, size.height)
+                                close()
+                            }
+                        }
+                        drawPath(
+                            path = wavePath,
+                            brush = Brush.verticalGradient(
+                                listOf(
+                                    DavezBordeaux.copy(alpha = (1f - splashPhase) * 0.15f),
+                                    Color.White.copy(alpha = (1f - splashPhase) * 0.30f)
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+
+            // B. Canvas per le gocce d'acqua che schizzano e l'onda d'urto sul bordo del muro
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                if (splashPhase < 1f && impactWall != 0) {
+                    val wallX = if (impactWall == 1) size.width else 0f
+                    val dir = if (impactWall == 1) -1f else 1f
+
+                    // 1. Onda d'urto ad arco radiale che si propaga dal punto di impatto
+                    val rippleR = splashPhase * 28.dp.toPx()
+                    val rippleAlpha = (1f - splashPhase).coerceIn(0f, 1f) * 0.45f
+                    if (rippleR > 1f) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    DavezBordeaux.copy(alpha = rippleAlpha),
+                                    Color.White.copy(alpha = rippleAlpha * 0.8f)
+                                ),
+                                center = Offset(wallX, size.height / 2f),
+                                radius = rippleR
+                            ),
+                            radius = rippleR,
+                            center = Offset(wallX, size.height / 2f),
+                            style = Stroke(width = 1.4.dp.toPx())
+                        )
+                    }
+
+                    // 2. Micro-gocce d'acqua balistiche che schizzano all'indietro dal muro
+                    val dropletData = listOf(
+                        Triple(0.80f, -0.55f, 3.0.dp.toPx()),
+                        Triple(1.15f, -0.20f, 2.5.dp.toPx()),
+                        Triple(0.70f, 0.30f, 2.8.dp.toPx()),
+                        Triple(1.30f, 0.65f, 2.4.dp.toPx()),
+                        Triple(0.95f, 0.05f, 2.0.dp.toPx())
+                    )
+                    for ((vx, vy, r) in dropletData) {
+                        val maxD = 24.dp.toPx()
+                        val dx = wallX + dir * splashPhase * maxD * vx
+                        val dy = size.height / 2f + vy * 14.dp.toPx() * splashPhase + (splashPhase * splashPhase * 8.dp.toPx())
+                        val rad = (1f - splashPhase) * r
+                        val alpha = (1f - splashPhase) * 0.80f
+                        if (rad > 0.5f && alpha > 0.05f) {
+                            drawCircle(
+                                color = DavezBordeaux.copy(alpha = alpha * 0.85f),
+                                radius = rad,
+                                center = Offset(dx, dy)
+                            )
+                            drawCircle(
+                                color = Color.White.copy(alpha = alpha),
+                                radius = rad * 0.55f,
+                                center = Offset(dx - 0.4f * rad, dy - 0.4f * rad)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // C. Livello etichette ed icone con transizione cromatica fluida continua
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Sezione Assistente
+                val chatFraction = (1f - currentProgress).coerceIn(0f, 1f)
+                val chatColor = lerp(AppleLabelSecondary, DavezBordeaux, chatFraction)
+                val chatInteraction = remember { MutableInteractionSource() }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(13.dp))
+                        .clickable(
+                            interactionSource = chatInteraction,
+                            indication = null
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelectTab(MainAppTab.CHAT)
+                        }
+                        .emilPressScale(chatInteraction, pressedScale = 0.97f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
+                            contentDescription = "Assistente",
+                            tint = chatColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Assistente",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (chatFraction > 0.5f) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 13.5.sp,
+                                letterSpacing = (-0.2).sp
+                            ),
+                            color = chatColor
+                        )
+                    }
+                }
+
+                // Sezione Agenda
+                val agendaFraction = currentProgress.coerceIn(0f, 1f)
+                val agendaColor = lerp(AppleLabelSecondary, DavezBordeaux, agendaFraction)
+                val agendaInteraction = remember { MutableInteractionSource() }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(13.dp))
+                        .clickable(
+                            interactionSource = agendaInteraction,
+                            indication = null
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelectTab(MainAppTab.AGENDA)
+                        }
+                        .emilPressScale(agendaInteraction, pressedScale = 0.97f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
+                            contentDescription = "Agenda",
+                            tint = agendaColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Agenda",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (agendaFraction > 0.5f) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 13.5.sp,
+                                letterSpacing = (-0.2).sp
+                            ),
+                            color = agendaColor
+                        )
+                        if (agendaCount > 0) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = CircleShape,
+                                color = lerp(DavezBordeaux.copy(alpha = 0.16f), DavezBordeaux, agendaFraction),
+                                modifier = Modifier.size(18.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = if (agendaCount > 99) "99+" else agendaCount.toString(),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = if (agendaFraction > 0.5f) AppleWhite else DavezBordeaux
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2926,7 +3199,9 @@ fun InAppVoiceRecordingBar(
 }
 
 // =============================================================================
-// FOGLIO MODALE ALLEGATI SQUIRCLE STILE WHATSAPP / IOS (ZERO MENU QUADRATI!)
+// FOGLIO MODALE ALLEGATI SQUIRCLE STILE WHATSAPP / IOS (APPLE HIG & RESPONSIVE)
+// Risolve il problema del pulsante Chiudi che va a capo e garantisce perfetta responsività
+// su schermi compatti, standard, foldable e tablet senza menu quadrati!
 // =============================================================================
 @Composable
 fun ModernAttachmentSheet(
@@ -2936,93 +3211,144 @@ fun ModernAttachmentSheet(
     onOpenFolders: () -> Unit,
     onClose: () -> Unit
 ) {
-    Column(
+    val haptic = LocalHapticFeedback.current
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppleWhite)
-            .padding(horizontal = 18.dp, vertical = 8.dp)
-            .semantics { testTag = "modern_attachment_sheet" },
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Allega o Scansiona in Chat",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = AppleLabelPrimary
-                )
-                Text(
-                    text = "Smistamento automatico nelle 6 Cartelle con OCR On-Device",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppleLabelSecondary
-                )
-            }
-            TextButton(onClick = onClose) {
-                Text("Chiudi", color = DavezBordeaux, fontWeight = FontWeight.SemiBold)
-            }
-        }
-
-        // Griglia 2x2 Bento Squircle stile Apple HIG & Studio Tecnico
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .background(DavezAlabaster)
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .semantics { testTag = "modern_attachment_sheet" },
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Header con titolo e pulsante circolare Chiudi stile Apple HIG (non va MAI a capo!)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                SquircleAttachmentTile(
-                    emoji = "📸",
-                    title = "Scanner 3D",
-                    subtitle = "Foto & OCR Live",
-                    tintColor = DavezBordeaux,
-                    bgColor = AppleBlueSoft,
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenScanner
-                )
-                SquircleAttachmentTile(
-                    emoji = "📄",
-                    title = "File & .p7m",
-                    subtitle = "Importa da Telefono",
-                    tintColor = DavezFotografiaSlate,
-                    bgColor = Color(0xFFEDF2F5),
-                    modifier = Modifier.weight(1f),
-                    onClick = onPickSystemFile
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                SquircleAttachmentTile(
-                    emoji = "🎙️",
-                    title = "Nota Vocale",
-                    subtitle = "Voce & Trascrizione",
-                    tintColor = AppleGreen,
-                    bgColor = AppleGreenSoft,
-                    modifier = Modifier.weight(1f),
-                    onClick = onStartVoiceNote
-                )
-                SquircleAttachmentTile(
-                    emoji = "📂",
-                    title = "6 Cartelle",
-                    subtitle = "Archivio & Perizie",
-                    tintColor = AppleOrange,
-                    bgColor = AppleOrangeSoft,
-                    modifier = Modifier.weight(1f),
-                    onClick = onOpenFolders
-                )
-            }
-        }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp)
+                ) {
+                    Text(
+                        text = "Allega o Scansiona",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            letterSpacing = (-0.3).sp
+                        ),
+                        color = AppleLabelPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Smistamento OCR automatico nei 6 Faldoni peritali",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 12.sp,
+                            letterSpacing = (-0.1).sp
+                        ),
+                        color = AppleLabelSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
-        Spacer(Modifier.height(16.dp))
+                // Pulsante Chiudi Circolare Stile Apple HIG: NON va MAI a capo!
+                val closeInteraction = remember { MutableInteractionSource() }
+                Surface(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClose()
+                    },
+                    interactionSource = closeInteraction,
+                    shape = CircleShape,
+                    color = Color(0x14000000),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .emilPressScale(closeInteraction, pressedScale = 0.90f)
+                        .semantics { contentDescription = "Chiudi finestra allegati" }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Chiudi",
+                            tint = AppleLabelPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // Griglia 2x2 Bento Squircle Responsive stile Apple HIG & Studio Tecnico
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val isCompact = maxWidth < 340.dp
+                val tileSpacing = if (isCompact) 8.dp else 12.dp
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(tileSpacing)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(tileSpacing)
+                    ) {
+                        SquircleAttachmentTile(
+                            emoji = "📸",
+                            title = "Scanner 3D",
+                            subtitle = "Foto & OCR Live",
+                            tintColor = DavezBordeaux,
+                            bgColor = AppleBlueSoft,
+                            modifier = Modifier.weight(1f),
+                            onClick = onOpenScanner
+                        )
+                        SquircleAttachmentTile(
+                            emoji = "📄",
+                            title = "File & .p7m",
+                            subtitle = "Importa da Telefono",
+                            tintColor = DavezFotografiaSlate,
+                            bgColor = Color(0xFFEDF2F5),
+                            modifier = Modifier.weight(1f),
+                            onClick = onPickSystemFile
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(tileSpacing)
+                    ) {
+                        SquircleAttachmentTile(
+                            emoji = "🎙️",
+                            title = "Nota Vocale",
+                            subtitle = "Voce & Trascrizione",
+                            tintColor = AppleGreen,
+                            bgColor = AppleGreenSoft,
+                            modifier = Modifier.weight(1f),
+                            onClick = onStartVoiceNote
+                        )
+                        SquircleAttachmentTile(
+                            emoji = "📂",
+                            title = "6 Cartelle",
+                            subtitle = "Archivio & Perizie",
+                            tintColor = AppleOrange,
+                            bgColor = AppleOrangeSoft,
+                            modifier = Modifier.weight(1f),
+                            onClick = onOpenFolders
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+        }
     }
 }
 
@@ -3038,36 +3364,47 @@ private fun SquircleAttachmentTile(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val haptic = LocalHapticFeedback.current
+
     Surface(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
         interactionSource = interaction,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         color = bgColor,
-        border = BorderStroke(1.dp, tintColor.copy(alpha = 0.22f)),
+        border = BorderStroke(0.8.dp, tintColor.copy(alpha = 0.20f)),
+        shadowElevation = 0.5.dp,
         modifier = modifier.emilPressScale(interaction, pressedScale = 0.95f)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(AppleWhite),
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AppleWhite)
+                    .border(0.5.dp, Color.Black.copy(alpha = 0.04f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = emoji, fontSize = 22.sp)
+                Text(text = emoji, fontSize = 20.sp)
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp,
+                        letterSpacing = (-0.2).sp
+                    ),
                     color = tintColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -3075,9 +3412,11 @@ private fun SquircleAttachmentTile(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        letterSpacing = (-0.1).sp
+                    ),
                     color = AppleLabelSecondary,
-                    fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
