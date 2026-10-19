@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 6,
-  "latestVersionName": "1.0.5",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.5/app-release.apk",
-  "releaseNotes": "• Risolto Bug Impostazioni: Eliminato il rimbalzo e la chiusura accidentale scorrendo fino in fondo al pannello delle impostazioni; aggiunti margini di sicurezza per barra di sistema e tastiera\n• Prompt Engineering Avanzato: Sistema di prompt peritale interamente riscritto secondo gli standard più avanzati (Qwen 3.5 2B / Rizzo Flow 1.7B) con iniezione del profilo studio, ancoraggio temporale ISO-8601 dinamico e 4 esempi Few-Shot per estrazione e categorizzazione\n• Integrità Terminologica: Zero riferimenti residui a 'cantiere' in tutto il codice e documentazione (terminologia rigorosa Perito Tecnico Estimativo / CTU)\n• Build R8 Super-Snella: APK minificato e ottimizzato a soli 21.7 MB",
+  "latestVersionCode": 7,
+  "latestVersionName": "1.0.6",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.6/app-release.apk",
+  "releaseNotes": "• Raffinamento Dock iOS 17 (Liquid Fluid): Eliminati gli schizzi rossi e l'onda d'urto colorata che potevano apparire come artefatti di errore; introdotto un riflesso speculare bianco cristallino puro (specular light sheen) all'impatto con il bordo\n• Fisica Elastica Preservata: Mantenuto il rimbalzo fluido, lo squash & stretch e l'inerzia tattile con spring damping armonico\n• Build R8 Super-Snella: APK minificato e ottimizzato a ~21.7 MB",
   "mandatory": false,
   "publishedAt": "2026-10-19T10:55:00Z"
 }

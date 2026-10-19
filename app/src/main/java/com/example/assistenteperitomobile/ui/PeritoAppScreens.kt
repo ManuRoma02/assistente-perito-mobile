@@ -872,7 +872,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             // BARRA DI SCRITTURA CON IL [+] DENTRO IL CONTENITORE DEI TASTI SEZIONE
             // Unificato in tonalità DavezAlabaster identica allo sfondo della chat e dell'app
             UnifiedStudioBottomBar(
-                selectedTab = if (pagerState.currentPage == 0) MainAppTab.CHAT else MainAppTab.AGENDA,
+                selectedTab = uiState.selectedTab,
                 onSelectTab = { tab ->
                     viewModel.selectTab(tab)
                     val page = if (tab == MainAppTab.CHAT) 0 else 1
@@ -1496,14 +1496,14 @@ fun LiquidFluidTabDock(
                         shape = RoundedCornerShape(13.dp)
                     )
             ) {
-                // Onda d'acqua sinusoidale (slosh) che sbatte e risale lungo la parete del fluido
+                // Onda di rifrazione e riflesso di luce liquida pura (specular sheen) all'impatto sul bordo
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     if (splashPhase < 1f && impactWall != 0) {
                         val sloshOsc = sin(splashPhase * PI.toFloat() * 2.2f) * exp(-splashPhase * 3.8f)
-                        val crest = sloshOsc * size.height * 0.35f
+                        val crest = sloshOsc * size.height * 0.28f
                         val wavePath = Path().apply {
                             if (impactWall == 1) {
-                                // Cresta d'onda che si infrange sul muro destro
+                                // Cresta e riflesso luminoso sul muro destro
                                 moveTo(0f, size.height)
                                 lineTo(0f, size.height * 0.75f)
                                 cubicTo(
@@ -1514,7 +1514,7 @@ fun LiquidFluidTabDock(
                                 lineTo(size.width, size.height)
                                 close()
                             } else {
-                                // Cresta d'onda che si infrange sul muro sinistro
+                                // Cresta e riflesso luminoso sul muro sinistro
                                 moveTo(size.width, size.height)
                                 lineTo(size.width, size.height * 0.75f)
                                 cubicTo(
@@ -1530,67 +1530,11 @@ fun LiquidFluidTabDock(
                             path = wavePath,
                             brush = Brush.verticalGradient(
                                 listOf(
-                                    DavezBordeaux.copy(alpha = (1f - splashPhase) * 0.15f),
-                                    Color.White.copy(alpha = (1f - splashPhase) * 0.30f)
+                                    Color.White.copy(alpha = (1f - splashPhase) * 0.60f),
+                                    Color.White.copy(alpha = (1f - splashPhase) * 0.10f)
                                 )
                             )
                         )
-                    }
-                }
-            }
-
-            // B. Canvas per le gocce d'acqua che schizzano e l'onda d'urto sul bordo del muro
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                if (splashPhase < 1f && impactWall != 0) {
-                    val wallX = if (impactWall == 1) size.width else 0f
-                    val dir = if (impactWall == 1) -1f else 1f
-
-                    // 1. Onda d'urto ad arco radiale che si propaga dal punto di impatto
-                    val rippleR = splashPhase * 28.dp.toPx()
-                    val rippleAlpha = (1f - splashPhase).coerceIn(0f, 1f) * 0.45f
-                    if (rippleR > 1f) {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    DavezBordeaux.copy(alpha = rippleAlpha),
-                                    Color.White.copy(alpha = rippleAlpha * 0.8f)
-                                ),
-                                center = Offset(wallX, size.height / 2f),
-                                radius = rippleR
-                            ),
-                            radius = rippleR,
-                            center = Offset(wallX, size.height / 2f),
-                            style = Stroke(width = 1.4.dp.toPx())
-                        )
-                    }
-
-                    // 2. Micro-gocce d'acqua balistiche che schizzano all'indietro dal muro
-                    val dropletData = listOf(
-                        Triple(0.80f, -0.55f, 3.0.dp.toPx()),
-                        Triple(1.15f, -0.20f, 2.5.dp.toPx()),
-                        Triple(0.70f, 0.30f, 2.8.dp.toPx()),
-                        Triple(1.30f, 0.65f, 2.4.dp.toPx()),
-                        Triple(0.95f, 0.05f, 2.0.dp.toPx())
-                    )
-                    for ((vx, vy, r) in dropletData) {
-                        val maxD = 24.dp.toPx()
-                        val dx = wallX + dir * splashPhase * maxD * vx
-                        val dy = size.height / 2f + vy * 14.dp.toPx() * splashPhase + (splashPhase * splashPhase * 8.dp.toPx())
-                        val rad = (1f - splashPhase) * r
-                        val alpha = (1f - splashPhase) * 0.80f
-                        if (rad > 0.5f && alpha > 0.05f) {
-                            drawCircle(
-                                color = DavezBordeaux.copy(alpha = alpha * 0.85f),
-                                radius = rad,
-                                center = Offset(dx, dy)
-                            )
-                            drawCircle(
-                                color = Color.White.copy(alpha = alpha),
-                                radius = rad * 0.55f,
-                                center = Offset(dx - 0.4f * rad, dy - 0.4f * rad)
-                            )
-                        }
                     }
                 }
             }
