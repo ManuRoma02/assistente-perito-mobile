@@ -202,6 +202,7 @@ class OtaUpdateManager(private val context: Context) {
                     val buffer = ByteArray(64 * 1024) // 64 KB buffer
                     var bytesRead: Int
                     var lastNotifiedProgress = -1f
+                    var lastNotifiedBytes = 0L
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
@@ -210,12 +211,15 @@ class OtaUpdateManager(private val context: Context) {
                         val progress = if (totalBytes > 0) {
                             (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                         } else {
-                            0f
+                            val estimatedTotal = 22 * 1024 * 1024f
+                            (downloadedBytes.toFloat() / estimatedTotal).coerceIn(0.01f, 0.95f)
                         }
 
-                        // Notifica se varia di almeno 1%
-                        if (Math.abs(progress - lastNotifiedProgress) >= 0.01f || downloadedBytes == totalBytes) {
+                        val progressChanged = Math.abs(progress - lastNotifiedProgress) >= 0.01f
+                        val bytesChangedSignificantly = (downloadedBytes - lastNotifiedBytes) >= (256 * 1024)
+                        if (progressChanged || bytesChangedSignificantly || downloadedBytes == totalBytes) {
                             lastNotifiedProgress = progress
+                            lastNotifiedBytes = downloadedBytes
                             onProgress(progress, downloadedBytes, totalBytes)
                         }
                     }

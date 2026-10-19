@@ -12,6 +12,8 @@ import com.example.assistenteperitomobile.domain.DocumentClassificationResult
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -27,6 +29,8 @@ class ArchiveRepository(
         ignoreUnknownKeys = true
         prettyPrint = true
     }
+
+    private val mutex = Mutex()
 
     val archiveRootDir: File
         get() = File(context.filesDir, "Perizie_Archivio").also { root ->
@@ -108,9 +112,11 @@ class ArchiveRepository(
             fascicoloId = fascicoloId
         )
 
-        val current = loadAllDocuments().toMutableList()
-        current.add(0, record)
-        saveIndex(current)
+        mutex.withLock {
+            val current = loadAllDocuments(forceRefresh = true).toMutableList()
+            current.add(0, record)
+            saveIndex(current)
+        }
         record
     }
 
@@ -118,43 +124,47 @@ class ArchiveRepository(
         documentId: String,
         newCategory: PeritoCategory
     ): ArchivedDocument? = withContext(Dispatchers.IO) {
-        val docs = loadAllDocuments().toMutableList()
-        val idx = docs.indexOfFirst { it.id == documentId }
-        if (idx < 0) return@withContext null
+        mutex.withLock {
+            val docs = loadAllDocuments(forceRefresh = true).toMutableList()
+            val idx = docs.indexOfFirst { it.id == documentId }
+            if (idx < 0) return@withContext null
 
-        val existing = docs[idx]
-        val oldFile = File(existing.filePath)
-        val newDir = File(archiveRootDir, newCategory.folderName).apply { if (!exists()) mkdirs() }
-        val newFile = File(newDir, existing.fileName)
+            val existing = docs[idx]
+            val oldFile = File(existing.filePath)
+            val newDir = File(archiveRootDir, newCategory.folderName).apply { if (!exists()) mkdirs() }
+            val newFile = File(newDir, existing.fileName)
 
-        if (oldFile.exists() && oldFile.absolutePath != newFile.absolutePath) {
-            oldFile.copyTo(newFile, overwrite = true)
-            oldFile.delete()
+            if (oldFile.exists() && oldFile.absolutePath != newFile.absolutePath) {
+                oldFile.copyTo(newFile, overwrite = true)
+                oldFile.delete()
+            }
+
+            // Aggiorna anche la cartella pubblica sincronizzata col PC (Scoped Storage)
+            deleteFromPublicDocuments(existing.categoryFolder, existing.fileName)
+            if (newFile.exists()) {
+                mirrorToPublicDocuments(newCategory, existing.fileName, newFile.readBytes())
+            }
+
+            val updated = existing.copy(
+                categoryFolder = newCategory.folderName,
+                filePath = newFile.absolutePath
+            )
+            docs[idx] = updated
+            saveIndex(docs)
+            updated
         }
-
-        // Aggiorna anche la cartella pubblica sincronizzata col PC (Scoped Storage)
-        deleteFromPublicDocuments(existing.categoryFolder, existing.fileName)
-        if (newFile.exists()) {
-            mirrorToPublicDocuments(newCategory, existing.fileName, newFile.readBytes())
-        }
-
-        val updated = existing.copy(
-            categoryFolder = newCategory.folderName,
-            filePath = newFile.absolutePath
-        )
-        docs[idx] = updated
-        saveIndex(docs)
-        updated
     }
 
     suspend fun deleteDocument(documentId: String): Boolean = withContext(Dispatchers.IO) {
-        val docs = loadAllDocuments().toMutableList()
-        val doc = docs.firstOrNull { it.id == documentId } ?: return@withContext false
-        File(doc.filePath).delete()
-        deleteFromPublicDocuments(doc.categoryFolder, doc.fileName)
-        docs.removeAll { it.id == documentId }
-        saveIndex(docs)
-        true
+        mutex.withLock {
+            val docs = loadAllDocuments(forceRefresh = true).toMutableList()
+            val doc = docs.firstOrNull { it.id == documentId } ?: return@withContext false
+            File(doc.filePath).delete()
+            deleteFromPublicDocuments(doc.categoryFolder, doc.fileName)
+            docs.removeAll { it.id == documentId }
+            saveIndex(docs)
+            true
+        }
     }
 
     private fun mirrorToPublicDocuments(category: PeritoCategory, fileName: String, bytes: ByteArray) {

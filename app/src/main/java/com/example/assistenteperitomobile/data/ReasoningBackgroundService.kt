@@ -230,8 +230,13 @@ class ReasoningBackgroundService : Service() {
                 action = ACTION_STOP_REASONING
             }
             try {
-                context.startService(intent)
+                if (MainActivity.isAppInForeground) {
+                    context.startService(intent)
+                } else {
+                    context.stopService(intent)
+                }
             } catch (_: Throwable) {
+                runCatching { context.stopService(intent) }
             }
         }
     }

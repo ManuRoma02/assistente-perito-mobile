@@ -118,18 +118,8 @@ class DocumentProcessor(private val context: Context) {
     }
 
     private suspend fun extractTextFromPdfBytes(pdfBytes: ByteArray): String {
-        // Fast-path: se il PDF ha testo digitale incorporato (atti telematici di cancelleria, PEC, CTU native),
-        // estrazione istantanea (<20ms) evitando rendering bitmap e OCR pesante
-        val directText = extractReadableTextFromRawBytes(pdfBytes)
-        if (directText.length >= 300) {
-            return directText
-        }
-
         val tempFile = File.createTempFile("ocr_pdf_", ".pdf", context.cacheDir)
         val sb = StringBuilder()
-        if (directText.isNotBlank()) {
-            sb.appendLine(directText)
-        }
         try {
             tempFile.writeBytes(pdfBytes)
             ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->

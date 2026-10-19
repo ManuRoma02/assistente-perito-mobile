@@ -11,6 +11,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.io.OutputStreamWriter
@@ -1232,13 +1235,37 @@ class PeritoAiEngine(private val context: Context? = null) {
                     OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload) }
                     if (conn.responseCode == 200) {
                         val body = conn.inputStream.bufferedReader().readText()
-                        extractJsonBlock(body)
+                        val unwrapped = extractContentFromApiResponse(body) ?: body
+                        extractJsonBlock(unwrapped)
                     } else null
                 } catch (_: Throwable) {
                     null
                 }
             } else null
         }
+    }
+
+    fun extractContentFromApiResponse(rawResponse: String): String? {
+        return runCatching {
+            val root = json.parseToJsonElement(rawResponse).jsonObject
+            // 1. OpenAI format: choices[0].message.content
+            val choices = root["choices"]?.jsonArray
+            if (choices != null && choices.isNotEmpty()) {
+                val firstChoice = choices[0].jsonObject
+                val msg = firstChoice["message"]?.jsonObject
+                val content = msg?.get("content")?.jsonPrimitive?.contentOrNull
+                if (!content.isNullOrBlank()) return@runCatching content
+            }
+            // 2. Ollama native generate format: response
+            val response = root["response"]?.jsonPrimitive?.contentOrNull
+            if (!response.isNullOrBlank()) return@runCatching response
+
+            // 3. Ollama native chat format: message.content
+            val directMsg = root["message"]?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+            if (!directMsg.isNullOrBlank()) return@runCatching directMsg
+
+            null
+        }.getOrNull()
     }
 
     private fun extractJsonBlock(raw: String): String? {
