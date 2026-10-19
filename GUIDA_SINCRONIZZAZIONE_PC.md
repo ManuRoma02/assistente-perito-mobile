@@ -24,7 +24,7 @@ Ogni volta che **PeritoAI** classifica un documento (PDF, busta crittografica `.
 
 ## 2. Confronto Rapido delle 5 Opzioni di Sincronizzazione
 
-| Opzione | Passa dal Cloud? | Limiti di Spazio | Funziona in Cantiere (4G/5G)? | Costo | Ideale per... |
+| Opzione | Passa dal Cloud? | Limiti di Spazio | Funziona in Mobilità (4G/5G)? | Costo | Ideale per... |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **1. Syncthing (P2P)** | ❌ No (Diretto Telefono↔PC) | **Illimitato** (spazio disco) | ✅ Sì (Relay crittografato) | **Gratis (Open Source)** | **Massima privacy (CTU/Tribunale), zero abbonamenti, velocità istantanea** |
 | **2. Dropbox + Dropsync** | ✅ Sì (Cloud Dropbox) | 2 GB gratis / 2 TB Pro | ✅ Sì | Gratis (fino a 1 cartella su Dropsync) | Chi usa già **Dropbox** sul PC dello studio |
@@ -121,4 +121,4 @@ Se in studio c'è un PC fisso sempre acceso o un NAS (Synology, QNAP, Fritz!NAS)
 2. **Sul Telefono Android:** Installa **FolderSync**:
    * Aggiungi un account di tipo **SMB3 (Windows Share)** inserendo l'IP locale del PC/NAS e le credenziali Windows.
    * Crea un *Folderpair* tra `/storage/emulated/0/Documents/Perizie_Archivio` e `\\192.168.1.100\Perizie_Archivio`.
-   * Attiva l'opzione **"Sincronizza solo quando connesso al Wi-Fi dello Studio"**: quando il perito rientra in studio dal cantiere, il telefono riversa automaticamente tutte le scansioni, le perizie e gli atti direttamente sul PC.
+   * Attiva l'opzione **"Sincronizza solo quando connesso al Wi-Fi dello Studio"**: quando il perito rientra in studio dal sopralluogo, il telefono riversa automaticamente tutte le scansioni, le perizie e gli atti direttamente sul PC.

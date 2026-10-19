@@ -3,7 +3,7 @@
 ====================================================================
 
 1. COSA FA L'APP SUL TELEFONO:
-   Trasforma lo smartphone Android in un assistente da cantiere autonomo e 100% privato che gestisce appuntamenti vocali, scansioni OCR e archivio perizie senza mai dipendere da un PC o dal cloud.
+   Trasforma lo smartphone Android in un assistente peritale e sopralluoghi autonomo e 100% privato che gestisce appuntamenti vocali, scansioni OCR e archivio perizie senza mai dipendere da un PC o dal cloud.
 
 2. DETTATURA VOCALE E CHAT AGENDA (TAB "ASSISTENTE"):
    Premi l'icona del microfono o scrivi un messaggio (es. "Sopralluogo domani alle 10:30 in Via Roma 15 con Ing. Rossi") per inserire l'appuntamento direttamente nel Google Calendar del telefono.
@@ -15,7 +15,7 @@
    Controlla in tempo reale il calendario nativo dello smartphone (con margine di ±15 minuti), ti avvisa con i pulsanti "Sostituisci / Inserisci comunque / Annulla" se l'orario è occupato e imposta sempre 3 promemoria (24 ore, 60 minuti e 30 minuti prima).
 
 5. SCANSIONE FOTOCAMERA OCR E SBUSTAMENTO .P7M (TAB "6 CARTELLE"):
-   Scatta una foto a un documento in cantiere o importa un file PDF / busta crittografica PEC (.p7m) per estrarre il testo offline con Google ML Kit e rinominarlo secondo lo standard "ANNO-MESE-GIORNO_Cliente_Oggetto_NomeFile".
+   Scatta una foto a un documento durante il sopralluogo o importa un file PDF / busta crittografica PEC (.p7m) per estrarre il testo offline con Google ML Kit e rinominarlo secondo lo standard "ANNO-MESE-GIORNO_Cliente_Oggetto_NomeFile".
 
 6. ARCHIVIAZIONE NELLE 6 CARTELLE UFFICIALI:
    Smista automaticamente ogni documento nelle 6 cartelle sul telefono (Atti_Tribunale, Perizie_Tecniche, Planimetrie_Computi, Fatture_Preventivi, Corrispondenza_Legale, Da_Classificare_Manualmente) con possibilità di spostarlo o condividerlo con un tocco.
