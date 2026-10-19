@@ -36,6 +36,7 @@ import com.example.assistenteperitomobile.domain.MainAppTab
 import com.example.assistenteperitomobile.domain.PendingConflictState
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
+import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.StudioProfile
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -1021,6 +1022,59 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Aggiorna titolo, categoria, orario, luogo e note di un appuntamento esistente,
+     * sincronizzando il calendario di sistema Android/Google e il registro locale dell'app.
+     */
+    fun updateCalendarEvent(
+        event: CalendarEventItem,
+        newTitle: String = event.titolo,
+        newCategory: String = event.categoria,
+        newStartIso: String = event.startIso,
+        newEndIso: String? = null,
+        newLocation: String = event.luogo,
+        newNotes: String = event.note,
+        notifyInChat: Boolean = true
+    ) {
+        viewModelScope.launch {
+            val computedEndIso = newEndIso ?: run {
+                val s = LocalDateTime.parse(newStartIso.take(19))
+                s.plusHours(1).format(isoFormatter)
+            }
+            val updated = calendarRepo.updateEvent(
+                event = event,
+                newTitle = newTitle,
+                newCategory = newCategory,
+                newStartIso = newStartIso,
+                newEndIso = computedEndIso,
+                newLocation = newLocation,
+                newNotes = newNotes
+            )
+            lastCreatedEvent = updated
+            refreshAllData()
+
+            _uiState.update { state ->
+                state.copy(
+                    messages = state.messages.map { msg ->
+                        if (msg.createdEvent?.id == event.id || (event.systemCalendarEventId != null && msg.createdEvent?.systemCalendarEventId == event.systemCalendarEventId)) {
+                            msg.copy(createdEvent = updated)
+                        } else msg
+                    },
+                    statusBanner = "✏️ Impegno aggiornato: ${updated.titolo}"
+                )
+            }
+
+            if (notifyInChat) {
+                appendAssistantMessage(
+                    buildConfirmationChatMessage(
+                        updated,
+                        prefix = "✏️ **Impegno Aggiornato con Successo!**\n\n"
+                    )
+                )
+            }
+        }
+    }
+
+    /**
      * Modifica l'orario o la data di un appuntamento esistente, aggiornando sia l'agenda
      * (locale e Google Calendar se collegato) sia la bolla interattiva nella chat.
      */
@@ -1030,44 +1084,12 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         newEndIso: String? = null,
         notifyInChat: Boolean = true
     ) {
-        viewModelScope.launch {
-            calendarRepo.deleteEvent(event)
-            val computedEndIso = newEndIso ?: run {
-                val s = LocalDateTime.parse(newStartIso.take(19))
-                s.plusHours(1).format(isoFormatter)
-            }
-            val updatedProposal = AppointmentParseResult(
-                has_appointment = true,
-                titolo = event.titolo,
-                data_inizio_iso = newStartIso,
-                data_fine_iso = computedEndIso,
-                luogo = event.luogo,
-                cliente = event.cliente,
-                note = event.note,
-                fascicoloId = event.fascicoloId
-            )
-            val created = calendarRepo.createEvent(updatedProposal)
-            lastCreatedEvent = created
-            refreshAllData()
-
-            _uiState.update { state ->
-                state.copy(
-                    messages = state.messages.map { msg ->
-                        if (msg.createdEvent?.id == event.id) msg.copy(createdEvent = created) else msg
-                    },
-                    statusBanner = "🕒 Orario aggiornato: ${created.startIso.drop(11).take(5)}"
-                )
-            }
-
-            if (notifyInChat) {
-                appendAssistantMessage(
-                    buildConfirmationChatMessage(
-                        created,
-                        prefix = "🕒 **Orario dell'appuntamento aggiornato con successo!**\n\n"
-                    )
-                )
-            }
-        }
+        updateCalendarEvent(
+            event = event,
+            newStartIso = newStartIso,
+            newEndIso = newEndIso,
+            notifyInChat = notifyInChat
+        )
     }
 
     fun setCategoryFilter(category: PeritoCategory?) {
@@ -1419,6 +1441,36 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
+        // B2.0 CAMBIO CATEGORIA APPUNTAMENTO (Linguaggio naturale)
+        val isCategoryChange = lower.contains("cambia categoria") ||
+            lower.contains("modifica categoria") ||
+            lower.contains("cambia la categoria") ||
+            lower.contains("imposta categoria") ||
+            lower.contains("è un appuntamento in comune") ||
+            lower.contains("è in comune") ||
+            lower.contains("appuntamenti in comune") ||
+            lower.contains("è in tribunale") ||
+            lower.contains("è una riunione") ||
+            lower.contains("è un sopralluogo") ||
+            lower.contains("non è un sopralluogo")
+
+        if (isCategoryChange) {
+            val targetCategory = PeritoEventCategory.fromString(text)
+            val clientSuffix = if (lastEv.cliente.isNotBlank() && lastEv.cliente != "Cliente" && !lastEv.cliente.equals(lastEv.categoria, ignoreCase = true)) {
+                " con ${lastEv.cliente}"
+            } else {
+                lastEv.titolo.substringAfter(" con ", "").let { if (it.isNotBlank()) " con $it" else "" }
+            }
+            val newTitle = "${targetCategory.defaultPrefix}$clientSuffix"
+            updateCalendarEvent(
+                event = lastEv,
+                newTitle = newTitle,
+                newCategory = targetCategory.displayName,
+                notifyInChat = true
+            )
+            return true
+        }
+
         // B2. CAMBIO ORARIO FLESSIBILE E ROBUSTO (Linguaggio naturale)
         val isTimeChangeKeyword = Regex(
             """\b(?:cambia|modifica|sposta|aggiorna)\s+(?:l['\s]ora|l['\s]orario|orari[oa]|l['\s]appuntamento|appuntamento|data|giorno)\b""" +
@@ -1716,7 +1768,10 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         }
         val dossier = archiveRepo.findClientDossier(event.cliente, event.luogo)
 
-        val clientPart = if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
+        val catEnum = PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
+        val categoryPart = "🏷️ **Categoria:** ${catEnum.emoji} ${catEnum.displayName}\n"
+
+        val clientPart = if (event.cliente.isNotBlank() && event.cliente != "Cliente" && !event.cliente.equals(event.titolo, ignoreCase = true) && !event.cliente.equals(event.categoria, ignoreCase = true)) {
             "👤 **Con / Cliente:** ${event.cliente}\n"
         } else {
             ""
@@ -1726,15 +1781,22 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             "📍 **Luogo:** Da definire\n"
         }
+        val notesPart = if (event.note.isNotBlank()) {
+            "📝 **Note:** ${event.note}\n"
+        } else {
+            ""
+        }
 
         return ChatMessage(
             id = UUID.randomUUID().toString(),
             isUser = false,
             text = prefix +
                 "📌 **${event.titolo}**\n" +
+                categoryPart +
                 "📅 **Data:** $dateStr dalle **$startH** alle **$endH**\n" +
                 clientPart +
                 placePart +
+                notesPart +
                 "🔔 **Promemoria automatici:** 24 ore prima, 60 min prima, 30 min prima\n" +
                 syncBadge,
             createdEvent = event,

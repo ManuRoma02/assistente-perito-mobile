@@ -114,6 +114,41 @@ data class ArchivedDocument(
         get() = PeritoCategory.fromFolderName(categoryFolder)
 }
 
+@Serializable
+enum class PeritoEventCategory(
+    val id: String,
+    val displayName: String,
+    val emoji: String,
+    val defaultPrefix: String
+) {
+    SOPRALLUOGO("sopralluogo", "Sopralluogo", "🔍", "Sopralluogo"),
+    COMUNE("comune", "Comune", "🏛️", "Incontro Comune"),
+    TRIBUNALE("tribunale", "Tribunale", "⚖️", "Udienza / Tribunale"),
+    RIUNIONE("riunione", "Riunione", "🏢", "Riunione Studio"),
+    CLIENTE("cliente", "Cliente", "👤", "Appuntamento Cliente"),
+    PERSONALE("personale", "Personale", "☕", "Personale"),
+    ALTRO("altro", "Altro", "📅", "Impegno");
+
+    companion object {
+        fun fromString(value: String?): PeritoEventCategory {
+            if (value.isNullOrBlank()) return SOPRALLUOGO
+            val norm = value.trim().lowercase(java.util.Locale.ITALIAN)
+            return entries.firstOrNull {
+                it.id.equals(norm, ignoreCase = true) ||
+                it.displayName.equals(norm, ignoreCase = true)
+            } ?: when {
+                norm.contains("comun") || norm.contains("catast") || norm.contains("ufficio tecnic") || norm.contains("sportello") || norm.contains("edilizia") || norm.contains("accesso atti") -> COMUNE
+                norm.contains("tribunal") || norm.contains("udienz") || norm.contains("giudic") || norm.contains("ctu") || norm.contains("giurament") || norm.contains("cancelleria") -> TRIBUNALE
+                norm.contains("riunion") || norm.contains("studi") || norm.contains("collegh") -> RIUNIONE
+                norm.contains("caff") || norm.contains("pranz") || norm.contains("cen") || norm.contains("aperitiv") || norm.contains("colazion") || norm.contains("person") -> PERSONALE
+                norm.contains("client") || norm.contains("firm") || norm.contains("consegn") -> CLIENTE
+                norm.contains("soprall") || norm.contains("riliev") || norm.contains("periz") || norm.contains("collaud") || norm.contains("visita") -> SOPRALLUOGO
+                else -> SOPRALLUOGO
+            }
+        }
+    }
+}
+
 @Immutable
 @Serializable
 data class AppointmentParseResult(
@@ -126,7 +161,8 @@ data class AppointmentParseResult(
     val note: String = "",
     val is_ambiguo: Boolean = false,
     val motivo_ambiguita: String = "",
-    val fascicoloId: String? = null
+    val fascicoloId: String? = null,
+    val categoria: String = "Sopralluogo"
 )
 
 @Immutable
@@ -144,7 +180,8 @@ data class CalendarEventItem(
     val note: String,
     val remindersMinutes: List<Int> = listOf(30, 60, 1440),
     val isFromSystemCalendar: Boolean = false,
-    val fascicoloId: String? = null
+    val fascicoloId: String? = null,
+    val categoria: String = "Sopralluogo"
 )
 
 @Immutable

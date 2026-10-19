@@ -510,5 +510,45 @@ class PeritoAiEngineTest {
         val prompt = engine.buildClassificationPrompt("Documento perizia", refDate, config)
         assertFalse(prompt.lowercase().contains("cantiere"))
     }
+
+    @Test
+    fun `test category detection and clean explicit notes in appointment parsing`() = runTest {
+        // 1. Appuntamento in Comune: categoria Comune, nessun "comune" come nome cliente
+        val comuneApp = engine.parseAppointment(
+            "Fissa appuntamento in comune domani alle 10 con Geom. Bianchi",
+            refNow
+        )
+        assertTrue(comuneApp.has_appointment)
+        assertEquals("Comune", comuneApp.categoria)
+        assertTrue(comuneApp.cliente.contains("Bianchi"))
+        assertFalse(comuneApp.cliente.lowercase().contains("comune"))
+        assertEquals("", comuneApp.note) // Nessuna nota esplicita -> note vuote!
+
+        // 2. Udienza Tribunale
+        val tribunaleApp = engine.parseAppointment(
+            "Udienza in tribunale giovedì alle 9:30 per giuramento CTU",
+            refNow
+        )
+        assertTrue(tribunaleApp.has_appointment)
+        assertEquals("Tribunale", tribunaleApp.categoria)
+        assertEquals("", tribunaleApp.note)
+
+        // 3. Sopralluogo con nota esplicita
+        val sopralluogoConNota = engine.parseAppointment(
+            "Fissa sopralluogo domani alle 11 in via Roma 10 con Rossi nota: portare chiavi e metro laser",
+            refNow
+        )
+        assertTrue(sopralluogoConNota.has_appointment)
+        assertEquals("Sopralluogo", sopralluogoConNota.categoria)
+        assertEquals("portare chiavi e metro laser", sopralluogoConNota.note)
+
+        // 4. Riunione Studio
+        val riunioneApp = engine.parseAppointment(
+            "Riunione di studio dopodomani alle 15 con colleghi",
+            refNow
+        )
+        assertTrue(riunioneApp.has_appointment)
+        assertEquals("Riunione", riunioneApp.categoria)
+    }
 }
 

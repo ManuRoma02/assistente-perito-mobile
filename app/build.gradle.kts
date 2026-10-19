@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.assistenteperitomobile"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }

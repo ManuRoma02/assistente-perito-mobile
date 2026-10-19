@@ -11,6 +11,7 @@ import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.CalendarEventItem
+import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -101,7 +102,7 @@ class CalendarRepository(private val context: Context) {
         if (hasCalendarPermissions()) {
             sysEventId = insertIntoSystemCalendar(
                 title = proposed.titolo.ifBlank { "Appuntamento - ${proposed.cliente}" },
-                description = "Cliente: ${proposed.cliente}\nNote: ${proposed.note}",
+                description = proposed.note.trim(),
                 location = proposed.luogo,
                 startMillis = startMillis,
                 endMillis = endMillis,
@@ -119,10 +120,11 @@ class CalendarRepository(private val context: Context) {
             endMillis = endMillis,
             luogo = proposed.luogo,
             cliente = proposed.cliente,
-            note = proposed.note,
+            note = proposed.note.trim(),
             remindersMinutes = reminders,
             isFromSystemCalendar = false,
-            fascicoloId = proposed.fascicoloId
+            fascicoloId = proposed.fascicoloId,
+            categoria = proposed.categoria.ifBlank { "Sopralluogo" }
         )
 
         mutex.withLock {
@@ -157,6 +159,62 @@ class CalendarRepository(private val context: Context) {
             } catch (_: Throwable) {
             }
         }
+    }
+
+    suspend fun updateEvent(
+        event: CalendarEventItem,
+        newTitle: String,
+        newCategory: String,
+        newStartIso: String,
+        newEndIso: String,
+        newLocation: String = event.luogo,
+        newNotes: String = ""
+    ): CalendarEventItem = withContext(Dispatchers.IO) {
+        val zone = ZoneId.systemDefault()
+        val startDt = runCatching { LocalDateTime.parse(newStartIso.take(19)) }.getOrNull()
+            ?: LocalDateTime.now()
+        val endDt = runCatching { LocalDateTime.parse(newEndIso.take(19)) }.getOrNull()
+            ?: startDt.plusHours(1)
+        val startMillis = startDt.atZone(zone).toInstant().toEpochMilli()
+        val endMillis = endDt.atZone(zone).toInstant().toEpochMilli()
+
+        if (hasCalendarPermissions() && event.systemCalendarEventId != null) {
+            try {
+                val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.systemCalendarEventId)
+                val values = ContentValues().apply {
+                    put(CalendarContract.Events.TITLE, newTitle)
+                    put(CalendarContract.Events.DESCRIPTION, newNotes.trim())
+                    put(CalendarContract.Events.EVENT_LOCATION, newLocation)
+                    put(CalendarContract.Events.DTSTART, startMillis)
+                    put(CalendarContract.Events.DTEND, endMillis)
+                }
+                context.contentResolver.update(uri, values, null, null)
+            } catch (_: Throwable) {
+            }
+        }
+
+        val updated = event.copy(
+            titolo = newTitle,
+            categoria = newCategory,
+            startIso = startDt.format(isoFormatter),
+            endIso = endDt.format(isoFormatter),
+            startMillis = startMillis,
+            endMillis = endMillis,
+            luogo = newLocation,
+            note = newNotes.trim()
+        )
+
+        mutex.withLock {
+            val local = loadLocalEvents().toMutableList()
+            val idx = local.indexOfFirst { it.id == event.id || (event.systemCalendarEventId != null && it.systemCalendarEventId == event.systemCalendarEventId) }
+            if (idx >= 0) {
+                local[idx] = updated
+            } else {
+                local.add(updated)
+            }
+            saveLocalEvents(local.sortedBy { it.startMillis })
+        }
+        updated
     }
 
     /**
@@ -357,9 +415,10 @@ class CalendarRepository(private val context: Context) {
                             startMillis = dtStart,
                             endMillis = dtEnd,
                             luogo = loc,
-                            cliente = title,
+                            cliente = "",
                             note = desc,
-                            isFromSystemCalendar = true
+                            isFromSystemCalendar = true,
+                            categoria = PeritoEventCategory.fromString(title).displayName
                         )
                     )
                 }

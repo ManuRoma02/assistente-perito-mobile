@@ -562,27 +562,49 @@ class PeritoAiEngine(private val context: Context? = null) {
             ?: extractAppointmentClient(normalized)
             ?: "Cliente"
 
-        val activityType = when {
-            lower.contains("colazione") || lower.contains("a colazione") || lower.contains("fare colazione") -> "Colazione"
-            lower.contains("pranzo") || lower.contains("pranzare") || lower.contains("a pranzo") -> "Pranzo"
-            lower.contains("cena") || lower.contains("cenare") || lower.contains("a cena") -> "Cena"
-            lower.contains("caffè") || lower.contains("caffe") -> "Caffè"
-            lower.contains("aperitivo") -> "Aperitivo"
-            lower.contains("chiamata") || lower.contains("telefonata") || lower.contains("chiamare") -> "Telefonata"
-            lower.contains("videochiamata") || lower.contains("call") || lower.contains("zoom") || lower.contains("meet") || lower.contains("teams") -> "Videochiamata"
-            lower.contains("sopralluogo") -> "Sopralluogo"
-            lower.contains("udienza") || lower.contains("giuramento") -> "Udienza Tribunale"
-            lower.contains("rilievo") -> "Rilievo Tecnico"
-            lower.contains("collaudo") -> "Collaudo Tecnico"
-            lower.contains("riunione") -> "Riunione Studio"
-            lower.contains("incontro") -> "Incontro"
-            lower.contains("visita") -> "Visita"
-            lower.contains("perizia") -> "Perizia"
-            lower.contains("firma") || lower.contains("firmare") -> "Firma Documenti"
-            lower.contains("consegna") -> "Consegna Documenti"
-            lower.contains("accesso agli atti") || lower.contains("accesso atti") -> "Accesso Atti"
-            lower.contains("catasto") -> "Catasto"
-            else -> "Appuntamento"
+        val detectedCat = when {
+            lower.contains("comune") || lower.contains("catasto") || lower.contains("ufficio tecnico") || lower.contains("accesso atti") || lower.contains("accesso agli atti") || lower.contains("sportello unico") || lower.contains("edilizia privata") -> PeritoEventCategory.COMUNE
+            lower.contains("udienza") || lower.contains("tribunale") || lower.contains("giuramento") || lower.contains("giudice") || lower.contains("cancelleria") || lower.contains("ctu") -> PeritoEventCategory.TRIBUNALE
+            lower.contains("riunione") || lower.contains("studio") -> PeritoEventCategory.RIUNIONE
+            lower.contains("colazione") || lower.contains("pranzo") || lower.contains("cena") || lower.contains("caffè") || lower.contains("caffe") || lower.contains("aperitivo") -> PeritoEventCategory.PERSONALE
+            lower.contains("chiamata") || lower.contains("telefonata") || lower.contains("videochiamata") || lower.contains("call") || lower.contains("zoom") || lower.contains("meet") || lower.contains("teams") -> PeritoEventCategory.CLIENTE
+            lower.contains("firma") || lower.contains("firmare") || lower.contains("consegna") -> PeritoEventCategory.CLIENTE
+            lower.contains("sopralluogo") || lower.contains("rilievo") || lower.contains("perizia") || lower.contains("collaudo") || lower.contains("visita") -> PeritoEventCategory.SOPRALLUOGO
+            else -> PeritoEventCategory.SOPRALLUOGO
+        }
+
+        val activityType = when (detectedCat) {
+            PeritoEventCategory.COMUNE -> when {
+                lower.contains("catasto") -> "Catasto"
+                lower.contains("accesso") -> "Accesso Atti"
+                else -> "Incontro Comune"
+            }
+            PeritoEventCategory.TRIBUNALE -> when {
+                lower.contains("giuramento") -> "Giuramento CTU"
+                else -> "Udienza Tribunale"
+            }
+            PeritoEventCategory.RIUNIONE -> "Riunione Studio"
+            PeritoEventCategory.PERSONALE -> when {
+                lower.contains("colazione") -> "Colazione"
+                lower.contains("pranzo") -> "Pranzo"
+                lower.contains("cena") -> "Cena"
+                lower.contains("caff") -> "Caffè"
+                else -> "Aperitivo"
+            }
+            PeritoEventCategory.CLIENTE -> when {
+                lower.contains("chiamat") || lower.contains("telefonat") -> "Telefonata"
+                lower.contains("video") || lower.contains("zoom") || lower.contains("call") -> "Videochiamata"
+                lower.contains("firm") -> "Firma Documenti"
+                lower.contains("consegn") -> "Consegna Documenti"
+                else -> "Appuntamento"
+            }
+            PeritoEventCategory.SOPRALLUOGO -> when {
+                lower.contains("rilievo") -> "Rilievo Tecnico"
+                lower.contains("collaudo") -> "Collaudo Tecnico"
+                lower.contains("perizia") -> "Perizia"
+                else -> "Sopralluogo"
+            }
+            PeritoEventCategory.ALTRO -> "Impegno"
         }
 
         val topic = extractMeetingTopic(correctedClause ?: normalized)
@@ -599,6 +621,8 @@ class PeritoAiEngine(private val context: Context? = null) {
                 append(" ($luogo)")
             }
         }
+
+        val extractedNote = extractExplicitNote(normalized)
 
         // Controllo Ambiguità (Data vaga o Orario vago/assente)
         val vagueTimeExpressions = listOf(
@@ -617,9 +641,10 @@ class PeritoAiEngine(private val context: Context? = null) {
                 data_fine_iso = null,
                 luogo = luogo,
                 cliente = cliente,
-                note = normalized,
+                note = extractedNote,
                 is_ambiguo = true,
-                motivo_ambiguita = "È stata indicata 'settimana prossima' ma mancano il giorno esatto e l'orario."
+                motivo_ambiguita = "È stata indicata 'settimana prossima' ma mancano il giorno esatto e l'orario.",
+                categoria = detectedCat.displayName
             )
         }
 
@@ -635,9 +660,10 @@ class PeritoAiEngine(private val context: Context? = null) {
                     data_fine_iso = null,
                     luogo = luogo,
                     cliente = cliente,
-                    note = normalized,
+                    note = extractedNote,
                     is_ambiguo = true,
-                    motivo_ambiguita = "È stata indicata l'attività peritale ma mancano la data e l'orario (es. 'domani alle 10:30')."
+                    motivo_ambiguita = "È stata indicata l'attività peritale ma mancano la data e l'orario (es. 'domani alle 10:30').",
+                    categoria = detectedCat.displayName
                 )
             }
             return AppointmentParseResult(has_appointment = false)
@@ -651,9 +677,10 @@ class PeritoAiEngine(private val context: Context? = null) {
                 data_fine_iso = null,
                 luogo = luogo,
                 cliente = cliente,
-                note = normalized,
+                note = extractedNote,
                 is_ambiguo = true,
-                motivo_ambiguita = "Manca il giorno dell'appuntamento (es. domani, martedì 14 ottobre)."
+                motivo_ambiguita = "Manca il giorno dell'appuntamento (es. domani, martedì 14 ottobre).",
+                categoria = detectedCat.displayName
             )
         }
 
@@ -670,9 +697,10 @@ class PeritoAiEngine(private val context: Context? = null) {
                 data_fine_iso = "${dateExtraction}T10:00:00",
                 luogo = luogo,
                 cliente = cliente,
-                note = normalized,
+                note = extractedNote,
                 is_ambiguo = true,
-                motivo_ambiguita = reason
+                motivo_ambiguita = reason,
+                categoria = detectedCat.displayName
             )
         }
 
@@ -689,9 +717,10 @@ class PeritoAiEngine(private val context: Context? = null) {
             data_fine_iso = endDateTime.format(isoFormatter),
             luogo = luogo,
             cliente = cliente,
-            note = normalized,
+            note = extractedNote,
             is_ambiguo = false,
-            motivo_ambiguita = ""
+            motivo_ambiguita = "",
+            categoria = detectedCat.displayName
         )
     }
 
@@ -1033,8 +1062,9 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         val forbiddenClients = setOf(
             "fare", "prendere", "mattina", "pomeriggio", "sera", "studio", "casa", "immobile",
-            "ufficio", "posto", "luogo", "ora", "orario", "tempo", "giorno", "data", "notte",
-            "colazione", "pranzo", "cena", "caffe", "caffè", "aperitivo", "perizia", "sopralluogo"
+            "ufficio", "uffici", "posto", "luogo", "ora", "orario", "tempo", "giorno", "data", "notte",
+            "colazione", "pranzo", "cena", "caffe", "caffè", "aperitivo", "perizia", "sopralluogo",
+            "comune", "catasto", "tribunale", "giudice", "cancelleria", "tecnico", "edilizia", "comunale"
         )
 
         val patterns = listOf(
@@ -1059,12 +1089,32 @@ class PeritoAiEngine(private val context: Context? = null) {
                     .trim()
                     .trimEnd(',', '.', ';')
                 val lowerCandidate = candidate.lowercase(Locale.ITALIAN)
-                if (candidate.length >= 3 && lowerCandidate !in forbiddenClients) {
+                val words = lowerCandidate.split(Regex("""\s+""")).toSet()
+                if (candidate.length >= 3 && words.intersect(forbiddenClients).isEmpty()) {
                     return formatLocationDisplayName(candidate)
                 }
             }
         }
         return null
+    }
+
+    fun extractExplicitNote(text: String): String {
+        if (text.isBlank()) return ""
+        val noteRegexes = listOf(
+            Regex("""\b(?:note|nota|appunto|promemoria|avviso)\s*:\s*(.+)$""", RegexOption.IGNORE_CASE),
+            Regex("""\b(?:ricorda\s+di|ricordami\s+di|ricordati\s+di)\s+(.+)$""", RegexOption.IGNORE_CASE),
+            Regex("""\bnota\s+bene\s*:\s*(.+)$""", RegexOption.IGNORE_CASE)
+        )
+        for (r in noteRegexes) {
+            val match = r.find(text)
+            if (match != null) {
+                val candidate = match.groupValues[1].trim()
+                if (candidate.isNotBlank()) {
+                    return candidate
+                }
+            }
+        }
+        return ""
     }
 
     private fun extractMeetingTopic(text: String): String? {
@@ -1450,7 +1500,8 @@ LINEE GUIDA RIGIDE:
                 cliente = obj["cliente"]?.jsonPrimitive?.content ?: "Cliente",
                 note = obj["note"]?.jsonPrimitive?.content ?: "",
                 is_ambiguo = obj["is_ambiguo"]?.jsonPrimitive?.booleanOrNull ?: false,
-                motivo_ambiguita = obj["motivo_ambiguita"]?.jsonPrimitive?.content ?: ""
+                motivo_ambiguita = obj["motivo_ambiguita"]?.jsonPrimitive?.content ?: "",
+                categoria = obj["categoria"]?.jsonPrimitive?.content ?: PeritoEventCategory.fromString(obj["titolo"]?.jsonPrimitive?.content).displayName
             )
         } catch (_: Throwable) {
             null
