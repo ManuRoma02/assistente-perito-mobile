@@ -423,5 +423,65 @@ class PeritoAiEngineTest {
         assertNotNull(extracted)
         assertTrue(extracted!!.contains("\"has_appointment\": false"))
     }
+
+    @Test
+    fun `test buildClassificationPrompt structure studio profile injection and zero cantiere`() {
+        val config = AiEngineConfig(
+            studioProfile = com.example.assistenteperitomobile.domain.StudioProfile(
+                studioName = "Studio Tecnico Restelli & Associati",
+                professionistaNome = "Geom. Mario Rossi"
+            )
+        )
+        val prompt = engine.buildClassificationPrompt("Documento di prova perizia", refDate, config)
+
+        // 1. Iniezione dinamica dello studio
+        assertTrue(prompt.contains("Studio Tecnico Restelli & Associati"))
+
+        // 2. Presenza di tutte le 6 categorie peritali ufficiali
+        assertTrue(prompt.contains("Atti_Tribunale"))
+        assertTrue(prompt.contains("Perizie_Tecniche"))
+        assertTrue(prompt.contains("Planimetrie_Computi"))
+        assertTrue(prompt.contains("Fatture_Preventivi"))
+        assertTrue(prompt.contains("Corrispondenza_Legale"))
+        assertTrue(prompt.contains("Da_Classificare_Manualmente"))
+
+        // 3. Regole anti-allucinazione e schema JSON
+        assertTrue(prompt.contains("ANTI-ALLUCINAZIONE"))
+        assertTrue(prompt.contains("cliente_o_controparte"))
+        assertTrue(prompt.contains("data_documento"))
+        assertTrue(prompt.contains("<esempio>"))
+
+        // 4. Zero occorrenze di "cantiere"
+        assertFalse(prompt.lowercase().contains("cantiere"))
+    }
+
+    @Test
+    fun `test buildAppointmentPrompt ISO temporal anchoring few-shots and zero cantiere`() {
+        val config = AiEngineConfig(
+            studioProfile = com.example.assistenteperitomobile.domain.StudioProfile(
+                studioName = "Studio Tecnico Restelli & Associati",
+                professionistaNome = "Geom. Mario Rossi"
+            )
+        )
+        val testNow = LocalDateTime.of(2026, 10, 19, 14, 30)
+        val prompt = engine.buildAppointmentPrompt("domani alle 10 incontro con Deiv", testNow, config)
+
+        // 1. Iniezione dinamica dello studio
+        assertTrue(prompt.contains("Studio Tecnico Restelli & Associati"))
+
+        // 2. Ancoraggio temporale ISO
+        assertTrue(prompt.contains("2026-10-19T14:30"))
+        assertTrue(prompt.contains("2026-10-20")) // domani
+
+        // 3. Presenza di regole, schema e few-shots
+        assertTrue(prompt.contains("has_appointment"))
+        assertTrue(prompt.contains("data_inizio_iso"))
+        assertTrue(prompt.contains("data_fine_iso"))
+        assertTrue(prompt.contains("ANTI-ALLUCINAZIONE"))
+        assertTrue(prompt.contains("<esempio>"))
+
+        // 4. Zero occorrenze di "cantiere"
+        assertFalse(prompt.lowercase().contains("cantiere"))
+    }
 }
 

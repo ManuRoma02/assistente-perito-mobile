@@ -166,7 +166,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                 deterministic.cliente_o_controparte == "Generico") && combinedText.length > 20
         ) {
             val llmJson = tryCallLocalLlm(
-                prompt = buildClassificationPrompt(combinedText, referenceDate),
+                prompt = buildClassificationPrompt(combinedText, referenceDate, config),
                 config = config
             )
             if (llmJson != null) {
@@ -231,7 +231,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         if (needsLlmEnrichment) {
             val llmJson = tryCallLocalLlm(
-                prompt = buildAppointmentPrompt(cleaned, now),
+                prompt = buildAppointmentPrompt(cleaned, now, config),
                 config = config
             )
             if (llmJson != null) {
@@ -1181,11 +1181,28 @@ class PeritoAiEngine(private val context: Context? = null) {
         val clean = question.trim()
         if (clean.length < 3) return@withContext null
 
+        val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
+        val professionista = config.studioProfile.professionistaNome.ifBlank { "Perito Tecnico Estimativo" }
+        val albo = if (config.studioProfile.alboIscrizione.isNotBlank()) " | Albo: ${config.studioProfile.alboIscrizione}" else ""
+        val citta = if (config.studioProfile.citta.isNotBlank()) " | Sede: ${config.studioProfile.citta}" else ""
+
+        val systemPrompt = """
+Sei PeritoAI, l'assistente intelligente ufficiale di $studio ($professionista$albo$citta).
+Sei un esperto di altissimo livello in Perizie Tecniche Estimative, Consulenze Tecniche d'Ufficio (CTU), Consulenze Tecniche di Parte (CTP), stime immobiliari, indagini su vizi costruttivi/danni da infiltrazione e conformità urbanistico-edilizia.
+
+LINEE GUIDA RIGIDE:
+1. RUOLO & STILE: Rispondi in italiano con massima precisione tecnico-giuridica, rigore terminologico e chiarezza espositiva.
+2. TERMINOLOGIA: Utilizza la corretta terminologia forense ed estimativa (es. "quesiti peritali", "inizio operazioni peritali", "verbale di sopralluogo", "computo metrico estimativo", "stima analitica"). NON usare MAI termini impropri o non peritali.
+3. STRUTTURA: Quando appropriato, organizza la risposta con punti elenco chiari, paragrafi titolati e citazione delle norme applicabili (es. Codice Civile, Testo Unico Edilizia D.P.R. 380/01, Norme UNI).
+4. ANTI-ALLUCINAZIONE: Basa le valutazioni su principi tecnici accertati. Se un dettaglio varia per comune o richiede verifica documentale/catastale, segnalalo con chiarezza.
+5. SINTESI OPERATIVA: Evita introduzioni prolisse o convenevoli generici; entra subito nel merito operativo del quesito.
+        """.trimIndent()
+
         withTimeoutOrNull(120_000L) {
             llamaMutex.withLock {
                 if (ensureGgufLoaded(config)) {
                     try {
-                        val prompt = "<|im_start|>system\nSei l'assistente IA dello Studio Tecnico Perito Edile Restelli. Rispondi in italiano con competenza tecnica, chiarezza e precisione peritale.<|im_end|>\n<|im_start|>user\n$clean<|im_end|>\n<|im_start|>assistant\n"
+                        val prompt = "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$clean<|im_end|>\n<|im_start|>assistant\n"
                         val res = LlamaBridge.generate(prompt).trim()
                         val cleanRes = res
                             .substringBefore("<|im_end|>")
@@ -1205,12 +1222,15 @@ class PeritoAiEngine(private val context: Context? = null) {
     }
 
     private suspend fun tryCallLocalLlm(prompt: String, config: AiEngineConfig): String? = withContext(Dispatchers.Default) {
+        val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
+        val systemPrompt = "Sei il motore di elaborazione ed estrazione dati di $studio. Rispondi ESCLUSIVAMENTE con un singolo oggetto JSON valido conforme allo schema richiesto, senza alcun commento o testo prima o dopo."
+
         withTimeoutOrNull(25_000L) {
             // 1. Prova prima il motore nativo llama.cpp (LlamaBridge) sui file .gguf scaricati (Qwen 3.5 2B Q4_K_M)
             val ggufResult = llamaMutex.withLock {
                 if (ensureGgufLoaded(config)) {
                     try {
-                        val formattedPrompt = "<|im_start|>system\nSei un assistente per periti edili. Rispondi esclusivamente in formato JSON valido.<|im_end|>\n<|im_start|>user\n$prompt<|im_end|>\n<|im_start|>assistant\n"
+                        val formattedPrompt = "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$prompt<|im_end|>\n<|im_start|>assistant\n"
                         val res = LlamaBridge.generateJson(formattedPrompt)
                         extractJsonBlock(res)
                     } catch (_: Throwable) {
@@ -1231,7 +1251,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                         doOutput = true
                         setRequestProperty("Content-Type", "application/json")
                     }
-                    val payload = """{"model":"${config.ollamaModel}","messages":[{"role":"user","content":${json.encodeToString(prompt)}}],"temperature":0.1}"""
+                    val payload = """{"model":"${config.ollamaModel}","messages":[{"role":"system","content":${json.encodeToString(systemPrompt)}},{"role":"user","content":${json.encodeToString(prompt)}}],"temperature":0.1}"""
                     OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload) }
                     if (conn.responseCode == 200) {
                         val body = conn.inputStream.bufferedReader().readText()
@@ -1291,33 +1311,103 @@ class PeritoAiEngine(private val context: Context? = null) {
         return hasExplicitPhrase && hasExplicitTime
     }
 
-    private fun buildClassificationPrompt(text: String, refDate: LocalDate): String {
+    fun buildClassificationPrompt(
+        text: String,
+        refDate: LocalDate,
+        config: AiEngineConfig = AiEngineConfig()
+    ): String {
+        val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
         return """
-            Sei l'assistente di un Perito Tecnico Estimativo / CTU. Classifica questo documento in JSON con le chiavi:
-            "categoria" (una tra: Atti_Tribunale, Perizie_Tecniche, Planimetrie_Computi, Fatture_Preventivi, Corrispondenza_Legale, Da_Classificare_Manualmente),
-            "cliente_o_controparte", "oggetto_sintetico", "data_documento" (default $refDate).
-            REGOLA RIGIDA ANTI-ALLUCINAZIONE: Se il testo non ha senso compiuto o non appartiene chiaramente a un documento tecnico/legale/contabile, usa obbligatoriamente "Da_Classificare_Manualmente". NON inventare nomi o oggetti non presenti nel testo.
-            Testo: ${text.take(1500)}
+            Sei l'assistente peritale specializzato di $studio.
+            Il tuo compito è classificare il documento fornito in una delle 6 cartelle peritali ufficiali ed estrarre i metadati chiave.
+            
+            LE 6 CATEGORIE AMMESSE:
+            1. "Atti_Tribunale": Nomine CTU, verbali d'udienza, decreti giudiziali, quesiti del Giudice, comunicazioni cancelleria, esecuzioni immobiliari, fallimenti.
+            2. "Perizie_Tecniche": Relazioni peritali (CTU / CTP), accertamenti tecnici preventivi (ATP), stime danni, perizie infiltrazioni, verbali di sopralluogo tecnico.
+            3. "Planimetrie_Computi": Visure catastali, schede planimetriche, computi metrici estimativi, elenchi prezzi, APE, elaborati grafici DWG/PDF.
+            4. "Fatture_Preventivi": Fatture professionali, parcelle pro-forma, preventivi imprese, note spese peritali, quietanze.
+            5. "Corrispondenza_Legale": Comunicazioni PEC legali, lettere diffida, osservazioni CTP, convocazioni inizio operazioni peritali.
+            6. "Da_Classificare_Manualmente": Testo illeggibile, non pertinente, frammentario o privo di valore tecnico/peritale.
+            
+            REGOLE CHIAVE & SCHEMA:
+            - Rispondi ESCLUSIVAMENTE in formato JSON con le seguenti chiavi:
+              {"categoria": "...", "cliente_o_controparte": "...", "oggetto_sintetico": "...", "data_documento": "YYYY-MM-DD"}
+            - "categoria": deve essere ESATTAMENTE una delle 6 sopra elencate.
+            - "cliente_o_controparte": nome del committente, controparte, tribunale o professionista menzionato. Se non presente nel testo, usa "Generico".
+            - "oggetto_sintetico": sintesi dell'oggetto in 3-5 parole. Se non rilevabile, usa "Documento".
+            - "data_documento": data in formato YYYY-MM-DD presente nel testo. Se assente, usa "$refDate".
+            - REGOLA RIGIDA ANTI-ALLUCINAZIONE: NON inventare mai nomi, date o fatti non presenti nel testo. Se il documento non ha senso compiuto o non è peritale/tecnico, assegna "Da_Classificare_Manualmente".
+            
+            ESEMPI:
+            <esempio>
+            Testo: "Tribunale Ordinario di Como - Sez. Civile - RG 4520/2026. Nomina CTU del Perito... Quesito peritale..."
+            JSON: {"categoria": "Atti_Tribunale", "cliente_o_controparte": "Tribunale di Como", "oggetto_sintetico": "Nomina CTU RG 4520/2026", "data_documento": "$refDate"}
+            </esempio>
+            <esempio>
+            Testo: "Relazione Tecnica di Stima Danni da Infiltrazione. Committente: Sig. Mario Rossi. Sopralluogo del 12/03/2026..."
+            JSON: {"categoria": "Perizie_Tecniche", "cliente_o_controparte": "Mario Rossi", "oggetto_sintetico": "Perizia Danni Infiltrazione", "data_documento": "2026-03-12"}
+            </esempio>
+            <esempio>
+            Testo: "Fattura N. 12/2026 emessa da Edilizia Lombarda Srl per ripristino solaio. Importo EUR 2.400..."
+            JSON: {"categoria": "Fatture_Preventivi", "cliente_o_controparte": "Edilizia Lombarda Srl", "oggetto_sintetico": "Fattura 12/2026 Ripristino Solaio", "data_documento": "$refDate"}
+            </esempio>
+            <esempio>
+            Testo: "Ricevuta pranzo bar tavola calda caffè 1.20 euro scontrino fiscale"
+            JSON: {"categoria": "Da_Classificare_Manualmente", "cliente_o_controparte": "Generico", "oggetto_sintetico": "Documento", "data_documento": "$refDate"}
+            </esempio>
+            
+            Testo da analizzare:
+            ${text.take(1500)}
         """.trimIndent()
     }
 
-    private fun buildAppointmentPrompt(text: String, now: LocalDateTime): String {
+    fun buildAppointmentPrompt(
+        text: String,
+        now: LocalDateTime,
+        config: AiEngineConfig = AiEngineConfig()
+    ): String {
+        val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
+        val refDate = now.toLocalDate()
+        val tomorrow = refDate.plusDays(1)
+        val dayAfterTomorrow = refDate.plusDays(2)
+        val dayOfWeek = now.dayOfWeek.name
         return """
-            Sei l'assistente agenda di uno studio peritale. Data e ora attuale di riferimento: $now.
-            Estrai i dettagli dell'appuntamento o incontro (tecnico, di lavoro o personale/informale come colazione, pranzo, caffè, cena, riunione, sopralluogo) dal messaggio dell'utente in formato JSON.
+            Sei l'assistente agenda intelligente di $studio.
+            Data e ora di riferimento: $now ($dayOfWeek, oggi: $refDate, domani: $tomorrow, dopodomani: $dayAfterTomorrow).
+            Il tuo compito è estrarre con la massima precisione i dati di qualsiasi appuntamento, incontro di lavoro, sopralluogo tecnico o incontro personale/informale (colazione, pranzo, caffè, cena, riunione, udienza).
             
             REGOLE DI ESTRAZIONE:
-            - "titolo": attività sintetica con chi/dove (es. "Colazione con Deiv", "Sopralluogo Perizia Rossi", "Pranzo di lavoro"). Se è un incontro informale, usa il tipo specifico ("Colazione", "Pranzo", "Caffè", "Incontro"), NON usare "Appuntamento Tecnico" generico.
-            - "cliente": nome della persona, collega, cliente o contatto con cui ci si incontra (es. "Deiv", "Dave", "Marco", "Ing. Bianchi"). Se non c'è una persona menzionata, metti "Cliente".
-            - "luogo": indirizzo, locale, bar, ristorante o comune specificato (es. "Non Solo Dolce di Albate", "Via Roma 12 Como", "Albate"). Se non specificato, metti "Da definire".
-            - "data_inizio_iso": data e ora d'inizio in formato ISO-8601 (YYYY-MM-DDTHH:mm:ss). Calcola la data corretta partendo da "$now" ("domani" = data attuale + 1 giorno, ecc.).
-            - "data_fine_iso": se specificata ora di fine, calcolala, altrimenti aggiungi 1 ora a data_inizio_iso.
-            - REGOLA ANTI-ALLUCINAZIONE: NON inventare mai giorni o orari assenti nel testo. Se nel messaggio non c'è alcun riferimento temporale, rispondi {"has_appointment": false}.
+            - "has_appointment": true se il messaggio contiene un evento con riferimento temporale, false altrimenti.
+            - "titolo": attività specifica e descrittiva con chi o dove (es. "Colazione con Deiv", "Sopralluogo Perizia Rossi", "Pranzo di lavoro con Ing. Neri", "Udienza CTU"). Se è un incontro informale (colazione/pranzo/caffè/cena), indica esattamente l'attività e NON usare "Appuntamento Tecnico" generico.
+            - "cliente": nome del cliente, collega, contatto o interlocutore incontrato (es. "Deiv", "Marco", "Arch. Verdi"). Se non menzionato, usa "Cliente".
+            - "luogo": indirizzo, locale, bar, ristorante o comune specificato (es. "Non Solo Dolce di Albate", "Via Roma 10 Como", "Milano"). Se non specificato, usa "Da definire".
+            - "data_inizio_iso": data e ora d'inizio in formato ISO-8601 (YYYY-MM-DDTHH:mm:ss). Calcola la data a partire dalla data di riferimento: oggi=$refDate, domani=$tomorrow, dopodomani=$dayAfterTomorrow.
+            - "data_fine_iso": data e ora di fine in formato ISO-8601. Se è specificato un orario di fine (es. "dalle 17 alle 19", "fino alle 20"), usalo. Altrimenti, imposta la fine a 1 ora dopo data_inizio_iso.
+            - "is_ambiguo": true se manca l'orario o il giorno è incerto, altrimenti false.
+            - "motivo_ambiguita": descrizione breve dell'ambiguità se is_ambiguo è true, altrimenti stringa vuota "".
+            - REGOLA ANTI-ALLUCINAZIONE: NON inventare mai giorni, orari, persone o luoghi non presenti nel testo. Se il testo non menziona alcun appuntamento o incontro, restituisci {"has_appointment": false}.
+            - Rispondi ESCLUSIVAMENTE con l'oggetto JSON puro, senza spiegazioni né blocchi di codice markdown.
             
-            Schema JSON richiesto:
-            {"has_appointment": true, "titolo": "...", "data_inizio_iso": "YYYY-MM-DDTHH:mm:ss", "data_fine_iso": "YYYY-MM-DDTHH:mm:ss", "luogo": "...", "cliente": "...", "is_ambiguo": false, "motivo_ambiguita": ""}
+            ESEMPI:
+            <esempio>
+            Input: "Lunedì prossimo alle 10:30 sopralluogo peritale con Ing. Bianchi in via Milano 15 a Varese"
+            JSON: {"has_appointment": true, "titolo": "Sopralluogo Peritale con Ing. Bianchi", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.MONDAY))}T10:30:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.MONDAY))}T11:30:00", "luogo": "Via Milano 15, Varese", "cliente": "Ing. Bianchi", "is_ambiguo": false, "motivo_ambiguita": ""}
+            </esempio>
+            <esempio>
+            Input: "Domani alle 9 deiv a fare colazione a non solo dolce di Albate"
+            JSON: {"has_appointment": true, "titolo": "Colazione con Deiv", "data_inizio_iso": "${tomorrow}T09:00:00", "data_fine_iso": "${tomorrow}T10:00:00", "luogo": "Non Solo Dolce di Albate", "cliente": "Deiv", "is_ambiguo": false, "motivo_ambiguita": ""}
+            </esempio>
+            <esempio>
+            Input: "Giovedì dalle 17:45 fino alle 20 palestra con Tedo a Lurate Caccivio"
+            JSON: {"has_appointment": true, "titolo": "Palestra con Tedo", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.THURSDAY))}T17:45:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.THURSDAY))}T20:00:00", "luogo": "Lurate Caccivio", "cliente": "Tedo", "is_ambiguo": false, "motivo_ambiguita": ""}
+            </esempio>
+            <esempio>
+            Input: "Ricordati di inviare la relazione tecnica all'avvocato Rossi via PEC"
+            JSON: {"has_appointment": false, "titolo": "", "data_inizio_iso": null, "data_fine_iso": null, "luogo": "Da definire", "cliente": "Cliente", "is_ambiguo": false, "motivo_ambiguita": ""}
+            </esempio>
             
-            Messaggio dell'utente: $text
+            Messaggio utente:
+            $text
         """.trimIndent()
     }
 

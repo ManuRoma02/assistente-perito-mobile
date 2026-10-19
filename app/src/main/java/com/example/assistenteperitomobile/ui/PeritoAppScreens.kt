@@ -1003,6 +1003,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             ModalBottomSheet(
                 onDismissRequest = { showAiSettingsSheet = false },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                sheetGesturesEnabled = false,
                 dragHandle = { AppleSheetDragHandle() },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 containerColor = AppleWhite
@@ -5127,14 +5128,20 @@ fun AiEngineSettingsSheetContent(
     var recapitoInput by remember(uiState.aiConfig.studioProfile.recapito) {
         mutableStateOf(uiState.aiConfig.studioProfile.recapito)
     }
+    var showManifestUrlEditor by rememberSaveable { mutableStateOf(false) }
+    var editedManifestUrl by rememberSaveable(uiState.aiConfig.otaManifestUrl) {
+        mutableStateOf(uiState.aiConfig.otaManifestUrl)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.92f)
             .background(AppleWhite)
+            .navigationBarsPadding()
+            .imePadding()
     ) {
-        // Header FISSO in alto (non scrolla via e non ricalcola il layout durante lo scroll)
+        // Header FISSO in alto con Brand PeritoAI e pulsante di chiusura Apple HIG
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5144,7 +5151,8 @@ fun AiEngineSettingsSheetContent(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f, fill = false)
             ) {
                 PeritoAiBrandEmblem(size = 36.dp, showOnlineBadge = false)
                 Column {
@@ -5152,28 +5160,46 @@ fun AiEngineSettingsSheetContent(
                         text = "Impostazioni & Modelli IA",
                         style = MaterialTheme.typography.titleMedium,
                         color = AppleLabelPrimary,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "PeritoAI • Download in Background & Privacy",
                         style = MaterialTheme.typography.labelSmall,
-                        color = DavezBordeaux
+                        color = DavezBordeaux,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-            TextButton(onClick = onClose) {
-                Text("Chiudi", color = DavezBordeaux, fontWeight = FontWeight.SemiBold)
+            Surface(
+                onClick = onClose,
+                shape = CircleShape,
+                color = AppleSecondaryGroupedBg.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .size(32.dp)
+                    .semantics { contentDescription = "Chiudi impostazioni" }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Chiudi impostazioni",
+                        tint = AppleLabelPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
 
         HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
 
-        // Contenuto scorrevole fluido a 60fps con LazyColumn (nessun conflitto col BottomSheet)
+        // Contenuto scorrevole fluido a 60fps con LazyColumn (nessun conflitto col BottomSheet grazie a sheetGesturesEnabled=false)
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // SEZIONE 0A: PROFILO STUDIO TECNICO (Personalizzabile dal Perito)
@@ -5574,8 +5600,6 @@ fun AiEngineSettingsSheetContent(
             // SEZIONE OTA: AGGIORNAMENTI & VERSIONE APP
             item(key = "settings_ota_updates_section") {
                 val context = LocalContext.current
-                var showManifestUrlEditor by rememberSaveable { mutableStateOf(false) }
-                var editedManifestUrl by rememberSaveable { mutableStateOf(uiState.aiConfig.otaManifestUrl) }
 
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -5841,7 +5865,7 @@ fun AiEngineSettingsSheetContent(
             }
 
             item(key = "settings_bottom_spacer") {
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(40.dp))
             }
         }
     }

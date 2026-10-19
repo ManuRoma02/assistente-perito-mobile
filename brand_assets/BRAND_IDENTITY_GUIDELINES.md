@@ -9,8 +9,8 @@
 | :--- | :--- |
 | **Entità Istituzionale** | **Studio Tecnico Restelli & Partner** (Mario Rossi, Geometra & CTU) |
 | **Nome Prodotto** | **PeritoAI** |
-| **Payoff Istituzionale** | *L'Intelligenza Artificiale Forense che non esce mai dal tuo cantiere.* |
-| **Proposta di Valore (UVP)** | **100% Privacy Locale & Zero Cloud**: Nessun dato giudiziario, foto di cantiere o perizia riservata viene inviata a server esterni o terze parti. Il modello linguistico (Qwen 2B GGUF) ragiona direttamente sull'hardware dello smartphone in background. |
+| **Payoff Istituzionale** | *L'Intelligenza Artificiale Forense che non esce mai dal tuo dispositivo.* |
+| **Proposta di Valore (UVP)** | **100% Privacy Locale & Zero Cloud**: Nessun dato giudiziario, foto di sopralluogo o perizia riservata viene inviata a server esterni o terze parti. Il modello linguistico (Qwen 2B GGUF) ragiona direttamente sull'hardware dello smartphone in background. |
 | **Target Principale** | Periti Edili, CTU (Consulenti Tecnici d'Ufficio), CTP, Geometri, Ingegneri Forensi, Architetti e Studi Legali. |
 
 ---
@@ -21,7 +21,7 @@ Ispirata all'estetica editoriale svizzera e al rigore degli studi notarili e per
 
 ```
 [#6B1724] DavezBordeaux      — Autorevolezza, rigore forense, timbro peritale e brand primario.
-[#F8F4F1] DavezAlabaster      — Fondo gesso caldo antiriflesso (perfetto sotto la luce diretta del cantiere).
+[#F8F4F1] DavezAlabaster      — Fondo gesso caldo antiriflesso (perfetto sotto la luce diretta durante i rilievi tecnici).
 [#D4AF37] DavezGoldSlate     — Monogramma istituzionale RD, calibro di precisione, rilievi millimetrici.
 [#1E293B] DavezSlateDark     — Testo ad alto contrasto per verbali e contratti.
 [#34C759] AppleGreen         — Validazione senza conflitti, appuntamento confermato, archivio allineato.
@@ -63,7 +63,7 @@ Conforme alle linee guida di `app-icon-and-logo-designer`:
 4. **Slide 4 — Dalla Voce all'Agenda in 3 Secondi**: Registratore vocale in-app ad alta fedeltà con riproduzione della voce reale, parsing data/ora e controllo conflitti orari a finestra mobile (±15 min).
 5. **Slide 5 — I 3 Promemoria Salva-Udienza**: Allarmi automatici sincronizzati a 30 minuti, 60 minuti e 24 ore prima dell'impegno.
 6. **Slide 6 — L'Archivio Intelligente a 6 Cartelle**: Smistamento automatico di perizie, verbali, planimetrie computi e diffide legali con spostamento rapido a 1-tap.
-7. **Slide 7 — Scanner Cantiere & Decrittazione .p7m**: Scansione ottica ad alto contrasto di documenti cartacei e sbustamento crittografico istantaneo di atti firmati digitalmente.
+7. **Slide 7 — Scanner Peritale & Decrittazione .p7m**: Scansione ottica ad alto contrasto di documenti cartacei e sbustamento crittografico istantaneo di atti firmati digitalmente.
 8. **Slide 8 — Reasoning in Background Senza Interruzioni**: Notifiche heads-up con CPU WakeLock attivo anche se l'app viene chiusa o lo schermo si spegne.
-9. **Slide 9 — Sincronizzazione Locale Studio-Cantiere**: Archiviazione su cartella pubblica USB accessibile immediatamente dal PC dell'ufficio senza passare da internet.
+9. **Slide 9 — Sincronizzazione Locale Studio-Mobile**: Archiviazione su cartella pubblica USB accessibile immediatamente dal PC dell'ufficio senza passare da internet.
 10. **Slide 10 — Contatti & Riferimenti**: *Studio Tecnico Restelli & Partner — Innovazione, Rigore e Precisione Forense.*
