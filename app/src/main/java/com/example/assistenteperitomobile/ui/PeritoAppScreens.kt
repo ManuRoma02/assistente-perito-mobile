@@ -5445,15 +5445,22 @@ fun AiEngineSettingsSheetContent(
                                             fontWeight = FontWeight.SemiBold,
                                             color = AppleLabelPrimary
                                         )
+                                        val calendarLabel = remember(uiState.aiConfig.selectedCalendarName, uiState.aiConfig.selectedCalendarAccount) {
+                                            val name = uiState.aiConfig.selectedCalendarName
+                                            val acc = uiState.aiConfig.selectedCalendarAccount
+                                            when {
+                                                name == null -> "Tutti gli account (sincronizzazione globale)"
+                                                acc.isNullOrBlank() || acc.equals(name, ignoreCase = true) -> name
+                                                else -> "$name ($acc)"
+                                            }
+                                        }
                                         Text(
-                                            text = if (uiState.aiConfig.selectedCalendarName != null) {
-                                                "${uiState.aiConfig.selectedCalendarName} (${uiState.aiConfig.selectedCalendarAccount ?: ""})"
-                                            } else {
-                                                "Tutti gli account (sincronizzazione globale)"
-                                            },
+                                            text = calendarLabel,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = DavezBordeaux,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                     Spacer(Modifier.width(8.dp))
@@ -6888,14 +6895,21 @@ fun RescheduleAppointmentDialog(
                                     selectedDate = newDt.toLocalDate()
                                     selectedTime = newDt.toLocalTime()
                                 },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(32.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 border = BorderStroke(0.8.dp, DavezStoneBorder)
                             ) {
-                                Text(label, fontSize = 11.sp, color = AppleLabelPrimary, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    color = AppleLabelPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
                     }
@@ -7201,6 +7215,7 @@ fun SelectCalendarAccountDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 480.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -7230,19 +7245,23 @@ fun SelectCalendarAccountDialog(
                             .fillMaxWidth()
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "🌐 Tutti gli account del telefono",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 color = if (isAllSelected) DavezBordeaux else AppleLabelPrimary
                             )
                             Text(
                                 text = "Mostra impegni da qualsiasi calendario configurato",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary
+                                color = AppleLabelSecondary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         if (isAllSelected) {
@@ -7285,51 +7304,71 @@ fun SelectCalendarAccountDialog(
                                     .fillMaxWidth()
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(cal.color?.let { Color(it) } ?: DavezBordeaux)
+                                )
+                                Column(
                                     modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clip(CircleShape)
-                                            .background(cal.color?.let { Color(it) } ?: DavezBordeaux)
-                                    )
-                                    Column {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = cal.name,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) DavezBordeaux else AppleLabelPrimary
-                                            )
-                                            if (cal.isPrimary) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    color = Color(0xFFE8F5E9)
-                                                ) {
-                                                    Text(
-                                                        text = "Principale",
-                                                        fontSize = 10.sp,
-                                                        color = Color(0xFF2E7D32),
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                                    )
-                                                }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = cal.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) DavezBordeaux else AppleLabelPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (cal.isPrimary) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFFE8F5E9)
+                                            ) {
+                                                Text(
+                                                    text = "Principale",
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF2E7D32),
+                                                    fontWeight = FontWeight.Bold,
+                                                    softWrap = false,
+                                                    maxLines = 1,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
                                             }
                                         }
-                                        Text(
-                                            text = cal.accountName.ifBlank { "Account locale" },
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppleLabelSecondary
-                                        )
                                     }
+
+                                    // Subtitle dinamico: elimina duplicazioni tra nome calendario e account
+                                    val subtitle = remember(cal.name, cal.accountName, cal.accountType) {
+                                        val isSame = cal.accountName.isBlank() || cal.accountName.equals(cal.name, ignoreCase = true)
+                                        val providerLabel = when {
+                                            cal.accountType.contains("google", ignoreCase = true) -> "Google Calendar"
+                                            cal.accountType.contains("exchange", ignoreCase = true) || cal.accountType.contains("office365", ignoreCase = true) -> "Microsoft Exchange"
+                                            cal.accountType.contains("icloud", ignoreCase = true) || cal.accountType.contains("apple", ignoreCase = true) -> "iCloud"
+                                            cal.accountType.contains("local", ignoreCase = true) || cal.accountType.contains("samsung", ignoreCase = true) -> "Calendario locale del dispositivo"
+                                            cal.accountType.isNotBlank() -> cal.accountType
+                                            else -> "Calendario dispositivo"
+                                        }
+                                        if (isSame) providerLabel else "${cal.accountName} • $providerLabel"
+                                    }
+
+                                    Text(
+                                        text = subtitle,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = AppleLabelSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                                 if (isSelected) {
                                     Icon(

@@ -297,17 +297,23 @@ fun AgendaVisivaScreen(
                                     color = AppleLabelSecondary,
                                     fontWeight = FontWeight.Medium
                                 )
+                                val accountLabel = remember(uiState.aiConfig.selectedCalendarName, uiState.aiConfig.selectedCalendarAccount) {
+                                    val name = uiState.aiConfig.selectedCalendarName
+                                    val acc = uiState.aiConfig.selectedCalendarAccount
+                                    when {
+                                        name == null -> "Tutti gli account"
+                                        acc.isNullOrBlank() || acc.equals(name, ignoreCase = true) -> name
+                                        else -> "$name ($acc)"
+                                    }
+                                }
                                 Text(
-                                    text = if (uiState.aiConfig.selectedCalendarName != null) {
-                                        "${uiState.aiConfig.selectedCalendarName} (${uiState.aiConfig.selectedCalendarAccount ?: ""})"
-                                    } else {
-                                        "Tutti gli account"
-                                    },
+                                    text = accountLabel,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = DavezBordeaux,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
                             }
                             Text(

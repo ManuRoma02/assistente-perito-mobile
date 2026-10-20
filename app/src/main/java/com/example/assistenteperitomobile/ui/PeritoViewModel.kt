@@ -323,7 +323,12 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             it.copy(
                 aiConfig = updated,
                 statusBanner = if (calendar != null) {
-                    "📅 Sincronizzazione impostata su: ${calendar.name} (${calendar.accountName})"
+                    val calLabel = if (calendar.accountName.isBlank() || calendar.accountName.equals(calendar.name, ignoreCase = true)) {
+                        calendar.name
+                    } else {
+                        "${calendar.name} (${calendar.accountName})"
+                    }
+                    "📅 Sincronizzazione impostata su: $calLabel"
                 } else {
                     "📅 Sincronizzazione attiva con: Tutti gli account"
                 }
