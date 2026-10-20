@@ -13,6 +13,7 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -43,6 +44,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
@@ -1351,14 +1353,10 @@ fun UnifiedStudioBottomBar(
                 }
             }
 
-            // 3. SEGMENTED SWITCHER LIQUIDO CON ONDA D'ACQUA E SCHIZZO SUL MURO (iOS 17 FLUID DOCK)
-            // Quando la tastiera è aperta (imeBottomPx > 0), compattiamo la barra per massimizzare la vista chat
+            // 3. SEGMENTED SWITCHER (iOS 17 FLUID DOCK)
+            // Quando la tastiera è aperta (imeBottomPx > 0), nascondiamo la barra dock all'istante senza animare l'altezza layout (Emil Kowalski: 100+ times/day = instant state change) per evitare jitter o incertezze con l'IME
             val isKeyboardOpen = imeBottomPx > 0
-            AnimatedVisibility(
-                visible = !isKeyboardOpen,
-                enter = fadeIn(tween(140)) + expandVertically(),
-                exit = fadeOut(tween(100)) + shrinkVertically()
-            ) {
+            if (!isKeyboardOpen) {
                 LiquidFluidTabDock(
                     selectedTab = selectedTab,
                     onSelectTab = onSelectTab,
@@ -1370,9 +1368,9 @@ fun UnifiedStudioBottomBar(
 }
 
 // =============================================================================
-// LIQUID FLUID TAB DOCK CON ONDA D'ACQUA E SCHIZZO SUL MURO
-// Fisica del fluido: spring di avanzamento, allungamento idrodinamico (stretch),
-// impatto contro il muro (squash elastico), onda d'urto ad arco e gocce di splash!
+// LIQUID FLUID TAB DOCK (iOS 17 ELEGANT SPRING SWITCHER)
+// Fisica a molla organica (/emilkowalski-animation): transizione fluida su GPU
+// senza distorsioni, onde anomale o deformazioni di scala.
 // =============================================================================
 @Composable
 fun LiquidFluidTabDock(
@@ -1385,30 +1383,17 @@ fun LiquidFluidTabDock(
     val targetIndex = if (selectedTab == MainAppTab.CHAT) 0 else 1
     val pillProgress = remember { Animatable(targetIndex.toFloat()) }
     var prevIndex by remember { mutableIntStateOf(targetIndex) }
-    val splashAnim = remember { Animatable(1f) }
-    var impactWall by remember { mutableIntStateOf(0) } // -1 = muro sinistro, +1 = muro destro
 
     LaunchedEffect(targetIndex) {
         if (targetIndex != prevIndex) {
-            val dir = if (targetIndex > prevIndex) 1 else -1
-            impactWall = dir
             prevIndex = targetIndex
-
-            // Movimento fluido con fisica a molla organica
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             pillProgress.animateTo(
                 targetValue = targetIndex.toFloat(),
                 animationSpec = spring(
-                    dampingRatio = 0.66f,
-                    stiffness = Spring.StiffnessMediumLow
+                    dampingRatio = 0.82f,
+                    stiffness = Spring.StiffnessMedium
                 )
-            )
-
-            // Impatto contro il muro: trigger del feedback tattile e dello schizzo d'acqua
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            splashAnim.snapTo(0f)
-            splashAnim.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing)
             )
         }
     }
@@ -1439,44 +1424,20 @@ fun LiquidFluidTabDock(
             val availableWidth = maxWidth
             val tabWidth = availableWidth / 2
             val currentProgress = pillProgress.value
-            val splashProgress = splashAnim.value
 
-            // Fisica idrodinamica del fluido:
-            // 1. Allungamento elastico in volo (stretch orizzontale)
-            val flightDelta = abs(currentProgress - targetIndex.toFloat())
-            val inFlightStretch = 1f + (flightDelta * 0.18f).coerceIn(0f, 0.18f)
-
-            // 2. Compressione e rimbalzo contro il muro all'impatto (squash & slosh)
-            val splashPhase = splashProgress
-            val splashWave = sin(splashPhase * PI.toFloat() * 2f) * exp(-splashPhase * 4.5f)
-            val wallSquashX = 1f - (splashWave * 0.22f)
-            val wallSquashY = 1f + (splashWave * 0.14f)
-
-            val effectiveScaleX = if (splashPhase < 1f) wallSquashX else inFlightStretch
-            val effectiveScaleY = if (splashPhase < 1f) wallSquashY else (1f / inFlightStretch)
-
-            val currentTransformOrigin = when {
-                splashPhase < 1f && impactWall == 1 -> TransformOrigin(1f, 0.5f) // Ancorato al muro destro
-                splashPhase < 1f && impactWall == -1 -> TransformOrigin(0f, 0.5f) // Ancorato al muro sinistro
-                else -> TransformOrigin.Center
-            }
-
-            // A. Pillola Liquida Apple White con ombra soffusa e riflesso superiore
+            // Pillola Bianca Apple morbida con ombra soffusa e bordo satinato su GPU RenderThread
             Box(
                 modifier = Modifier
                     .width(tabWidth)
                     .fillMaxHeight()
                     .graphicsLayer {
                         translationX = (currentProgress * tabWidth.toPx())
-                        scaleX = effectiveScaleX
-                        scaleY = effectiveScaleY
-                        transformOrigin = currentTransformOrigin
                     }
                     .shadow(
-                        elevation = 2.5.dp,
+                        elevation = 2.dp,
                         shape = RoundedCornerShape(13.dp),
-                        ambientColor = Color(0x33000000),
-                        spotColor = Color(0x22000000)
+                        ambientColor = Color(0x25000000),
+                        spotColor = Color(0x18000000)
                     )
                     .clip(RoundedCornerShape(13.dp))
                     .background(
@@ -1497,49 +1458,7 @@ fun LiquidFluidTabDock(
                         ),
                         shape = RoundedCornerShape(13.dp)
                     )
-            ) {
-                // Onda di rifrazione e riflesso di luce liquida pura (specular sheen) all'impatto sul bordo
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    if (splashPhase < 1f && impactWall != 0) {
-                        val sloshOsc = sin(splashPhase * PI.toFloat() * 2.2f) * exp(-splashPhase * 3.8f)
-                        val crest = sloshOsc * size.height * 0.28f
-                        val wavePath = Path().apply {
-                            if (impactWall == 1) {
-                                // Cresta e riflesso luminoso sul muro destro
-                                moveTo(0f, size.height)
-                                lineTo(0f, size.height * 0.75f)
-                                cubicTo(
-                                    size.width * 0.35f, size.height * 0.75f - crest * 0.2f,
-                                    size.width * 0.70f, size.height * 0.55f - crest * 0.7f,
-                                    size.width, size.height * 0.35f - crest
-                                )
-                                lineTo(size.width, size.height)
-                                close()
-                            } else {
-                                // Cresta e riflesso luminoso sul muro sinistro
-                                moveTo(size.width, size.height)
-                                lineTo(size.width, size.height * 0.75f)
-                                cubicTo(
-                                    size.width * 0.65f, size.height * 0.75f - crest * 0.2f,
-                                    size.width * 0.30f, size.height * 0.55f - crest * 0.7f,
-                                    0f, size.height * 0.35f - crest
-                                )
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                        }
-                        drawPath(
-                            path = wavePath,
-                            brush = Brush.verticalGradient(
-                                listOf(
-                                    Color.White.copy(alpha = (1f - splashPhase) * 0.60f),
-                                    Color.White.copy(alpha = (1f - splashPhase) * 0.10f)
-                                )
-                            )
-                        )
-                    }
-                }
-            }
+            )
 
             // C. Livello etichette ed icone con transizione cromatica fluida continua
             Row(
@@ -2107,12 +2026,21 @@ fun PeritoStudioChatScreen(
         derivedStateOf { listState.canScrollForward }
     }
 
-    LaunchedEffect(uiState.messages.size, uiState.isProcessing, imeBottomPx > 0) {
+    // Scroll fluido solo su arrivo di nuovi messaggi o inizio elaborazione
+    LaunchedEffect(uiState.messages.size, uiState.isProcessing) {
         val totalItems = uiState.messages.size + 1 + (if (uiState.isProcessing) 1 else 0)
-        if (uiState.messages.size > 1 || uiState.isProcessing || imeBottomPx > 0) {
-            listState.animateScrollToItem(totalItems - 1, scrollOffset = 10_000)
-            delay(280L)
-            listState.animateScrollToItem(totalItems - 1, scrollOffset = 10_000)
+        if (uiState.messages.size > 1 || uiState.isProcessing) {
+            listState.animateScrollToItem(totalItems - 1)
+        }
+    }
+
+    // Scroll istantaneo su apertura tastiera (IME): niente ritardi, delay o doppie animazioni concorrenti
+    LaunchedEffect(imeBottomPx > 0) {
+        if (imeBottomPx > 0) {
+            val totalItems = uiState.messages.size + 1 + (if (uiState.isProcessing) 1 else 0)
+            if (totalItems > 1) {
+                listState.scrollToItem(totalItems - 1)
+            }
         }
     }
 
@@ -7190,6 +7118,7 @@ fun SelectCalendarAccountDialog(
     onSelectCalendar: (SystemCalendarInfo?) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -7330,6 +7259,14 @@ fun SelectCalendarAccountDialog(
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
                                         )
+                                        val isOutlook = cal.accountType.contains("outlook", ignoreCase = true) ||
+                                            cal.accountType.contains("exchange", ignoreCase = true) ||
+                                            cal.accountType.contains("office365", ignoreCase = true) ||
+                                            cal.accountType.contains("hotmail", ignoreCase = true) ||
+                                            cal.accountType.contains("live.com", ignoreCase = true) ||
+                                            cal.accountType.contains("msn.com", ignoreCase = true) ||
+                                            cal.name.contains("outlook", ignoreCase = true)
+
                                         if (cal.isPrimary) {
                                             Surface(
                                                 shape = RoundedCornerShape(6.dp),
@@ -7346,14 +7283,36 @@ fun SelectCalendarAccountDialog(
                                                 )
                                             }
                                         }
+
+                                        if (isOutlook) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFFE5F1FB)
+                                            ) {
+                                                Text(
+                                                    text = "Outlook",
+                                                    fontSize = 10.sp,
+                                                    color = Color(0xFF0078D4),
+                                                    fontWeight = FontWeight.Bold,
+                                                    softWrap = false,
+                                                    maxLines = 1,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
                                     }
 
                                     // Subtitle dinamico: elimina duplicazioni tra nome calendario e account
                                     val subtitle = remember(cal.name, cal.accountName, cal.accountType) {
                                         val isSame = cal.accountName.isBlank() || cal.accountName.equals(cal.name, ignoreCase = true)
+                                        val isOutlookAccount = cal.accountType.contains("outlook", ignoreCase = true) ||
+                                            cal.accountType.contains("exchange", ignoreCase = true) ||
+                                            cal.accountType.contains("office365", ignoreCase = true) ||
+                                            cal.accountType.contains("hotmail", ignoreCase = true) ||
+                                            cal.accountType.contains("live.com", ignoreCase = true)
                                         val providerLabel = when {
+                                            isOutlookAccount -> "Microsoft Outlook / Exchange"
                                             cal.accountType.contains("google", ignoreCase = true) -> "Google Calendar"
-                                            cal.accountType.contains("exchange", ignoreCase = true) || cal.accountType.contains("office365", ignoreCase = true) -> "Microsoft Exchange"
                                             cal.accountType.contains("icloud", ignoreCase = true) || cal.accountType.contains("apple", ignoreCase = true) -> "iCloud"
                                             cal.accountType.contains("local", ignoreCase = true) || cal.accountType.contains("samsung", ignoreCase = true) -> "Calendario locale del dispositivo"
                                             cal.accountType.isNotBlank() -> cal.accountType
@@ -7378,6 +7337,109 @@ fun SelectCalendarAccountDialog(
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // Card di collegamento rapido Microsoft Outlook / Exchange
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFF0F6FF),
+                    border = BorderStroke(1.dp, Color(0xFFB9D7F7)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF0078D4)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Collega Microsoft Outlook",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF005A9E)
+                                )
+                                Text(
+                                    text = "Sincronizza impegni e sopralluoghi da Microsoft 365 / Exchange",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppleLabelSecondary
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "1. Con l'app Microsoft Outlook installata: apri Outlook > Impostazioni ⚙️ > tocca la tua email > attiva l'interruttore 'Sincronizza calendari'.\n2. Oppure aggiungi un account Exchange/Outlook nelle impostazioni di sistema del dispositivo.",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, lineHeight = 14.sp),
+                            color = AppleLabelSecondary
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val pm = context.packageManager
+                            val outlookIntent = pm.getLaunchIntentForPackage("com.microsoft.office.outlook")
+
+                            if (outlookIntent != null) {
+                                Button(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(outlookIntent)
+                                        } catch (_: Throwable) {}
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0078D4)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Apri Outlook", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val addAccountIntent = Intent(Settings.ACTION_ADD_ACCOUNT).apply {
+                                        putExtra(Settings.EXTRA_ACCOUNT_TYPES, arrayOf("com.microsoft.office.outlook", "com.microsoft.exchange", "com.google.android.exchange"))
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    val syncIntent = Intent(Settings.ACTION_SYNC_SETTINGS).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    try {
+                                        context.startActivity(addAccountIntent)
+                                    } catch (_: Throwable) {
+                                        try {
+                                            context.startActivity(syncIntent)
+                                        } catch (_: Throwable) {}
+                                    }
+                                },
+                                border = BorderStroke(1.dp, Color(0xFF0078D4)),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Aggiungi Account", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0078D4))
                             }
                         }
                     }
