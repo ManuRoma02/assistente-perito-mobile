@@ -1,5 +1,9 @@
 package com.example.assistenteperitomobile.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,10 +25,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
@@ -41,17 +47,20 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -99,7 +108,7 @@ fun AgendaVisivaScreen(
         today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
     }
 
-    // Calcolo giorni rimanenti della settimana corrente (da dopodomani fino a domenica)
+    // Calcolo giorni rimanenti della settimana corrente (da dopodomani fino a domenica corrente)
     val remainingWeekDays = remember(today, endOfWeek) {
         val list = mutableListOf<LocalDate>()
         var d = dayAfterTomorrow
@@ -109,26 +118,22 @@ fun AgendaVisivaScreen(
         }
         list
     }
-
-    // Se siamo a fine settimana (venerdì/sabato/domenica), mostra i giorni rimanenti + la settimana successiva lavorativa
-    val targetDays = remember(today, remainingWeekDays) {
-        if (remainingWeekDays.size >= 2) {
-            remainingWeekDays
-        } else {
-            val combined = remainingWeekDays.toMutableList()
-            val nextMonday = today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-            for (i in 0 until 5) {
-                val nextDay = nextMonday.plusDays(i.toLong())
-                if (!combined.contains(nextDay) && nextDay != tomorrow) {
-                    combined.add(nextDay)
-                }
-            }
-            combined
-        }
+    val remainingWeekDaysIso = remember(remainingWeekDays) {
+        remainingWeekDays.map { it.toString() }.toSet()
     }
+
+    // Settimana successiva (da Lunedì a Domenica della prossima settimana)
+    val nextWeekStart = remember(endOfWeek) { endOfWeek.plusDays(1) }
+    val nextWeekEnd = remember(nextWeekStart) { nextWeekStart.plusDays(6) }
+    val nextWeekStartIso = remember(nextWeekStart) { nextWeekStart.toString() }
+    val nextWeekEndIso = remember(nextWeekEnd) { nextWeekEnd.toString() }
 
     val dayFormatter = remember {
         DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ITALIAN)
+    }
+    val nextWeekRangeLabel = remember(nextWeekStart, nextWeekEnd) {
+        val f = DateTimeFormatter.ofPattern("d MMM", Locale.ITALIAN)
+        "Da ${f.format(nextWeekStart)} a ${f.format(nextWeekEnd)}"
     }
 
     val otherEvents = remember(uiState.upcomingEvents, uiState.todayEvents, uiState.tomorrowEvents) {
@@ -137,16 +142,22 @@ fun AgendaVisivaScreen(
         }
     }
 
-    val targetDaysIso = remember(targetDays) { targetDays.map { it.toString() }.toSet() }
-    val weeklyEvents = remember(otherEvents, targetDaysIso) {
-        otherEvents.filter { it.startIso.take(10) in targetDaysIso }
+    // Eventi nei giorni rimanenti di questa settimana
+    val currentWeekEvents = remember(otherEvents, remainingWeekDaysIso) {
+        otherEvents.filter { it.startIso.take(10) in remainingWeekDaysIso }
     }
 
-    val laterEvents = remember(otherEvents, targetDays) {
-        val lastTargetDate = targetDays.lastOrNull()
-        if (lastTargetDate != null) {
-            otherEvents.filter { it.startIso.take(10) > lastTargetDate.toString() }
-        } else emptyList()
+    // Eventi della SETTIMANA SUCCESSIVA
+    val nextWeekEvents = remember(otherEvents, nextWeekStartIso, nextWeekEndIso) {
+        otherEvents.filter {
+            val d = it.startIso.take(10)
+            d >= nextWeekStartIso && d <= nextWeekEndIso
+        }
+    }
+
+    // Eventi oltre la settimana successiva
+    val laterEvents = remember(otherEvents, nextWeekEndIso) {
+        otherEvents.filter { it.startIso.take(10) > nextWeekEndIso }
     }
 
     Column(
@@ -388,24 +399,20 @@ fun AgendaVisivaScreen(
                 }
             }
 
-            // Sezione PROGRAMMA SETTIMANALE • GIORNI RIMANENTI
-            item(key = "header_weekly") {
-                SectionHeaderBadge(
-                    title = "PROGRAMMA SETTIMANALE • GIORNI RIMANENTI",
-                    count = weeklyEvents.size,
-                    color = DavezBordeaux
-                )
-            }
-
-            if (targetDays.isEmpty()) {
-                item(key = "empty_weekly") {
-                    EmptyEventPlaceholder(message = "Nessun altro impegno programmato per questa settimana.")
+            // Sezione QUESTA SETTIMANA • GIORNI RIMANENTI (se ci sono giorni da dopodomani a domenica)
+            if (remainingWeekDays.isNotEmpty()) {
+                item(key = "header_this_week") {
+                    SectionHeaderBadge(
+                        title = "QUESTA SETTIMANA • GIORNI RIMANENTI",
+                        count = currentWeekEvents.size,
+                        color = DavezBordeaux
+                    )
                 }
-            } else {
-                targetDays.forEach { day ->
+
+                remainingWeekDays.forEach { day ->
                     val dayIso = day.toString()
                     val dayLabel = dayFormatter.format(day).replaceFirstChar { it.uppercase(Locale.ITALIAN) }
-                    val dayEvents = weeklyEvents.filter { it.startIso.take(10) == dayIso }
+                    val dayEvents = currentWeekEvents.filter { it.startIso.take(10) == dayIso }
 
                     item(key = "day_header_$dayIso") {
                         DaySubHeaderBadge(
@@ -434,11 +441,45 @@ fun AgendaVisivaScreen(
                 }
             }
 
-            // Se ci sono ulteriori impegni oltre il programma settimanale corrente
+            // Sezione SETTIMANA SUCCESSIVA (Card compatte ed espandibili al tap con fisica a molla Emil Kowalski)
+            item(key = "header_next_week") {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    SectionHeaderBadge(
+                        title = "SETTIMANA SUCCESSIVA",
+                        count = nextWeekEvents.size,
+                        color = AppleBlueDark
+                    )
+                    Text(
+                        text = "$nextWeekRangeLabel • Tocca per espandere i dettagli",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppleLabelSecondary,
+                        modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 4.dp)
+                    )
+                }
+            }
+
+            if (nextWeekEvents.isEmpty()) {
+                item(key = "empty_next_week") {
+                    EmptyEventPlaceholder(message = "Nessun sopralluogo programmato per la settimana successiva ($nextWeekRangeLabel).")
+                }
+            } else {
+                items(nextWeekEvents, key = { it.id }) { ev ->
+                    NextWeekExpandableEventCard(
+                        event = ev,
+                        onOpenMap = {
+                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
+                        },
+                        onReschedule = { eventToReschedule = ev },
+                        onDelete = { viewModel.deleteCalendarEvent(ev) }
+                    )
+                }
+            }
+
+            // Se ci sono ulteriori impegni oltre la settimana successiva
             if (laterEvents.isNotEmpty()) {
                 item(key = "header_later") {
                     SectionHeaderBadge(
-                        title = "SUCCESSIVI",
+                        title = "SUCCESSIVI • OLTRE LA SETTIMANA SUCCESSIVA",
                         count = laterEvents.size,
                         color = AppleLabelSecondary
                     )
@@ -504,6 +545,277 @@ fun SectionHeaderBadge(title: String, count: Int, color: Color) {
                     color = color,
                     fontSize = 10.5.sp
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Card compatta ed espandibile per gli appuntamenti della settimana successiva (/emilkowalski-animation).
+ * - Default: compresso, mostra solo i dettagli essenziali (orario, giorno, categoria e titolo sintetico).
+ * - Al tap: espansione fluida a molla su GPU (animateContentSize + rotazione chevron 180° su graphicsLayer)
+ *   rivelando indirizzo completo, Google Maps, cliente, note e azioni Modifica/Elimina.
+ */
+@Composable
+fun NextWeekExpandableEventCard(
+    event: CalendarEventItem,
+    onOpenMap: () -> Unit,
+    onReschedule: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "next_week_chevron_rot"
+    )
+
+    val startTime = event.startIso.drop(11).take(5)
+    val endTime = event.endIso.drop(11).take(5)
+    val dateIso = event.startIso.take(10)
+    val dateLabel = remember(dateIso) {
+        runCatching {
+            val d = LocalDate.parse(dateIso)
+            d.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.ITALIAN)).replaceFirstChar { it.uppercase(Locale.ITALIAN) }
+        }.getOrDefault(dateIso)
+    }
+
+    val catEnum = remember(event.categoria, event.titolo) {
+        PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
+    }
+
+    Surface(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            isExpanded = !isExpanded
+        },
+        shape = RoundedCornerShape(14.dp),
+        color = AppleWhite,
+        border = BorderStroke(
+            if (isExpanded) 1.dp else 0.5.dp,
+            if (isExpanded) AppleBlueDark.copy(alpha = 0.45f) else DavezStoneBorder
+        ),
+        shadowElevation = if (isExpanded) 1.5.dp else 0.5.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = 0.82f,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            // RIGA PRINCIPALE (Sintetica - Sempre Visibile)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Pillola di accento verticale blu Apple
+                Box(
+                    modifier = Modifier
+                        .width(3.5.dp)
+                        .height(34.dp)
+                        .background(
+                            color = AppleBlueDark,
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                )
+
+                // Informazioni essenziali
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = DavezTravertine,
+                            border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.6f))
+                        ) {
+                            Text(
+                                text = "$dateLabel • $startTime-$endTime",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = AppleLabelPrimary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = AppleBlueDark.copy(alpha = 0.10f),
+                            border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.25f))
+                        ) {
+                            Text(
+                                text = "${catEnum.emoji} ${catEnum.displayName}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = AppleBlueDark,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 10.5.sp
+                            )
+                        }
+                    }
+
+                    // Titolo sintetico
+                    Text(
+                        text = event.titolo,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = (-0.1).sp
+                        ),
+                        color = AppleLabelPrimary,
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Chevron rotante senza reflow di layout (GPU graphicsLayer)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .graphicsLayer { rotationZ = chevronRotation },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Comprimi dettagli" else "Espandi tutti i dettagli",
+                        tint = AppleLabelSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // DETTAGLI COMPLETI (Visibili solo se espanso)
+            if (isExpanded) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(0.6.dp)
+                        .background(DavezStoneBorder.copy(alpha = 0.5f))
+                )
+                Spacer(Modifier.height(10.dp))
+
+                // Cliente (se specificato e significativo)
+                if (event.cliente.isNotBlank() && event.cliente != "Cliente" && !event.cliente.equals(event.titolo, ignoreCase = true) && !event.cliente.equals(event.categoria, ignoreCase = true)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp))
+                        Text(
+                            text = "Cliente: ${event.cliente}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleLabelSecondary
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                // Note personali
+                if (event.note.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Description,
+                            contentDescription = null,
+                            tint = AppleLabelSecondary,
+                            modifier = Modifier.size(13.dp).padding(top = 1.dp)
+                        )
+                        Text(
+                            text = event.note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleLabelSecondary
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // Indirizzo e Google Maps
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = AppleRed, modifier = Modifier.size(14.dp))
+                        Text(
+                            text = event.luogo,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleLabelPrimary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (event.luogo.isNotBlank() && event.luogo != "Da definire") {
+                        Surface(
+                            onClick = onOpenMap,
+                            shape = RoundedCornerShape(8.dp),
+                            color = DavezTravertine,
+                            border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.35f)),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Map, contentDescription = null, tint = AppleBlueDark, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Google Maps", color = AppleBlueDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // Pulsanti Azione Modifica ed Elimina
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onReschedule,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = DavezBordeaux, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Modifica", color = DavezBordeaux, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Spacer(Modifier.width(4.dp))
+
+                    TextButton(
+                        onClick = onDelete,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = AppleRed.copy(alpha = 0.85f), modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Elimina", color = AppleRed.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
     }
