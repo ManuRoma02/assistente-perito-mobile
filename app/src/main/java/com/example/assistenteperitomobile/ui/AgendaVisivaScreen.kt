@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -192,16 +193,30 @@ fun AgendaVisivaScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = if (uiState.todayEvents.isNotEmpty()) {
-                                "☀️ ${uiState.todayEvents.size} sopralluogh${if (uiState.todayEvents.size == 1) "o" else "i"} in programma oggi"
-                            } else {
-                                "Nessun sopralluogo per oggi"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (uiState.todayEvents.isNotEmpty()) DavezBordeaux else AppleLabelSecondary,
-                            fontWeight = if (uiState.todayEvents.isNotEmpty()) FontWeight.Bold else FontWeight.Normal
-                        )
+                        val todayCount = uiState.todayEvents.size
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (todayCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(DavezBordeaux)
+                                )
+                            }
+                            Text(
+                                text = when (todayCount) {
+                                    0 -> "Nessun sopralluogo per oggi"
+                                    1 -> "1 sopralluogo in programma oggi"
+                                    else -> "$todayCount sopralluoghi in programma oggi"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (todayCount > 0) DavezBordeaux else AppleLabelSecondary,
+                                fontWeight = if (todayCount > 0) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
                     }
 
                     Button(
@@ -589,11 +604,14 @@ fun NextWeekExpandableEventCard(
         PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+
     Surface(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             isExpanded = !isExpanded
         },
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(14.dp),
         color = AppleWhite,
         border = BorderStroke(
@@ -603,6 +621,7 @@ fun NextWeekExpandableEventCard(
         shadowElevation = if (isExpanded) 1.5.dp else 0.5.dp,
         modifier = Modifier
             .fillMaxWidth()
+            .emilPressScale(interactionSource, pressedScale = 0.985f)
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = 0.82f,
@@ -1072,7 +1091,7 @@ fun DaySubHeaderBadge(
                 color = DavezBordeaux.copy(alpha = 0.12f)
             ) {
                 Text(
-                    text = "$eventCount sopralluogh${if (eventCount == 1) "o" else "i"}",
+                    text = if (eventCount == 1) "1 sopralluogo" else "$eventCount sopralluoghi",
                     style = MaterialTheme.typography.labelSmall,
                     color = DavezBordeaux,
                     fontWeight = FontWeight.SemiBold,
