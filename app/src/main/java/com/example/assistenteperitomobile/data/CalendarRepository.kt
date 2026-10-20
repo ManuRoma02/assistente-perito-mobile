@@ -320,11 +320,13 @@ class CalendarRepository(private val context: Context) {
             CalendarContract.Calendars.CALENDAR_COLOR,
             CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL
         )
+        // Seleziona solo calendari visibili e scrivibili (per consentire all'utente di aggiungere/sincronizzare impegni)
+        val selection = "${CalendarContract.Calendars.VISIBLE} = 1 AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ${CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR}"
         try {
             context.contentResolver.query(
                 CalendarContract.Calendars.CONTENT_URI,
                 projection,
-                null,
+                selection,
                 null,
                 "${CalendarContract.Calendars.IS_PRIMARY} DESC, ${CalendarContract.Calendars.ACCOUNT_NAME} ASC"
             )?.use { cursor ->
@@ -337,6 +339,17 @@ class CalendarRepository(private val context: Context) {
                     val color = if (!cursor.isNull(5)) cursor.getInt(5) else null
                     val access = cursor.getInt(6)
                     val canWrite = access >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR
+
+                    // Escludi calendari spazzatura / pseudo-calendari contatti come compleanni Samsung/Google o festività
+                    val isJunkOrBirthday = accountType.equals("local.samsungbirthday", ignoreCase = true) ||
+                        accountType.contains("birthday", ignoreCase = true) ||
+                        displayName.contains("birthday", ignoreCase = true) ||
+                        displayName.contains("compleann", ignoreCase = true) ||
+                        displayName.contains("date importanti", ignoreCase = true) ||
+                        displayName.contains("holiday", ignoreCase = true) ||
+                        displayName.contains("festivit", ignoreCase = true)
+                    if (isJunkOrBirthday) continue
+
                     list.add(
                         SystemCalendarInfo(
                             id = id,
@@ -352,6 +365,53 @@ class CalendarRepository(private val context: Context) {
             }
         } catch (_: Throwable) {
         }
+
+        // Se nessun calendario scrivibile è stato trovato, esegui fallback sui calendari visibili
+        if (list.isEmpty()) {
+            try {
+                context.contentResolver.query(
+                    CalendarContract.Calendars.CONTENT_URI,
+                    projection,
+                    "${CalendarContract.Calendars.VISIBLE} = 1",
+                    null,
+                    "${CalendarContract.Calendars.IS_PRIMARY} DESC, ${CalendarContract.Calendars.ACCOUNT_NAME} ASC"
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(0)
+                        val displayName = cursor.getString(1) ?: "Calendario $id"
+                        val accountName = cursor.getString(2) ?: ""
+                        val accountType = cursor.getString(3) ?: ""
+                        val isPrimary = cursor.getInt(4) == 1
+                        val color = if (!cursor.isNull(5)) cursor.getInt(5) else null
+                        val access = cursor.getInt(6)
+                        val canWrite = access >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR
+
+                        val isJunkOrBirthday = accountType.equals("local.samsungbirthday", ignoreCase = true) ||
+                            accountType.contains("birthday", ignoreCase = true) ||
+                            displayName.contains("birthday", ignoreCase = true) ||
+                            displayName.contains("compleann", ignoreCase = true) ||
+                            displayName.contains("date importanti", ignoreCase = true) ||
+                            displayName.contains("holiday", ignoreCase = true) ||
+                            displayName.contains("festivit", ignoreCase = true)
+                        if (isJunkOrBirthday) continue
+
+                        list.add(
+                            SystemCalendarInfo(
+                                id = id,
+                                name = displayName,
+                                accountName = accountName,
+                                accountType = accountType,
+                                isPrimary = isPrimary,
+                                color = color,
+                                canWrite = canWrite
+                            )
+                        )
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+
         return list
     }
 

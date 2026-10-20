@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 10,
-  "latestVersionName": "1.0.9",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.9/app-release.apk",
-  "releaseNotes": "• Nuove Categorie Dedicate: Aggiunte le categorie richieste 'Unioncasa' (🏠), 'Agenzia Orso' (🐻) e 'Rilievo' (📐), con riconoscimento vocale automatico e chip rapidi nell'Agenda\n• Filtro Account Calendario: Possibilità di selezionare uno specifico account o calendario (es. solo quello dello Studio Tecnico) escludendo gli altri account personali del telefono, con selettore rapido sia nell'Agenda Visiva sia nelle Impostazioni\n• Risolto Download Modello Potenziato (4B): Corretto il nome file e il percorso Hugging Face per Qwen 3.5 4B Instruct Q4_K_M (2.81 GB) con indicatore di velocità in tempo reale (MB/s) e stima del tempo rimanente (ETA)",
+  "latestVersionCode": 11,
+  "latestVersionName": "1.0.10",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.10/app-release.apk",
+  "releaseNotes": "• Layout e Tipografia Responsive per tutti i dispositivi: Risolto bug di schiacciamento verticale del badge 'Principale' su schermi compatti o con font grandi, con vincoli di testo dedicati ed ellissi protetta\n• Pulizia Calendari di Sistema: Esclusi calendari non pertinenti o di sola lettura come 'Date importanti dei contatti' e compleanni Samsung, mostrando solo i calendari operativi\n• Rimozione Testo Duplicato: Sottotitolo pulito e professionale (es. 'Google Calendar' o 'Calendario locale') senza ripetere l'indirizzo email due volte\n• Categorie Unioncasa, Agenzia Orso e Rilievo attive e stabili",
   "mandatory": false,
-  "publishedAt": "2026-10-20T14:40:00Z"
+  "publishedAt": "2026-10-20T18:30:00Z"
 }
