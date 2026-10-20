@@ -3,6 +3,7 @@ package com.example.assistenteperitomobile
 import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
+import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -490,25 +491,65 @@ class PeritoAiEngineTest {
             id = "qwen35_4b_instruct_q4km",
             roleBadge = "🚀 REASONING POTENZIATO (4B)",
             title = "Qwen 3.5 - 4B Instruct (Potenziato)",
-            subtitle = "Versione 4B ad alta capacità logica per perizie complesse e stime articolate (2.74 GB). Suggerito sulla card: frob/qwen3.5-instruct:4b (Ollama / GGUF).",
-            sizeLabel = "2.74 GB",
-            expectedBytes = 2_942_177_280L,
-            fileName = "Qwen3.5-4B-Q4_K_M.gguf",
-            downloadUrl = "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+            subtitle = "Versione 4B ad alta capacità logica per perizie complesse e stime articolate (2.81 GB). Suggerito sulla card: frob/qwen3.5-instruct:4b (Ollama / GGUF).",
+            sizeLabel = "2.81 GB",
+            expectedBytes = 3_013_027_808L,
+            fileName = "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+            downloadUrl = "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
             isPrimaryReasoning = true,
             suggestedOllamaTag = "frob/qwen3.5-instruct:4b"
         )
         assertEquals("qwen35_4b_instruct_q4km", powerful.id)
         assertEquals("frob/qwen3.5-instruct:4b", powerful.suggestedOllamaTag)
-        assertEquals("Qwen3.5-4B-Q4_K_M.gguf", powerful.fileName)
+        assertEquals("Qwen_Qwen3.5-4B-Q4_K_M.gguf", powerful.fileName)
+        assertEquals("2.81 GB", powerful.sizeLabel)
+        assertEquals(3_013_027_808L, powerful.expectedBytes)
         assertTrue(powerful.isPrimaryReasoning)
 
-        val config = AiEngineConfig(reasoningModelId = "qwen35_4b_instruct_q4km")
+        val config = AiEngineConfig(
+            reasoningModelId = "qwen35_4b_instruct_q4km",
+            selectedCalendarId = 42L,
+            selectedCalendarAccount = "studio@perito.it",
+            selectedCalendarName = "Studio Tecnico"
+        )
         assertEquals("qwen35_4b_instruct_q4km", config.reasoningModelId)
+        assertEquals(42L, config.selectedCalendarId)
+        assertEquals("studio@perito.it", config.selectedCalendarAccount)
+        assertEquals("Studio Tecnico", config.selectedCalendarName)
 
         // Verify zero occurrences of "cantiere" in prompts
         val prompt = engine.buildClassificationPrompt("Documento perizia", refDate, config)
         assertFalse(prompt.lowercase().contains("cantiere"))
+    }
+
+    @Test
+    fun `test category detection for unioncasa agenzia orso and rilievo`() = runTest {
+        // 1. Rilievo Tecnico
+        val rilievoApp = engine.parseAppointment(
+            "Fissa rilievo domani alle 14 in via Roma con Geom. Neri",
+            refNow
+        )
+        assertTrue(rilievoApp.has_appointment)
+        assertEquals("Rilievo", rilievoApp.categoria)
+        assertEquals(PeritoEventCategory.RILIEVO, PeritoEventCategory.fromString(rilievoApp.categoria))
+
+        // 2. Unioncasa
+        val unioncasaApp = engine.parseAppointment(
+            "Incontro con Unioncasa dopodomani alle 10 per perizia",
+            refNow
+        )
+        assertTrue(unioncasaApp.has_appointment)
+        assertEquals("Unioncasa", unioncasaApp.categoria)
+        assertEquals(PeritoEventCategory.UNIONCASA, PeritoEventCategory.fromString("unioncasa"))
+
+        // 3. Agenzia Orso
+        val orsoApp = engine.parseAppointment(
+            "Appuntamento con Agenzia Orso venerdì alle 16",
+            refNow
+        )
+        assertTrue(orsoApp.has_appointment)
+        assertEquals("Agenzia Orso", orsoApp.categoria)
+        assertEquals(PeritoEventCategory.AGENZIA_ORSO, PeritoEventCategory.fromString("agenzia orso"))
     }
 
     @Test

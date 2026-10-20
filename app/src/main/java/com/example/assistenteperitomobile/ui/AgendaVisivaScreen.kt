@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
@@ -251,6 +252,70 @@ fun AgendaVisivaScreen(
                                     fontSize = 11.5.sp
                                 )
                             }
+                        }
+                    }
+                } else {
+                    var showCalendarAccountDialog by remember { mutableStateOf(false) }
+                    if (showCalendarAccountDialog) {
+                        SelectCalendarAccountDialog(
+                            availableCalendars = uiState.availableCalendars,
+                            selectedCalendarId = uiState.aiConfig.selectedCalendarId,
+                            onSelectCalendar = { viewModel.selectSystemCalendar(it) },
+                            onDismiss = { showCalendarAccountDialog = false }
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        onClick = { showCalendarAccountDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        color = AppleWhite,
+                        border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.7f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FilterList,
+                                    contentDescription = null,
+                                    tint = DavezBordeaux,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Account: ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = AppleLabelSecondary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = if (uiState.aiConfig.selectedCalendarName != null) {
+                                        "${uiState.aiConfig.selectedCalendarName} (${uiState.aiConfig.selectedCalendarAccount ?: ""})"
+                                    } else {
+                                        "Tutti gli account"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DavezBordeaux,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Text(
+                                text = "Cambia ▾",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DavezBordeaux,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }

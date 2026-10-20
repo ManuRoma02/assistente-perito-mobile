@@ -122,6 +122,9 @@ enum class PeritoEventCategory(
     val defaultPrefix: String
 ) {
     SOPRALLUOGO("sopralluogo", "Sopralluogo", "🔍", "Sopralluogo"),
+    RILIEVO("rilievo", "Rilievo", "📐", "Rilievo Tecnico"),
+    UNIONCASA("unioncasa", "Unioncasa", "🏠", "Incontro Unioncasa"),
+    AGENZIA_ORSO("agenzia_orso", "Agenzia Orso", "🐻", "Appuntamento Agenzia Orso"),
     COMUNE("comune", "Comune", "🏛️", "Incontro Comune"),
     TRIBUNALE("tribunale", "Tribunale", "⚖️", "Udienza / Tribunale"),
     RIUNIONE("riunione", "Riunione", "🏢", "Riunione Studio"),
@@ -137,17 +140,32 @@ enum class PeritoEventCategory(
                 it.id.equals(norm, ignoreCase = true) ||
                 it.displayName.equals(norm, ignoreCase = true)
             } ?: when {
+                norm.contains("unioncasa") || norm.contains("union casa") -> UNIONCASA
+                norm.contains("agenzia orso") || norm.contains("orso") -> AGENZIA_ORSO
+                norm.contains("riliev") || norm.contains("misuraz") || norm.contains("misure") -> RILIEVO
                 norm.contains("comun") || norm.contains("catast") || norm.contains("ufficio tecnic") || norm.contains("sportello") || norm.contains("edilizia") || norm.contains("accesso atti") -> COMUNE
                 norm.contains("tribunal") || norm.contains("udienz") || norm.contains("giudic") || norm.contains("ctu") || norm.contains("giurament") || norm.contains("cancelleria") -> TRIBUNALE
                 norm.contains("riunion") || norm.contains("studi") || norm.contains("collegh") -> RIUNIONE
                 norm.contains("caff") || norm.contains("pranz") || norm.contains("cen") || norm.contains("aperitiv") || norm.contains("colazion") || norm.contains("person") -> PERSONALE
                 norm.contains("client") || norm.contains("firm") || norm.contains("consegn") -> CLIENTE
-                norm.contains("soprall") || norm.contains("riliev") || norm.contains("periz") || norm.contains("collaud") || norm.contains("visita") -> SOPRALLUOGO
+                norm.contains("soprall") || norm.contains("periz") || norm.contains("collaud") || norm.contains("visita") -> SOPRALLUOGO
                 else -> SOPRALLUOGO
             }
         }
     }
 }
+
+@Immutable
+@Serializable
+data class SystemCalendarInfo(
+    val id: Long,
+    val name: String,
+    val accountName: String,
+    val accountType: String,
+    val isPrimary: Boolean = false,
+    val color: Int? = null,
+    val canWrite: Boolean = true
+)
 
 @Immutable
 @Serializable
@@ -227,6 +245,9 @@ data class AiEngineConfig(
     val morningBriefingEnabled: Boolean = true,
     val hasSeenModelSetupPrompt: Boolean = false,
     val syncSystemCalendar: Boolean = true,
+    val selectedCalendarId: Long? = null,
+    val selectedCalendarAccount: String? = null,
+    val selectedCalendarName: String? = null,
     val otaManifestUrl: String = "https://raw.githubusercontent.com/ManuRoma02/assistente-perito-mobile/main/ota-update.json",
     val autoCheckUpdatesOnStart: Boolean = true,
     val studioProfile: StudioProfile = StudioProfile()

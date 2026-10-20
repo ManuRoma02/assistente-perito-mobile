@@ -46,6 +46,7 @@ data class ModelDownloadProgress(
     val modelTitle: String = "",
     val downloadedBytes: Long = 0L,
     val totalBytes: Long = 0L,
+    val bytesPerSecond: Long = 0L,
     val currentQueueIndex: Int = 0,
     val totalQueueCount: Int = 0,
     val error: String? = null
@@ -55,6 +56,27 @@ data class ModelDownloadProgress(
 
     val progressPercent: Int
         get() = (progressFraction * 100).toInt()
+
+    val speedLabel: String
+        get() {
+            if (bytesPerSecond <= 0L) return ""
+            val mbps = bytesPerSecond / (1024.0 * 1024.0)
+            return String.format(Locale.ITALIAN, "%.1f MB/s", mbps)
+        }
+
+    val etaLabel: String
+        get() {
+            if (bytesPerSecond <= 0L || totalBytes <= downloadedBytes) return ""
+            val remainingBytes = totalBytes - downloadedBytes
+            val seconds = (remainingBytes / bytesPerSecond).coerceAtLeast(1L)
+            return if (seconds < 60) {
+                "~${seconds}s rimanenti"
+            } else {
+                val mins = seconds / 60
+                val secs = seconds % 60
+                "~${mins}m ${secs}s rimanenti"
+            }
+        }
 }
 
 /**
@@ -232,7 +254,7 @@ class ModelDownloadManager(private val context: Context) {
 
     /**
      * Modello Potenziato per il REASONING:
-     * Qwen 3.5 - 4B Instruct in quantizzazione 4-bit Q4_K_M (2.74 GB).
+     * Qwen 3.5 - 4B Instruct in quantizzazione 4-bit Q4_K_M (2.81 GB).
      * Modello a 4 miliardi di parametri per perizie complesse, deduzioni logiche forensi e stime articolate.
      * Versione suggerita per Ollama / GGUF: frob/qwen3.5-instruct:4b.
      */
@@ -240,11 +262,11 @@ class ModelDownloadManager(private val context: Context) {
         id = "qwen35_4b_instruct_q4km",
         roleBadge = "🚀 REASONING POTENZIATO (4B)",
         title = "Qwen 3.5 - 4B Instruct (Potenziato)",
-        subtitle = "Versione 4B ad alta capacità logica per perizie complesse e stime articolate (2.74 GB). Suggerito sulla card: frob/qwen3.5-instruct:4b (Ollama / GGUF).",
-        sizeLabel = "2.74 GB",
-        expectedBytes = 2_942_177_280L,
-        fileName = "Qwen3.5-4B-Q4_K_M.gguf",
-        downloadUrl = "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+        subtitle = "Versione 4B ad alta capacità logica per perizie complesse e stime articolate (2.81 GB). Suggerito sulla card: frob/qwen3.5-instruct:4b (Ollama / GGUF).",
+        sizeLabel = "2.81 GB",
+        expectedBytes = 3_013_027_808L,
+        fileName = "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+        downloadUrl = "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
         isPrimaryReasoning = true,
         suggestedOllamaTag = "frob/qwen3.5-instruct:4b"
     )
@@ -364,7 +386,8 @@ class ModelDownloadManager(private val context: Context) {
         totalBytes: Long,
         queueIndex: Int = 1,
         queueTotal: Int = 1,
-        isFirstStart: Boolean = false
+        isFirstStart: Boolean = false,
+        bytesPerSecond: Long = 0L
     ) {
         runCatching {
             ModelDownloadService.ensureChannels(context)
@@ -377,7 +400,15 @@ class ModelDownloadManager(private val context: Context) {
             val percent = if (totalBytes > 0L) {
                 ((downloadedBytes.toDouble() / totalBytes.toDouble()) * 100.0).toInt().coerceIn(0, 100)
             } else 0
-            val subtitle = "$percent% • $dlMb / $totMb (attivo in background)"
+            val speedPart = if (bytesPerSecond > 0L) {
+                val mbps = bytesPerSecond / (1024.0 * 1024.0)
+                String.format(Locale.ITALIAN, " • %.1f MB/s", mbps)
+            } else ""
+            val etaPart = if (bytesPerSecond > 0L && totalBytes > downloadedBytes) {
+                val remSec = ((totalBytes - downloadedBytes) / bytesPerSecond).coerceAtLeast(1L)
+                if (remSec < 60) " • ~${remSec}s" else " • ~${remSec / 60}m ${remSec % 60}s"
+            } else ""
+            val subtitle = "$percent% • $dlMb / $totMb$speedPart$etaPart"
             val indeterminate = downloadedBytes <= 0L
 
             if (isFirstStart) {
@@ -449,7 +480,7 @@ class ModelDownloadManager(private val context: Context) {
 
     suspend fun downloadModel(
         model: DownloadableAiModel,
-        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit
+        onProgress: (downloadedBytes: Long, totalBytes: Long, bytesPerSecond: Long) -> Unit
     ): File = withContext(Dispatchers.IO) {
         val targetFile = File(modelsDir, model.fileName)
         val tempFile = File(modelsDir, "${model.fileName}.part")
@@ -516,12 +547,13 @@ class ModelDownloadManager(private val context: Context) {
                 if (contentLength > 0L) contentLength else model.expectedBytes
             }
             var downloaded = if (isResume) existingPartBytes else 0L
-            onProgress(downloaded, totalBytes)
+            onProgress(downloaded, totalBytes, 0L)
 
             activeConn.inputStream.use { input ->
                 FileOutputStream(tempFile, isResume).use { output ->
                     val buffer = ByteArray(256 * 1024)
                     var lastReportTimeMs = SystemClock.elapsedRealtime()
+                    var lastReportBytes = downloaded
                     while (true) {
                         coroutineContext.ensureActive()
                         val read = input.read(buffer)
@@ -529,10 +561,13 @@ class ModelDownloadManager(private val context: Context) {
                         output.write(buffer, 0, read)
                         downloaded += read
                         val nowMs = SystemClock.elapsedRealtime()
+                        val deltaMs = nowMs - lastReportTimeMs
                         // Throttle a 350ms per evitare ricomposizioni eccessive della UI durante lo scroll
-                        if (nowMs - lastReportTimeMs >= 350L || downloaded >= totalBytes) {
+                        if (deltaMs >= 350L || downloaded >= totalBytes) {
+                            val speed = if (deltaMs > 0) ((downloaded - lastReportBytes) * 1000L) / deltaMs else 0L
                             lastReportTimeMs = nowMs
-                            onProgress(downloaded, totalBytes)
+                            lastReportBytes = downloaded
+                            onProgress(downloaded, totalBytes, speed)
                         }
                     }
                     output.flush()

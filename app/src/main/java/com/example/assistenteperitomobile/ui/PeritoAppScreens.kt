@@ -153,6 +153,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.assistenteperitomobile.domain.MainAppTab
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.StudioProfile
+import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -5080,6 +5081,16 @@ fun AiEngineSettingsSheetContent(
     var editedManifestUrl by rememberSaveable(uiState.aiConfig.otaManifestUrl) {
         mutableStateOf(uiState.aiConfig.otaManifestUrl)
     }
+    var showCalendarAccountDialog by remember { mutableStateOf(false) }
+
+    if (showCalendarAccountDialog) {
+        SelectCalendarAccountDialog(
+            availableCalendars = uiState.availableCalendars,
+            selectedCalendarId = uiState.aiConfig.selectedCalendarId,
+            onSelectCalendar = { viewModel.selectSystemCalendar(it) },
+            onDismiss = { showCalendarAccountDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -5405,6 +5416,55 @@ fun AiEngineSettingsSheetContent(
                                         )
                                         Spacer(Modifier.width(4.dp))
                                         Text("Collega", fontSize = 12.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Selettore Account / Calendario specifico
+                        val isCalendarSyncActive = uiState.hasCalendarPermission && uiState.aiConfig.syncSystemCalendar
+                        if (isCalendarSyncActive) {
+                            Surface(
+                                onClick = { showCalendarAccountDialog = true },
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppleWhite,
+                                border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "🎯 Account Calendario Sincronizzato",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = AppleLabelPrimary
+                                        )
+                                        Text(
+                                            text = if (uiState.aiConfig.selectedCalendarName != null) {
+                                                "${uiState.aiConfig.selectedCalendarName} (${uiState.aiConfig.selectedCalendarAccount ?: ""})"
+                                            } else {
+                                                "Tutti gli account (sincronizzazione globale)"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = DavezBordeaux,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    OutlinedButton(
+                                        onClick = { showCalendarAccountDialog = true },
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(0.8.dp, DavezStoneBorder),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Text("Cambia", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleLabelPrimary)
                                     }
                                 }
                             }
@@ -7102,6 +7162,195 @@ fun AppUpdateDialog(
             }
         }
     }
+}
+
+/**
+ * Dialog per la selezione dell'account di calendario sincronizzato.
+ * Consente al perito di scegliere un singolo calendario specifico (es. Studio Tecnico)
+ * oppure sincronizzare tutti gli account rilevati sul telefono.
+ */
+@Composable
+fun SelectCalendarAccountDialog(
+    availableCalendars: List<SystemCalendarInfo>,
+    selectedCalendarId: Long?,
+    onSelectCalendar: (SystemCalendarInfo?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = DavezBordeaux,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "Filtro Account Calendario",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppleLabelPrimary
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Scegli da quale account visualizzare e sincronizzare gli appuntamenti (es. account dello Studio Tecnico), escludendo gli altri account personali del telefono.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppleLabelSecondary
+                )
+
+                // Opzione 1: Tutti gli account
+                val isAllSelected = selectedCalendarId == null
+                Surface(
+                    onClick = {
+                        onSelectCalendar(null)
+                        onDismiss()
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isAllSelected) AppleBlueSoft else AppleWhite,
+                    border = BorderStroke(
+                        if (isAllSelected) 1.5.dp else 0.5.dp,
+                        if (isAllSelected) DavezBordeaux else DavezStoneBorder
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🌐 Tutti gli account del telefono",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isAllSelected) DavezBordeaux else AppleLabelPrimary
+                            )
+                            Text(
+                                text = "Mostra impegni da qualsiasi calendario configurato",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppleLabelSecondary
+                            )
+                        }
+                        if (isAllSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = DavezBordeaux,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Opzioni per ogni calendario rilevato
+                if (availableCalendars.isEmpty()) {
+                    Text(
+                        text = "Nessun calendario di sistema rilevato o permessi non concessi.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppleLabelSecondary,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                } else {
+                    availableCalendars.forEach { cal ->
+                        val isSelected = selectedCalendarId == cal.id
+                        Surface(
+                            onClick = {
+                                onSelectCalendar(cal)
+                                onDismiss()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) AppleBlueSoft else AppleWhite,
+                            border = BorderStroke(
+                                if (isSelected) 1.5.dp else 0.5.dp,
+                                if (isSelected) DavezBordeaux else DavezStoneBorder
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(cal.color?.let { Color(it) } ?: DavezBordeaux)
+                                    )
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = cal.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) DavezBordeaux else AppleLabelPrimary
+                                            )
+                                            if (cal.isPrimary) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = Color(0xFFE8F5E9)
+                                                ) {
+                                                    Text(
+                                                        text = "Principale",
+                                                        fontSize = 10.sp,
+                                                        color = Color(0xFF2E7D32),
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            text = cal.accountName.ifBlank { "Account locale" },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = AppleLabelSecondary
+                                        )
+                                    }
+                                }
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = DavezBordeaux,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Chiudi", color = DavezBordeaux, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 
