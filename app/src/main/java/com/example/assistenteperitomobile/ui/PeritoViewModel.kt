@@ -38,6 +38,7 @@ import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.StudioProfile
+import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +79,7 @@ data class PeritoUiState(
     val processingLabel: String = "",
     val hasCalendarPermission: Boolean = false,
     val hasNativeCalendarPermission: Boolean = false,
+    val availableCalendars: List<SystemCalendarInfo> = emptyList(),
     val aiConfig: AiEngineConfig = AiEngineConfig(),
     val statusBanner: String? = null,
     val showFirstRunModelDialog: Boolean = false,
@@ -151,6 +153,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
         val studioName = loadedConfig.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
         calendarRepo.isSyncEnabled = loadedConfig.syncSystemCalendar
+        calendarRepo.selectedCalendarId = loadedConfig.selectedCalendarId
 
         val vName = otaUpdateManager.getCurrentVersionName()
         val vCode = otaUpdateManager.getCurrentVersionCode()
@@ -221,6 +224,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
             // Sincronizzazione preferenza utente con CalendarRepository
             calendarRepo.isSyncEnabled = _uiState.value.aiConfig.syncSystemCalendar
+            calendarRepo.selectedCalendarId = _uiState.value.aiConfig.selectedCalendarId
+
+            val availableCals = if (calendarRepo.hasNativeCalendarPermissions()) {
+                calendarRepo.getAvailableCalendars()
+            } else emptyList()
 
             // Singola query IPC al Calendar Provider invece di 3 roundtrip separati
             val allEventsInRange = calendarRepo.getEventsInRange(startOfTodayMillis, rangeEndMillis)
@@ -248,6 +256,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     upcomingEvents = next30Days,
                     hasCalendarPermission = calendarRepo.hasCalendarPermissions(),
                     hasNativeCalendarPermission = calendarRepo.hasNativeCalendarPermissions(),
+                    availableCalendars = availableCals,
                     downloadedModelIds = computeDownloadedModelIds(),
                     isReasoningReady = reasoningReady,
                     areAllModelsReady = allReady
@@ -293,6 +302,31 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 hasCalendarPermission = calendarRepo.hasCalendarPermissions(),
                 hasNativeCalendarPermission = calendarRepo.hasNativeCalendarPermissions(),
                 statusBanner = "Calendario di sistema ricollegato"
+            )
+        }
+        refreshAllData()
+    }
+
+    /**
+     * Seleziona uno specifico account/calendario di sistema (es. Studio Tecnico o Personale)
+     * oppure imposta null per sincronizzare tutti i calendari rilevati sul dispositivo.
+     */
+    fun selectSystemCalendar(calendar: SystemCalendarInfo?) {
+        val updated = _uiState.value.aiConfig.copy(
+            selectedCalendarId = calendar?.id,
+            selectedCalendarAccount = calendar?.accountName,
+            selectedCalendarName = calendar?.name
+        )
+        calendarRepo.selectedCalendarId = calendar?.id
+        saveConfig(updated)
+        _uiState.update {
+            it.copy(
+                aiConfig = updated,
+                statusBanner = if (calendar != null) {
+                    "📅 Sincronizzazione impostata su: ${calendar.name} (${calendar.accountName})"
+                } else {
+                    "📅 Sincronizzazione attiva con: Tutti gli account"
+                }
             )
         }
         refreshAllData()
@@ -2050,12 +2084,13 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         queueTotal = missing.size,
                         isFirstStart = (idx == 0)
                     )
-                    val downloadedFile = modelDownloadManager.downloadModel(model) { readBytes, totalBytes ->
+                    val downloadedFile = modelDownloadManager.downloadModel(model) { readBytes, totalBytes, speedBytes ->
                         _uiState.update { state ->
                             state.copy(
                                 downloadProgress = state.downloadProgress.copy(
                                     downloadedBytes = readBytes,
-                                    totalBytes = totalBytes
+                                    totalBytes = totalBytes,
+                                    bytesPerSecond = speedBytes
                                 )
                             )
                         }
@@ -2065,7 +2100,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                             totalBytes = totalBytes,
                             queueIndex = idx + 1,
                             queueTotal = missing.size,
-                            isFirstStart = false
+                            isFirstStart = false,
+                            bytesPerSecond = speedBytes
                         )
                     }
                     if (model.isPrimaryReasoning) {
@@ -2169,12 +2205,13 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 isFirstStart = true
             )
             try {
-                val downloadedFile = modelDownloadManager.downloadModel(model) { readBytes, totalBytes ->
+                val downloadedFile = modelDownloadManager.downloadModel(model) { readBytes, totalBytes, speedBytes ->
                     _uiState.update { state ->
                         state.copy(
                             downloadProgress = state.downloadProgress.copy(
                                 downloadedBytes = readBytes,
-                                totalBytes = totalBytes
+                                totalBytes = totalBytes,
+                                bytesPerSecond = speedBytes
                             )
                         )
                     }
@@ -2184,7 +2221,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         totalBytes = totalBytes,
                         queueIndex = 1,
                         queueTotal = 1,
-                        isFirstStart = false
+                        isFirstStart = false,
+                        bytesPerSecond = speedBytes
                     )
                 }
 

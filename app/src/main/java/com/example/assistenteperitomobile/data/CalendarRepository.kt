@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.CalendarEventItem
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,6 +43,7 @@ class CalendarRepository(private val context: Context) {
     private val isoFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
     var isSyncEnabled: Boolean = true
+    var selectedCalendarId: Long? = null
 
     fun hasNativeCalendarPermissions(): Boolean {
         val read = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
@@ -302,7 +304,59 @@ class CalendarRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Elenca tutti i calendari rilevati sul dispositivo (Google Workspace, Gmail, Exchange, Locale)
+     * per consentire all'utente di selezionare solo il calendario professionale/studio desiderato.
+     */
+    fun getAvailableCalendars(): List<SystemCalendarInfo> {
+        if (!hasNativeCalendarPermissions()) return emptyList()
+        val list = mutableListOf<SystemCalendarInfo>()
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.ACCOUNT_TYPE,
+            CalendarContract.Calendars.IS_PRIMARY,
+            CalendarContract.Calendars.CALENDAR_COLOR,
+            CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL
+        )
+        try {
+            context.contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI,
+                projection,
+                null,
+                null,
+                "${CalendarContract.Calendars.IS_PRIMARY} DESC, ${CalendarContract.Calendars.ACCOUNT_NAME} ASC"
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val displayName = cursor.getString(1) ?: "Calendario $id"
+                    val accountName = cursor.getString(2) ?: ""
+                    val accountType = cursor.getString(3) ?: ""
+                    val isPrimary = cursor.getInt(4) == 1
+                    val color = if (!cursor.isNull(5)) cursor.getInt(5) else null
+                    val access = cursor.getInt(6)
+                    val canWrite = access >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR
+                    list.add(
+                        SystemCalendarInfo(
+                            id = id,
+                            name = displayName,
+                            accountName = accountName,
+                            accountType = accountType,
+                            isPrimary = isPrimary,
+                            color = color,
+                            canWrite = canWrite
+                        )
+                    )
+                }
+            }
+        } catch (_: Throwable) {
+        }
+        return list
+    }
+
     private fun findWritableCalendarId(): Long? {
+        val targetId = selectedCalendarId
         val projection = arrayOf(
             CalendarContract.Calendars._ID,
             CalendarContract.Calendars.IS_PRIMARY,
@@ -310,6 +364,7 @@ class CalendarRepository(private val context: Context) {
         )
         return try {
             var fallbackId: Long? = null
+            var matchedSelectedId: Long? = null
             context.contentResolver.query(
                 CalendarContract.Calendars.CONTENT_URI,
                 projection,
@@ -322,12 +377,19 @@ class CalendarRepository(private val context: Context) {
                     val isPrimary = cursor.getInt(1) == 1
                     val access = cursor.getInt(2)
                     if (access >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR) {
-                        if (isPrimary) return id
-                        if (fallbackId == null) fallbackId = id
+                        if (targetId != null && id == targetId) {
+                            matchedSelectedId = id
+                            break
+                        }
+                        if (isPrimary && fallbackId == null) {
+                            fallbackId = id
+                        } else if (fallbackId == null) {
+                            fallbackId = id
+                        }
                     }
                 }
             }
-            fallbackId
+            matchedSelectedId ?: fallbackId
         } catch (_: SecurityException) {
             null
         } catch (_: Throwable) {
@@ -382,8 +444,16 @@ class CalendarRepository(private val context: Context) {
             CalendarContract.Events.EVENT_LOCATION,
             CalendarContract.Events.DESCRIPTION
         )
-        val selection = "${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DTEND} >= ? AND ${CalendarContract.Events.DELETED} = 0"
-        val selectionArgs = arrayOf(maxMillis.toString(), minMillis.toString())
+        val targetCalId = selectedCalendarId
+        val selection: String
+        val selectionArgs: Array<String>
+        if (targetCalId != null) {
+            selection = "${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DTEND} >= ? AND ${CalendarContract.Events.DELETED} = 0 AND ${CalendarContract.Events.CALENDAR_ID} = ?"
+            selectionArgs = arrayOf(maxMillis.toString(), minMillis.toString(), targetCalId.toString())
+        } else {
+            selection = "${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DTEND} >= ? AND ${CalendarContract.Events.DELETED} = 0"
+            selectionArgs = arrayOf(maxMillis.toString(), minMillis.toString())
+        }
 
         try {
             val zone = ZoneId.systemDefault()

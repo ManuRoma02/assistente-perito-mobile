@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 9,
-  "latestVersionName": "1.0.8",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.8/app-release.apk",
-  "releaseNotes": "• Modifica Categoria Evento in Agenda & Dialogo: Possibilità di visualizzare e cambiare la categoria dell'evento (🔍 Sopralluogo, 🏛️ Comune, ⚖️ Tribunale, 🏢 Riunione, 👤 Cliente, ☕ Personale, 📅 Altro) con chip dedicati e modifica diretta di Titolo e Note\n• Note Calendario Pulite & Discrete: Eliminata l'iniezione automatica di 'Cliente: ... / Con: ...' o dell'intero prompt vocale nella descrizione del calendario di sistema Android/Google; il campo note ora contiene esclusivamente le annotazioni esplicitamente fornite dall'utente\n• Rilevamento Intelligente Interlocutore: Esclusione delle parole istituzionali ('comune', 'catasto', 'tribunale') dall'essere erroneamente etichettate come nome del cliente sotto il titolo\n• Comandi Naturali in Chat: Possibilità di dire 'cambia la categoria in comune' o 'è in tribunale' per aggiornare istantaneamente l'evento in corso\n• Selezione Data Flessibile: Aggiunto DatePickerDialog nativo nel dialogo di modifica per scegliere qualsiasi giorno oltre a oggi e domani",
+  "latestVersionCode": 10,
+  "latestVersionName": "1.0.9",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.9/app-release.apk",
+  "releaseNotes": "• Nuove Categorie Dedicate: Aggiunte le categorie richieste 'Unioncasa' (🏠), 'Agenzia Orso' (🐻) e 'Rilievo' (📐), con riconoscimento vocale automatico e chip rapidi nell'Agenda\n• Filtro Account Calendario: Possibilità di selezionare uno specifico account o calendario (es. solo quello dello Studio Tecnico) escludendo gli altri account personali del telefono, con selettore rapido sia nell'Agenda Visiva sia nelle Impostazioni\n• Risolto Download Modello Potenziato (4B): Corretto il nome file e il percorso Hugging Face per Qwen 3.5 4B Instruct Q4_K_M (2.81 GB) con indicatore di velocità in tempo reale (MB/s) e stima del tempo rimanente (ETA)",
   "mandatory": false,
-  "publishedAt": "2026-10-19T14:40:00Z"
+  "publishedAt": "2026-10-20T14:40:00Z"
 }

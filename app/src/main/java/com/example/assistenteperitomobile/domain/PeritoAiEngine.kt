@@ -52,18 +52,21 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         val candidateFile: File? = run {
             val modelsDir = File(ctx.filesDir, "models")
-            val target4b = File(modelsDir, "Qwen3.5-4B-Q4_K_M.gguf")
+            val target4b = File(modelsDir, "Qwen_Qwen3.5-4B-Q4_K_M.gguf")
+            val target4bLegacy = File(modelsDir, "Qwen3.5-4B-Q4_K_M.gguf")
             val target2b = File(modelsDir, "Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT.i1-Q4_K_M.gguf")
 
             // Priorità 1: Modello attivamente selezionato dall'utente
             if (config.reasoningModelId == "qwen35_4b_instruct_q4km") {
                 if (target4b.exists() && target4b.length() > 10_000_000L) return@run target4b
+                if (target4bLegacy.exists() && target4bLegacy.length() > 10_000_000L) return@run target4bLegacy
             } else {
                 if (target2b.exists() && target2b.length() > 10_000_000L) return@run target2b
             }
 
             // Priorità 2: Fallback intelligente su qualsiasi versione di Qwen scaricata
             if (target4b.exists() && target4b.length() > 10_000_000L) return@run target4b
+            if (target4bLegacy.exists() && target4bLegacy.length() > 10_000_000L) return@run target4bLegacy
             if (target2b.exists() && target2b.length() > 10_000_000L) return@run target2b
 
             if (config.mediaPipeModelPath.isNotBlank()) {
@@ -563,17 +566,26 @@ class PeritoAiEngine(private val context: Context? = null) {
             ?: "Cliente"
 
         val detectedCat = when {
+            lower.contains("unioncasa") || lower.contains("union casa") -> PeritoEventCategory.UNIONCASA
+            lower.contains("agenzia orso") || lower.contains("orso") -> PeritoEventCategory.AGENZIA_ORSO
+            lower.contains("rilievo") || lower.contains("rilievi") || lower.contains("misuraz") -> PeritoEventCategory.RILIEVO
             lower.contains("comune") || lower.contains("catasto") || lower.contains("ufficio tecnico") || lower.contains("accesso atti") || lower.contains("accesso agli atti") || lower.contains("sportello unico") || lower.contains("edilizia privata") -> PeritoEventCategory.COMUNE
             lower.contains("udienza") || lower.contains("tribunale") || lower.contains("giuramento") || lower.contains("giudice") || lower.contains("cancelleria") || lower.contains("ctu") -> PeritoEventCategory.TRIBUNALE
             lower.contains("riunione") || lower.contains("studio") -> PeritoEventCategory.RIUNIONE
             lower.contains("colazione") || lower.contains("pranzo") || lower.contains("cena") || lower.contains("caffè") || lower.contains("caffe") || lower.contains("aperitivo") -> PeritoEventCategory.PERSONALE
             lower.contains("chiamata") || lower.contains("telefonata") || lower.contains("videochiamata") || lower.contains("call") || lower.contains("zoom") || lower.contains("meet") || lower.contains("teams") -> PeritoEventCategory.CLIENTE
             lower.contains("firma") || lower.contains("firmare") || lower.contains("consegna") -> PeritoEventCategory.CLIENTE
-            lower.contains("sopralluogo") || lower.contains("rilievo") || lower.contains("perizia") || lower.contains("collaudo") || lower.contains("visita") -> PeritoEventCategory.SOPRALLUOGO
+            lower.contains("sopralluogo") || lower.contains("perizia") || lower.contains("collaudo") || lower.contains("visita") -> PeritoEventCategory.SOPRALLUOGO
             else -> PeritoEventCategory.SOPRALLUOGO
         }
 
         val activityType = when (detectedCat) {
+            PeritoEventCategory.UNIONCASA -> "Incontro Unioncasa"
+            PeritoEventCategory.AGENZIA_ORSO -> "Appuntamento Agenzia Orso"
+            PeritoEventCategory.RILIEVO -> when {
+                lower.contains("misure") || lower.contains("misuraz") -> "Misurazioni e Rilievo"
+                else -> "Rilievo Tecnico"
+            }
             PeritoEventCategory.COMUNE -> when {
                 lower.contains("catasto") -> "Catasto"
                 lower.contains("accesso") -> "Accesso Atti"
@@ -599,7 +611,6 @@ class PeritoAiEngine(private val context: Context? = null) {
                 else -> "Appuntamento"
             }
             PeritoEventCategory.SOPRALLUOGO -> when {
-                lower.contains("rilievo") -> "Rilievo Tecnico"
                 lower.contains("collaudo") -> "Collaudo Tecnico"
                 lower.contains("perizia") -> "Perizia"
                 else -> "Sopralluogo"
