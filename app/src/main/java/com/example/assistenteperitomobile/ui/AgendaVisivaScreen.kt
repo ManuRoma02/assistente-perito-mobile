@@ -584,8 +584,8 @@ fun NextWeekExpandableEventCard(
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         animationSpec = spring(
-            dampingRatio = 0.82f,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = 0.65f,
+            stiffness = Spring.StiffnessMediumLow
         ),
         label = "next_week_chevron_rot"
     )
@@ -618,14 +618,14 @@ fun NextWeekExpandableEventCard(
             if (isExpanded) 1.dp else 0.5.dp,
             if (isExpanded) AppleBlueDark.copy(alpha = 0.45f) else DavezStoneBorder
         ),
-        shadowElevation = if (isExpanded) 1.5.dp else 0.5.dp,
+        shadowElevation = if (isExpanded) 2.dp else 0.5.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .emilPressScale(interactionSource, pressedScale = 0.985f)
+            .cartoonPressSquash(interactionSource, pressedScaleY = 0.97f, squashScaleX = 1.015f)
             .animateContentSize(
                 animationSpec = spring(
-                    dampingRatio = 0.82f,
-                    stiffness = Spring.StiffnessMedium
+                    dampingRatio = 0.72f,
+                    stiffness = Spring.StiffnessMediumLow
                 )
             )
     ) {

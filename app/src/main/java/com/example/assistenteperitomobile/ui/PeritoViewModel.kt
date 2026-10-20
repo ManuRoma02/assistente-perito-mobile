@@ -67,6 +67,7 @@ import java.util.UUID
 data class PeritoUiState(
     val selectedTab: MainAppTab = MainAppTab.CHAT,
     val messages: List<ChatMessage> = emptyList(),
+    val isClearingHistory: Boolean = false,
     val fascicoli: List<Fascicolo> = emptyList(),
     val selectedFascicoloId: String? = null,
     val archivedDocuments: List<ArchivedDocument> = emptyList(),
@@ -1865,6 +1866,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearChatHistory() {
         viewModelScope.launch {
+            // Trigger cartoonish vaporize/dissolve animation across all message bubbles
+            _uiState.update { it.copy(isClearingHistory = true) }
+            kotlinx.coroutines.delay(420L)
             chatHistoryRepo.clearHistory()
             val studio = _uiState.value.aiConfig.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
             val freshMsg = ChatMessage(
@@ -1873,7 +1877,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 text = "🧹 **Cronologia ripulita.**\n\nPronto per un nuovo sopralluogo o documento per lo studio **$studio**."
             )
             chatHistoryRepo.saveMessages(listOf(freshMsg))
-            _uiState.update { it.copy(messages = listOf(freshMsg)) }
+            _uiState.update { it.copy(messages = listOf(freshMsg), isClearingHistory = false) }
         }
     }
 

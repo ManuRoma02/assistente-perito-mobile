@@ -310,6 +310,44 @@ fun Modifier.emilPressScale(
     }
 }
 
+/**
+ * 12 Disney Principles + Emil Kowalski Physics: Cartoon Squash-and-Stretch (/emilkowalski-animation).
+ * Squashes vertically (scaleY < 1f) and expands horizontally (scaleX > 1f) on press,
+ * then overshoots with an elastic cartoon bounce on release on the GPU graphicsLayer.
+ */
+fun Modifier.cartoonPressSquash(
+    interactionSource: InteractionSource,
+    pressedScaleY: Float = 0.92f,
+    squashScaleX: Float = 1.05f
+): Modifier = composed {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    val scaleY by animateFloatAsState(
+        targetValue = if (isPressed) pressedScaleY else 1f,
+        animationSpec = if (animationsEnabled) {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        } else snap(),
+        label = "cartoon_squash_y"
+    )
+    val scaleX by animateFloatAsState(
+        targetValue = if (isPressed) squashScaleX else 1f,
+        animationSpec = if (animationsEnabled) {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        } else snap(),
+        label = "cartoon_squash_x"
+    )
+    this.graphicsLayer {
+        this.scaleX = scaleX
+        this.scaleY = scaleY
+    }
+}
+
 // =============================================================================
 // 2. 3D PERSPECTIVE NEURAL ORB & ARCHITECTURAL PRISM (/threejs + davez Palette)
 // Real-time 60fps 3D scene graph with Fibonacci sphere nodes, isometric house
@@ -1216,7 +1254,7 @@ fun UnifiedStudioBottomBar(
                             shadowElevation = 1.5.dp,
                             modifier = Modifier
                                 .size(44.dp)
-                                .emilPressScale(attachInteraction, pressedScale = 0.92f)
+                                .cartoonPressSquash(attachInteraction, pressedScaleY = 0.90f, squashScaleX = 1.08f)
                                 .semantics {
                                     contentDescription = "Azioni e allegati"
                                     testTag = "chat_attach_button"
@@ -1313,7 +1351,7 @@ fun UnifiedStudioBottomBar(
                             shadowElevation = 2.5.dp,
                             modifier = Modifier
                                 .size(44.dp)
-                                .emilPressScale(sendInteraction, pressedScale = 0.90f)
+                                .cartoonPressSquash(sendInteraction, pressedScaleY = 0.88f, squashScaleX = 1.08f)
                                 .semantics {
                                     contentDescription = if (hasText) "Invia messaggio" else "Detta nota vocale"
                                     testTag = if (hasText) "chat_send_button" else "chat_mic_button"
@@ -1473,6 +1511,15 @@ fun LiquidFluidTabDock(
                 val chatFraction = (1f - currentProgress).coerceIn(0f, 1f)
                 val chatColor = lerp(AppleLabelSecondary, DavezBordeaux, chatFraction)
                 val chatInteraction = remember { MutableInteractionSource() }
+                val isChatSelected = selectedTab == MainAppTab.CHAT
+                val chatIconBounce by animateFloatAsState(
+                    targetValue = if (isChatSelected) 1.16f else 1.0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "chat_tab_bounce"
+                )
 
                 Box(
                     modifier = Modifier
@@ -1486,7 +1533,7 @@ fun LiquidFluidTabDock(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSelectTab(MainAppTab.CHAT)
                         }
-                        .emilPressScale(chatInteraction, pressedScale = 0.97f),
+                        .cartoonPressSquash(chatInteraction, pressedScaleY = 0.93f, squashScaleX = 1.03f),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -1497,7 +1544,12 @@ fun LiquidFluidTabDock(
                             imageVector = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
                             contentDescription = "Assistente",
                             tint = chatColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier
+                                .size(16.dp)
+                                .graphicsLayer {
+                                    scaleX = chatIconBounce
+                                    scaleY = chatIconBounce
+                                }
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -1516,6 +1568,23 @@ fun LiquidFluidTabDock(
                 val agendaFraction = currentProgress.coerceIn(0f, 1f)
                 val agendaColor = lerp(AppleLabelSecondary, DavezBordeaux, agendaFraction)
                 val agendaInteraction = remember { MutableInteractionSource() }
+                val isAgendaSelected = selectedTab == MainAppTab.AGENDA
+                val agendaIconBounce by animateFloatAsState(
+                    targetValue = if (isAgendaSelected) 1.16f else 1.0f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "agenda_tab_bounce"
+                )
+                val badgeScale by animateFloatAsState(
+                    targetValue = if (agendaCount > 0) 1.0f else 0f,
+                    animationSpec = spring(
+                        dampingRatio = 0.52f,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "agenda_badge_scale"
+                )
 
                 Box(
                     modifier = Modifier
@@ -1529,7 +1598,7 @@ fun LiquidFluidTabDock(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSelectTab(MainAppTab.AGENDA)
                         }
-                        .emilPressScale(agendaInteraction, pressedScale = 0.97f),
+                        .cartoonPressSquash(agendaInteraction, pressedScaleY = 0.93f, squashScaleX = 1.03f),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -1540,7 +1609,12 @@ fun LiquidFluidTabDock(
                             imageVector = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
                             contentDescription = "Agenda",
                             tint = agendaColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier
+                                .size(16.dp)
+                                .graphicsLayer {
+                                    scaleX = agendaIconBounce
+                                    scaleY = agendaIconBounce
+                                }
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -1557,7 +1631,12 @@ fun LiquidFluidTabDock(
                             Surface(
                                 shape = CircleShape,
                                 color = lerp(DavezBordeaux.copy(alpha = 0.16f), DavezBordeaux, agendaFraction),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .graphicsLayer {
+                                        scaleX = badgeScale
+                                        scaleY = badgeScale
+                                    }
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
@@ -1916,7 +1995,19 @@ private fun HeroActionBentoCard(
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
     val haptic = LocalHapticFeedback.current
+
+    // Cartoonish icon bounce when pressed
+    val iconBounce by animateFloatAsState(
+        targetValue = if (isPressed) 0.84f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "bento_icon_bounce"
+    )
+
     Surface(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1926,7 +2017,7 @@ private fun HeroActionBentoCard(
         shape = RoundedCornerShape(14.dp),
         color = DavezAlabaster,
         border = BorderStroke(0.6.dp, DavezStoneBorder),
-        modifier = modifier.emilPressScale(interactionSource, pressedScale = 0.96f)
+        modifier = modifier.cartoonPressSquash(interactionSource, pressedScaleY = 0.92f, squashScaleX = 1.05f)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
@@ -1937,7 +2028,11 @@ private fun HeroActionBentoCard(
                     .size(28.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(AppleWhite)
-                    .border(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                    .border(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .graphicsLayer {
+                        scaleX = iconBounce
+                        scaleY = iconBounce
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -1972,6 +2067,19 @@ private fun HeroActionBentoCard(
 // =============================================================================
 @Composable
 fun AgenticThinkingBubble(label: String) {
+    val infiniteTransition = rememberInfiniteTransition(label = "thinking_orb_breathe")
+    val breathePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2.0 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "breathe_phase"
+    )
+    val breatheScaleX = 1f + sin(breathePhase) * 0.025f
+    val breatheScaleY = 1f - sin(breathePhase) * 0.025f
+
     Surface(
         shape = RoundedCornerShape(
             topStart = 22.dp,
@@ -1983,6 +2091,10 @@ fun AgenticThinkingBubble(label: String) {
         border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.25f)),
         modifier = Modifier
             .widthIn(min = 180.dp, max = 330.dp)
+            .graphicsLayer {
+                scaleX = breatheScaleX
+                scaleY = breatheScaleY
+            }
             .semantics { testTag = "agentic_thinking_bubble" }
     ) {
         Row(
@@ -2071,15 +2183,23 @@ fun PeritoStudioChatScreen(
             items(uiState.messages, key = { it.id }) { msg ->
                 Box(
                     modifier = Modifier.animateItem(
-                        fadeInSpec = tween(durationMillis = 200),
-                        placementSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
+                        fadeInSpec = spring(
+                            dampingRatio = 0.62f,
                             stiffness = Spring.StiffnessMediumLow
+                        ),
+                        placementSpec = spring(
+                            dampingRatio = 0.72f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        fadeOutSpec = spring(
+                            dampingRatio = 0.65f,
+                            stiffness = Spring.StiffnessMedium
                         )
                     )
                 ) {
                     PeritoStudioMessageBubble(
                         message = msg,
+                        isClearingHistory = uiState.isClearingHistory,
                         viewModel = viewModel,
                         onOpenDocument = { doc ->
                             viewModel.archiveRepo.createShareOrOpenIntent(doc, asShare = false)?.let {
@@ -3862,6 +3982,7 @@ fun PeritoQuickPill(
 @Composable
 fun PeritoStudioMessageBubble(
     message: ChatMessage,
+    isClearingHistory: Boolean = false,
     viewModel: PeritoViewModel,
     onOpenDocument: (ArchivedDocument) -> Unit,
     onShareDocument: (ArchivedDocument) -> Unit,
@@ -3887,15 +4008,22 @@ fun PeritoStudioMessageBubble(
         )
     }
 
-    // Emil Kowalski rule: Never scale from 0f! Subtle 0.94f -> 1f entrance on GPU layer.
-    val entranceProgress = remember(message.id) { Animatable(0.94f) }
+    // Cartoonish Dissolve / Vaporize transition on Clear Chat History
+    val dissolveProgress by animateFloatAsState(
+        targetValue = if (isClearingHistory) 1f else 0f,
+        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        label = "dissolve_vaporize"
+    )
+
+    // Emil Kowalski Cartoon Physics: Bouncy spring entrance from 0.82f on GPU layer
+    val entranceProgress = remember(message.id) { Animatable(0.82f) }
     LaunchedEffect(message.id) {
         if (ValueAnimator.areAnimatorsEnabled()) {
             entranceProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
+                    dampingRatio = 0.58f,
+                    stiffness = Spring.StiffnessMediumLow
                 )
             )
         } else {
@@ -3945,8 +4073,25 @@ fun PeritoStudioMessageBubble(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                scaleX = entranceProgress.value
-                scaleY = entranceProgress.value
+                if (dissolveProgress > 0f) {
+                    val p = dissolveProgress
+                    // Cartoon Vaporize: Puff up slightly, float upward, tilt and fade out
+                    val puffScale = if (p < 0.25f) {
+                        1f + (p / 0.25f) * 0.08f
+                    } else {
+                        1.08f - ((p - 0.25f) / 0.75f) * 0.70f
+                    }
+                    scaleX = puffScale
+                    scaleY = puffScale
+                    alpha = (1f - p * 1.25f).coerceIn(0f, 1f)
+                    translationY = -p * 140f
+                    rotationZ = if (isUser) p * 7f else -p * 7f
+                } else {
+                    scaleX = entranceProgress.value
+                    scaleY = entranceProgress.value
+                    alpha = ((entranceProgress.value - 0.80f) / 0.20f).coerceIn(0f, 1f)
+                    translationY = (1f - entranceProgress.value) * 45f
+                }
             },
         horizontalAlignment = alignment
     ) {
@@ -4632,11 +4777,33 @@ fun ModernAttachmentBubbleCard(
 private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
     val startH = event.startIso.drop(11).take(5)
     val endH = event.endIso.drop(11).take(5)
+
+    // Cartoon celebratory pop on mount
+    val cardScale = remember { Animatable(0.90f) }
+    LaunchedEffect(Unit) {
+        if (ValueAnimator.areAnimatorsEnabled()) {
+            cardScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.55f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        } else {
+            cardScale.snapTo(1f)
+        }
+    }
+
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = DavezAlabaster,
         border = BorderStroke(0.8.dp, AppleGreen.copy(alpha = 0.45f)),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = cardScale.value
+                scaleY = cardScale.value
+            }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -4714,7 +4881,7 @@ fun PeritoStudioInlineButton(
         border = borderColor?.let { BorderStroke(0.6.dp, it) },
         modifier = modifier
             .heightIn(min = 44.dp)
-            .emilPressScale(interactionSource, pressedScale = 0.97f)
+            .cartoonPressSquash(interactionSource, pressedScaleY = 0.93f, squashScaleX = 1.04f)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
