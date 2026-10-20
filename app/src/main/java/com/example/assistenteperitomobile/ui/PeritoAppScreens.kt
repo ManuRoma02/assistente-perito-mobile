@@ -123,13 +123,17 @@ import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Folder
@@ -1872,42 +1876,32 @@ fun PeritoInteractiveHeroHeader(
                 }
             }
 
-            // Azione Rapida Contestuale: /elimina (senza duplicare i tab Pratiche e Agenda)
-            Surface(
-                onClick = onPrefillDelete,
-                shape = RoundedCornerShape(14.dp),
-                color = AppleWhite,
-                border = BorderStroke(0.6.dp, DavezStoneBorder),
-                modifier = Modifier.fillMaxWidth()
+            // 3 Quick Action Bento Cards (/design-taste-frontend-v1 & /agency-ui-designer)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("🗑️", fontSize = 16.sp)
-                        Text(
-                            text = "/elimina",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = DavezBordeaux,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text(
-                        text = "Rimuovi file da archivio o appuntamenti",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                }
+                HeroActionBentoCard(
+                    icon = Icons.Default.CalendarMonth,
+                    title = "/oggi",
+                    subtitle = "Impegni",
+                    modifier = Modifier.weight(1f),
+                    onClick = onSendOggi
+                )
+                HeroActionBentoCard(
+                    icon = Icons.Default.Search,
+                    title = "/cerca",
+                    subtitle = "Fascicoli",
+                    modifier = Modifier.weight(1f),
+                    onClick = onPrefillSearch
+                )
+                HeroActionBentoCard(
+                    icon = Icons.Default.DeleteOutline,
+                    title = "/elimina",
+                    subtitle = "Rimuovi",
+                    modifier = Modifier.weight(1f),
+                    onClick = onPrefillDelete
+                )
             }
         }
     }
@@ -1915,7 +1909,7 @@ fun PeritoInteractiveHeroHeader(
 
 @Composable
 private fun HeroActionBentoCard(
-    emoji: String,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
@@ -1929,23 +1923,29 @@ private fun HeroActionBentoCard(
             onClick()
         },
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         color = DavezAlabaster,
-        border = BorderStroke(0.8.dp, DavezStoneBorder),
-        modifier = modifier.emilPressScale(interactionSource, pressedScale = 0.95f)
+        border = BorderStroke(0.6.dp, DavezStoneBorder),
+        modifier = modifier.emilPressScale(interactionSource, pressedScale = 0.96f)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(AppleWhite),
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(AppleWhite)
+                    .border(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = emoji, fontSize = 17.sp)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = DavezBordeaux,
+                    modifier = Modifier.size(15.dp)
+                )
             }
             Spacer(Modifier.height(5.dp))
             Text(
@@ -1958,7 +1958,7 @@ private fun HeroActionBentoCard(
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = AppleLabelSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -4114,20 +4114,23 @@ fun PeritoStudioMessageBubble(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 PeritoStudioInlineButton(
-                    text = "🔄 Sostituisci precedente",
+                    text = "Sostituisci precedente",
+                    leadingIcon = Icons.Default.Sync,
                     containerColor = DavezBordeaux,
                     contentColor = AppleWhite,
                     onClick = { viewModel.resolveConflictReplace(message.id, conflict) }
                 )
                 PeritoStudioInlineButton(
-                    text = "⚠️ Inserisci comunque",
+                    text = "Inserisci comunque",
+                    leadingIcon = Icons.Default.Warning,
                     containerColor = AppleOrangeSoft,
                     contentColor = AppleOrange,
                     borderColor = AppleOrange.copy(alpha = 0.45f),
                     onClick = { viewModel.resolveConflictForce(message.id, conflict) }
                 )
                 PeritoStudioInlineButton(
-                    text = "❌ Annulla",
+                    text = "Annulla",
+                    leadingIcon = Icons.Default.Close,
                     containerColor = AppleRedSoft,
                     contentColor = AppleRed,
                     borderColor = AppleRed.copy(alpha = 0.35f),
@@ -4145,7 +4148,8 @@ fun PeritoStudioMessageBubble(
             ) {
                 if (ev.luogo != "Da definire") {
                     PeritoStudioInlineButton(
-                        text = "🗺️ Apri Google Maps (${ev.luogo})",
+                        text = "Apri Google Maps (${ev.luogo})",
+                        leadingIcon = Icons.Default.Place,
                         containerColor = AppleWhite,
                         contentColor = DavezBordeaux,
                         borderColor = DavezBordeaux.copy(alpha = 0.32f),
@@ -4153,14 +4157,16 @@ fun PeritoStudioMessageBubble(
                     )
                 }
                 PeritoStudioInlineButton(
-                    text = "🕒 Modifica Orario",
+                    text = "Modifica Orario",
+                    leadingIcon = Icons.Default.Edit,
                     containerColor = AppleWhite,
                     contentColor = DavezBordeaux,
                     borderColor = DavezBordeaux.copy(alpha = 0.32f),
                     onClick = { showRescheduleDialog = true }
                 )
                 PeritoStudioInlineButton(
-                    text = "📲 Condividi Appuntamento (WhatsApp / SMS)",
+                    text = "Condividi Appuntamento (WhatsApp / SMS)",
+                    leadingIcon = Icons.Default.Share,
                     containerColor = AppleWhite,
                     contentColor = DavezBordeaux,
                     borderColor = DavezBordeaux.copy(alpha = 0.32f),
@@ -4181,7 +4187,8 @@ fun PeritoStudioMessageBubble(
                     }
                 )
                 PeritoStudioInlineButton(
-                    text = "🗑️ Elimina Appuntamento",
+                    text = "Elimina Appuntamento",
+                    leadingIcon = Icons.Default.DeleteOutline,
                     containerColor = AppleRedSoft,
                     contentColor = AppleRed,
                     borderColor = AppleRed.copy(alpha = 0.30f),
@@ -4219,7 +4226,8 @@ fun PeritoStudioMessageBubble(
                 message.briefingEvents.filter { it.luogo != "Da definire" }.forEach { ev ->
                     val startH = ev.startIso.drop(11).take(5)
                     PeritoStudioInlineButton(
-                        text = "🗺️ Maps $startH • ${ev.luogo}",
+                        text = "$startH • ${ev.luogo}",
+                        leadingIcon = Icons.Default.Place,
                         containerColor = AppleWhite,
                         contentColor = DavezBordeaux,
                         borderColor = DavezBordeaux.copy(alpha = 0.32f),
@@ -4241,14 +4249,16 @@ fun PeritoStudioMessageBubble(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     PeritoStudioInlineButton(
-                        text = "📄 Apri",
+                        text = "Apri",
+                        leadingIcon = Icons.Default.Description,
                         containerColor = DavezBordeaux,
                         contentColor = AppleWhite,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpenDocument(doc) }
                     )
                     PeritoStudioInlineButton(
-                        text = "📤 Invia",
+                        text = "Invia",
+                        leadingIcon = Icons.Default.Share,
                         containerColor = AppleWhite,
                         contentColor = DavezBordeaux,
                         borderColor = DavezBordeaux.copy(alpha = 0.30f),
@@ -4256,7 +4266,8 @@ fun PeritoStudioMessageBubble(
                         onClick = { onShareDocument(doc) }
                     )
                     PeritoStudioInlineButton(
-                        text = "🗑️ Elimina",
+                        text = "Elimina",
+                        leadingIcon = Icons.Default.DeleteOutline,
                         containerColor = AppleRedSoft,
                         contentColor = AppleRed,
                         borderColor = AppleRed.copy(alpha = 0.35f),
@@ -4277,7 +4288,8 @@ fun PeritoStudioMessageBubble(
                                 val cat = categories[idx]
                                 val isSelected = doc.category == cat
                                 PeritoStudioInlineButton(
-                                    text = if (isSelected) "✅ ${cat.displayTitle}" else "📂 ${cat.displayTitle}",
+                                    text = cat.displayTitle,
+                                    leadingIcon = if (isSelected) Icons.Default.Check else Icons.Default.Folder,
                                     containerColor = if (isSelected) AppleGreenSoft else AppleWhite,
                                     contentColor = if (isSelected) AppleLabelPrimary else DavezBordeaux,
                                     borderColor = if (isSelected) AppleGreen else DavezStoneBorder,
@@ -4621,7 +4633,7 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
     val startH = event.startIso.drop(11).take(5)
     val endH = event.endIso.drop(11).take(5)
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = DavezAlabaster,
         border = BorderStroke(0.8.dp, AppleGreen.copy(alpha = 0.45f)),
         modifier = Modifier.fillMaxWidth()
@@ -4633,23 +4645,47 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
         ) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = AppleWhite
+                color = AppleWhite,
+                border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f))
             ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = DavezBordeaux,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = "$startH–$endH",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = AppleLabelPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.NotificationsActive,
+                    contentDescription = null,
+                    tint = AppleLabelSecondary,
+                    modifier = Modifier.size(13.dp)
+                )
                 Text(
-                    text = "🕒 $startH–$endH",
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                    color = AppleLabelPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                    text = "3 Alert: 24h • 60m • 30m",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppleLabelSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = "🔔 3 Alert: 24h • 60m • 30m",
-                style = MaterialTheme.typography.labelSmall,
-                color = AppleLabelSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
@@ -4657,6 +4693,7 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
 @Composable
 fun PeritoStudioInlineButton(
     text: String,
+    leadingIcon: ImageVector? = null,
     containerColor: Color,
     contentColor: Color,
     borderColor: Color? = null,
@@ -4679,10 +4716,20 @@ fun PeritoStudioInlineButton(
             .heightIn(min = 44.dp)
             .emilPressScale(interactionSource, pressedScale = 0.97f)
     ) {
-        Box(
+        Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            contentAlignment = Alignment.Center
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+            }
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelMedium.copy(
