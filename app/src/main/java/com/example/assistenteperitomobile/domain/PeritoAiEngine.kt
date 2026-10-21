@@ -610,6 +610,7 @@ class PeritoAiEngine(private val context: Context? = null) {
             else -> when (detectedCat) {
                 PeritoEventCategory.UNIONCASA -> "Incontro"
                 PeritoEventCategory.AGENZIA_ORSO -> "Appuntamento"
+                PeritoEventCategory.APE -> "Sopralluogo APE"
                 PeritoEventCategory.RILIEVO -> "Rilievo Tecnico"
                 PeritoEventCategory.COMUNE -> "Incontro Comune"
                 PeritoEventCategory.TRIBUNALE -> "Udienza Tribunale"
