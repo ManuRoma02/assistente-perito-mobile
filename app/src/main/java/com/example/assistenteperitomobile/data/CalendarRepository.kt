@@ -100,10 +100,30 @@ class CalendarRepository(private val context: Context) {
         val endMillis = endDt.atZone(zone).toInstant().toEpochMilli()
         val reminders = listOf(30, 60, 1440)
 
+        val resolvedSubject = if (proposed.cliente.isNotBlank() && proposed.cliente != "Cliente") {
+            proposed.cliente
+        } else if (proposed.categoria == PeritoEventCategory.UNIONCASA.displayName) {
+            "Unioncasa"
+        } else if (proposed.categoria == PeritoEventCategory.AGENZIA_ORSO.displayName) {
+            "Agenzia Orso"
+        } else if (proposed.luogo.isNotBlank() && proposed.luogo != "Da definire") {
+            proposed.luogo
+        } else {
+            "Studio"
+        }
+
+        val effectiveTitle = if (proposed.titolo.isNotBlank() && (proposed.titolo.contains(" - ") || proposed.titolo.contains(" / "))) {
+            proposed.titolo
+        } else if (proposed.titolo.isNotBlank() && proposed.titolo != proposed.categoria) {
+            "${proposed.titolo} - $resolvedSubject"
+        } else {
+            "${proposed.categoria.ifBlank { "Sopralluogo" }} - $resolvedSubject"
+        }
+
         var sysEventId: Long? = null
         if (hasCalendarPermissions()) {
             sysEventId = insertIntoSystemCalendar(
-                title = proposed.titolo.ifBlank { "Appuntamento - ${proposed.cliente}" },
+                title = effectiveTitle,
                 description = proposed.note.trim(),
                 location = proposed.luogo,
                 startMillis = startMillis,
@@ -115,13 +135,13 @@ class CalendarRepository(private val context: Context) {
         val item = CalendarEventItem(
             id = UUID.randomUUID().toString(),
             systemCalendarEventId = sysEventId,
-            titolo = proposed.titolo.ifBlank { "Appuntamento - ${proposed.cliente}" },
+            titolo = effectiveTitle,
             startIso = startDt.format(isoFormatter),
             endIso = endDt.format(isoFormatter),
             startMillis = startMillis,
             endMillis = endMillis,
             luogo = proposed.luogo,
-            cliente = proposed.cliente,
+            cliente = if (proposed.cliente == "Cliente" && resolvedSubject != "Cliente") resolvedSubject else proposed.cliente,
             note = proposed.note.trim(),
             remindersMinutes = reminders,
             isFromSystemCalendar = false,

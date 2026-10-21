@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -49,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -101,6 +103,10 @@ fun AgendaVisivaScreen(
 ) {
     val context = LocalContext.current
     var eventToReschedule by remember { mutableStateOf<CalendarEventItem?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshAllData()
+    }
 
     val today = remember { LocalDate.now() }
     val tomorrow = remember(today) { today.plusDays(1) }
@@ -219,15 +225,50 @@ fun AgendaVisivaScreen(
                         }
                     }
 
-                    Button(
-                        onClick = onDirectVoiceClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Detta Impegno", color = AppleWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        var isRotating by remember { mutableStateOf(false) }
+                        val rotationAnim by animateFloatAsState(
+                            targetValue = if (isRotating) 360f else 0f,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "agenda_refresh_rot",
+                            finishedListener = { isRotating = false }
+                        )
+
+                        Surface(
+                            onClick = {
+                                isRotating = true
+                                viewModel.refreshAllData()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = AppleWhite,
+                            border = BorderStroke(0.5.dp, DavezStoneBorder),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Aggiorna Agenda",
+                                    tint = DavezBordeaux,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .graphicsLayer { rotationZ = rotationAnim }
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = onDirectVoiceClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Detta Impegno", color = AppleWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

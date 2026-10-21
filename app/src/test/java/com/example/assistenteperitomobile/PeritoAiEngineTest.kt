@@ -591,5 +591,48 @@ class PeritoAiEngineTest {
         assertTrue(riunioneApp.has_appointment)
         assertEquals("Riunione", riunioneApp.categoria)
     }
+
+    @Test
+    fun `test appointment titles reference both activity type and person or agency`() = runTest {
+        // 1. Rilievo con Tecnico: "Rilievo Tecnico - Geom. Neri"
+        val rilievo = engine.parseAppointment(
+            "Fissa rilievo domani alle 14 in via Roma con Geom. Neri",
+            refNow
+        )
+        assertTrue(rilievo.has_appointment)
+        assertTrue(rilievo.titolo.startsWith("Rilievo"))
+        assertTrue(rilievo.titolo.contains("Geom. Neri"))
+        assertEquals("Geom. Neri", rilievo.cliente)
+
+        // 2. Sopralluogo con Unioncasa: "Sopralluogo - Unioncasa"
+        val sopralluogoUnioncasa = engine.parseAppointment(
+            "Sopralluogo domani alle 15 con Unioncasa in via Dante",
+            refNow
+        )
+        assertTrue(sopralluogoUnioncasa.has_appointment)
+        assertTrue(sopralluogoUnioncasa.titolo.startsWith("Sopralluogo"))
+        assertTrue(sopralluogoUnioncasa.titolo.contains("Unioncasa"))
+        assertEquals("Unioncasa", sopralluogoUnioncasa.cliente)
+
+        // 3. Sopralluogo con Agenzia Orso: "Sopralluogo - Agenzia Orso"
+        val sopralluogoOrso = engine.parseAppointment(
+            "Sopralluogo venerdì alle 16 con Agenzia Orso",
+            refNow
+        )
+        assertTrue(sopralluogoOrso.has_appointment)
+        assertTrue(sopralluogoOrso.titolo.startsWith("Sopralluogo"))
+        assertTrue(sopralluogoOrso.titolo.contains("Agenzia Orso"))
+        assertEquals("Agenzia Orso", sopralluogoOrso.cliente)
+
+        // 4. Incontro informale con persona: "Colazione - Deiv"
+        val colazione = engine.parseAppointment(
+            "Domani alle 9 deiv a fare colazione a non solo dolce di Albate",
+            refNow
+        )
+        assertTrue(colazione.has_appointment)
+        assertTrue(colazione.titolo.startsWith("Colazione"))
+        assertTrue(colazione.titolo.contains("Deiv"))
+        assertEquals("Deiv", colazione.cliente)
+    }
 }
 

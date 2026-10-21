@@ -11,6 +11,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.provider.Settings
@@ -18,6 +19,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.widget.Toast
+import com.example.assistenteperitomobile.data.MorningBriefingWorker
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -633,6 +635,26 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
     ) { bitmap ->
         if (bitmap != null) {
             viewModel.processCameraBitmap(bitmap)
+        }
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            MorningBriefingWorker.scheduleDailyBriefing(context)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasNotifPerm = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!hasNotifPerm) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
     }
 
@@ -5626,34 +5648,52 @@ fun AiEngineSettingsSheetContent(
                             border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "☀️ Briefing Mattutino (ore 08:00)",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = AppleLabelPrimary
-                                    )
-                                    Text(
-                                        text = "Riepilogo automatico sopralluoghi di oggi, domani e fascicoli clienti",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AppleLabelSecondary
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "☀️ Briefing Mattutino (ore 08:00)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = AppleLabelPrimary
+                                        )
+                                        Text(
+                                            text = "Riepilogo automatico sopralluoghi di oggi, domani e fascicoli clienti",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = AppleLabelSecondary
+                                        )
+                                    }
+                                    Switch(
+                                        checked = briefingEnabled,
+                                        onCheckedChange = {
+                                            briefingEnabled = it
+                                            viewModel.updateAiConfig(uiState.aiConfig.copy(morningBriefingEnabled = it))
+                                        },
+                                        colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
                                     )
                                 }
-                                Switch(
-                                    checked = briefingEnabled,
-                                    onCheckedChange = {
-                                        briefingEnabled = it
-                                        viewModel.updateAiConfig(uiState.aiConfig.copy(morningBriefingEnabled = it))
-                                    },
-                                    colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
-                                )
+                                if (briefingEnabled) {
+                                    Spacer(Modifier.height(6.dp))
+                                    OutlinedButton(
+                                        onClick = { viewModel.triggerTestMorningBriefing() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.5f)),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = DavezBordeaux, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Invia Notifica Briefing di Prova", color = DavezBordeaux, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
                             }
                         }
 
