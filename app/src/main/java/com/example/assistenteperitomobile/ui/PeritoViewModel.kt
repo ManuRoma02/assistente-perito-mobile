@@ -32,6 +32,7 @@ import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.ArchivedDocument
 import com.example.assistenteperitomobile.domain.CalendarEventItem
+import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
 import com.example.assistenteperitomobile.domain.ChatMessage
 import com.example.assistenteperitomobile.domain.DocumentClassificationResult
 import com.example.assistenteperitomobile.domain.Fascicolo
@@ -43,6 +44,7 @@ import com.example.assistenteperitomobile.domain.PeritoCategory
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.StudioProfile
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
+import com.example.assistenteperitomobile.domain.defaultCategoryFormats
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -751,7 +753,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     notifyOrStopBackgroundService("🚨 Conflitto d'Agenda Rilevato", "Conflitto per ${parsed.titolo} con impegni esistenti")
                 } else {
-                    val created = calendarRepo.createEvent(parsed)
+                    val catEnum = PeritoEventCategory.fromString(parsed.categoria.ifBlank { parsed.titolo })
+                    val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+                    val created = calendarRepo.createEvent(parsed, catFormat)
                     lastCreatedEvent = created
                     refreshAllData()
                     appendAssistantMessage(buildConfirmationChatMessage(created))
@@ -779,9 +783,12 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun resolveConflictReplace(messageId: String, conflictState: PendingConflictState) {
         viewModelScope.launch {
+            val catEnum = PeritoEventCategory.fromString(conflictState.proposed.categoria.ifBlank { conflictState.proposed.titolo })
+            val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
             val created = calendarRepo.replaceConflictsAndCreate(
                 conflicts = conflictState.conflictingEvents,
-                proposed = conflictState.proposed
+                proposed = conflictState.proposed,
+                format = catFormat
             )
             lastCreatedEvent = created
             clearConflictButtonsOnMessage(messageId)
@@ -800,7 +807,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun resolveConflictForce(messageId: String, conflictState: PendingConflictState) {
         viewModelScope.launch {
-            val created = calendarRepo.createEvent(conflictState.proposed)
+            val catEnum = PeritoEventCategory.fromString(conflictState.proposed.categoria.ifBlank { conflictState.proposed.titolo })
+            val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+            val created = calendarRepo.createEvent(conflictState.proposed, catFormat)
             lastCreatedEvent = created
             clearConflictButtonsOnMessage(messageId)
             refreshAllData()
@@ -1176,6 +1185,65 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(statusBanner = null) }
     }
 
+    /**
+     * Aggiorna la configurazione di visualizzazione del riferimento per una specifica categoria.
+     */
+    fun updateCategoryReferenceFormat(categoryId: String, format: CategoryReferenceFormat) {
+        val currentMap = _uiState.value.aiConfig.categoryFormats.toMutableMap()
+        currentMap[categoryId] = format
+        val updatedConfig = _uiState.value.aiConfig.copy(categoryFormats = currentMap)
+        updateAiConfig(updatedConfig)
+    }
+
+    /**
+     * Ripristina i formati di riferimento predefiniti per tutte le categorie.
+     */
+    fun resetCategoryReferenceFormats() {
+        val updatedConfig = _uiState.value.aiConfig.copy(categoryFormats = defaultCategoryFormats())
+        updateAiConfig(updatedConfig)
+    }
+
+    /**
+     * Calcola il titolo sintetico/riferimento di un appuntamento rispettando le impostazioni
+     * configurate dall'utente per la categoria associata.
+     */
+    fun formatEventReference(event: CalendarEventItem): String {
+        val catEnum = PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
+        val format = _uiState.value.aiConfig.categoryFormats[catEnum.id] ?: CategoryReferenceFormat()
+        val defaultType = catEnum.defaultPrefix
+
+        val subject = if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
+            event.cliente
+        } else if (catEnum == PeritoEventCategory.UNIONCASA) {
+            "Unioncasa"
+        } else if (catEnum == PeritoEventCategory.AGENZIA_ORSO) {
+            "Agenzia Orso"
+        } else {
+            ""
+        }
+
+        val effectiveSubject = if (subject.isBlank() && event.titolo.isNotBlank() &&
+            !event.titolo.equals(catEnum.displayName, ignoreCase = true) &&
+            !event.titolo.equals(defaultType, ignoreCase = true)
+        ) {
+            if (event.titolo.contains(" - ")) {
+                event.titolo.substringAfter(" - ").substringBefore(" (").trim()
+            } else {
+                event.titolo.substringBefore(" (").trim()
+            }
+        } else {
+            subject
+        }
+
+        return format.formatTitle(
+            startTimeIso = event.startIso,
+            categoryType = defaultType,
+            subject = effectiveSubject,
+            place = event.luogo,
+            notes = event.note
+        )
+    }
+
     private suspend fun handleProcessedDocumentPayload(
         cleanFileName: String,
         bytes: ByteArray,
@@ -1285,7 +1353,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             if (maybeAppointment.has_appointment && !maybeAppointment.is_ambiguo && maybeAppointment.data_inizio_iso != null) {
                 val conflicts = calendarRepo.checkConflicts(maybeAppointment)
                 if (conflicts.isEmpty()) {
-                    val created = calendarRepo.createEvent(maybeAppointment)
+                    val catEnum = PeritoEventCategory.fromString(maybeAppointment.categoria.ifBlank { maybeAppointment.titolo })
+                    val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+                    val created = calendarRepo.createEvent(maybeAppointment, catFormat)
                     lastCreatedEvent = created
                     refreshAllData()
                     appendAssistantMessage(
@@ -1484,7 +1554,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     cliente = lastEv.cliente,
                     note = lastEv.note
                 )
-                val updated = calendarRepo.createEvent(updatedProposal)
+                val catEnum = PeritoEventCategory.fromString(updatedProposal.categoria.ifBlank { updatedProposal.titolo })
+                val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+                val updated = calendarRepo.createEvent(updatedProposal, catFormat)
                 lastCreatedEvent = updated
                 refreshAllData()
                 appendAssistantMessage(

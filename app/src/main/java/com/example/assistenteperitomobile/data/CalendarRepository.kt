@@ -11,6 +11,7 @@ import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.CalendarEventItem
+import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +88,10 @@ class CalendarRepository(private val context: Context) {
      * Inserisce l'appuntamento con i 3 promemoria automatici (24 ore, 60 min, 30 min prima)
      * sia nel Calendario di sistema Android/Google sia nel registro locale dell'app.
      */
-    suspend fun createEvent(proposed: AppointmentParseResult): CalendarEventItem = withContext(Dispatchers.IO) {
+    suspend fun createEvent(
+        proposed: AppointmentParseResult,
+        format: CategoryReferenceFormat? = null
+    ): CalendarEventItem = withContext(Dispatchers.IO) {
         val zone = ZoneId.systemDefault()
         val startDt = proposed.data_inizio_iso?.let {
             runCatching { LocalDateTime.parse(it.take(19)) }.getOrNull()
@@ -112,7 +116,23 @@ class CalendarRepository(private val context: Context) {
             "Studio"
         }
 
-        val effectiveTitle = if (proposed.titolo.isNotBlank() && (proposed.titolo.contains(" - ") || proposed.titolo.contains(" / "))) {
+        val activityType = if (proposed.titolo.isNotBlank() && proposed.titolo.contains(" - ")) {
+            proposed.titolo.substringBefore(" - ").trim()
+        } else if (proposed.categoria.isNotBlank()) {
+            proposed.categoria
+        } else {
+            "Sopralluogo"
+        }
+
+        val effectiveTitle = if (format != null) {
+            format.formatTitle(
+                startTimeIso = startDt.format(isoFormatter),
+                categoryType = activityType,
+                subject = resolvedSubject,
+                place = proposed.luogo,
+                notes = proposed.note
+            )
+        } else if (proposed.titolo.isNotBlank() && (proposed.titolo.contains(" - ") || proposed.titolo.contains(" / "))) {
             proposed.titolo
         } else if (proposed.titolo.isNotBlank() && proposed.titolo != proposed.categoria) {
             "${proposed.titolo} - $resolvedSubject"
@@ -159,12 +179,13 @@ class CalendarRepository(private val context: Context) {
 
     suspend fun replaceConflictsAndCreate(
         conflicts: List<CalendarEventItem>,
-        proposed: AppointmentParseResult
+        proposed: AppointmentParseResult,
+        format: CategoryReferenceFormat? = null
     ): CalendarEventItem = withContext(Dispatchers.IO) {
         for (c in conflicts) {
             deleteEvent(c)
         }
-        createEvent(proposed)
+        createEvent(proposed, format)
     }
 
     suspend fun deleteEvent(event: CalendarEventItem) = withContext(Dispatchers.IO) {
