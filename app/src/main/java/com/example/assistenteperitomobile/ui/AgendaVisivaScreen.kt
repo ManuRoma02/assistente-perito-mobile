@@ -1,9 +1,14 @@
 package com.example.assistenteperitomobile.ui
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -229,17 +234,20 @@ fun AgendaVisivaScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        var isRotating by remember { mutableStateOf(false) }
-                        val rotationAnim by animateFloatAsState(
-                            targetValue = if (isRotating) 360f else 0f,
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                            label = "agenda_refresh_rot",
-                            finishedListener = { isRotating = false }
-                        )
+                        val coroutineScope = rememberCoroutineScope()
+                        val refreshRotation = remember { Animatable(0f) }
 
                         Surface(
                             onClick = {
-                                isRotating = true
+                                coroutineScope.launch {
+                                    refreshRotation.animateTo(
+                                        targetValue = refreshRotation.value + 360f,
+                                        animationSpec = tween(
+                                            durationMillis = 480,
+                                            easing = FastOutSlowInEasing
+                                        )
+                                    )
+                                }
                                 viewModel.refreshAllData()
                             },
                             shape = RoundedCornerShape(12.dp),
@@ -254,7 +262,7 @@ fun AgendaVisivaScreen(
                                     tint = DavezBordeaux,
                                     modifier = Modifier
                                         .size(18.dp)
-                                        .graphicsLayer { rotationZ = rotationAnim }
+                                        .graphicsLayer { rotationZ = refreshRotation.value }
                                 )
                             }
                         }

@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 12,
-  "latestVersionName": "1.0.11",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.11/app-release.apk",
-  "releaseNotes": "• Integrazione Calendario Microsoft Outlook / Exchange: Riconoscimento automatico degli account Microsoft con badge dedicato 'Outlook' e scorciatoia/guida per sincronizzare l'app Outlook o le impostazioni Android\n• Appuntamenti Settimana Successiva Espandibili (/emilkowalski-animation): Nuova sezione 'SETTIMANA SUCCESSIVA' con card compatte ed espansione fluida a molla al tap per visualizzare dettagli completi, mappa, note e opzioni di modifica/eliminazione\n• Fluidità Tastiera & Fine Tuning Animazioni: Eliminato ogni bug o jitter all'apertura della tastiera (transizione istantanea senza conflitti di layout né ritardi di scroll concorrenti) e rimossa l'onda anomala sul dock inferiore sostituita da una scorrimento a molla organico su GPU",
+  "latestVersionCode": 13,
+  "latestVersionName": "1.0.12",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.12/app-release.apk",
+  "releaseNotes": "• Nuova Interfaccia Impostazioni a Tendina (Accordions): Tutte le sezioni (Profilo Studio, Categorie, Calendario, Briefing, Modelli IA, OTA) sono ora organizzate in eleganti tendine comprimibili con rotazione chevron e animazioni fluide su GPU\n• Perfezionamento Animazioni Emil Kowalski: Ricalibrate tutte le curve temporali troppo rapide (<180ms) portandole a 280-350ms con fisica a molla organica (StiffnessMediumLow, damping 0.8) per una percezione visiva fluida e naturale\n• Personalizzazione Riferimento Categorie nell'Agenda: Configurazione flessibile delle informazioni nel titolo per ogni categoria di appuntamento (orario, cliente, luogo, note)",
   "mandatory": false,
-  "publishedAt": "2026-10-20T21:45:00Z"
+  "publishedAt": "2026-10-21T11:25:00Z"
 }

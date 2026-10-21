@@ -230,7 +230,10 @@ fun CategoryAccordionCard(
 ) {
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(
+            dampingRatio = 0.78f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
         label = "chevronRotation"
     )
 

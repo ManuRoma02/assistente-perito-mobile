@@ -32,6 +32,9 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.unit.IntSize
+import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -47,6 +50,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -303,7 +307,7 @@ fun Modifier.emilPressScale(
         animationSpec = if (animationsEnabled) {
             spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
+                stiffness = Spring.StiffnessMediumLow
             )
         } else {
             snap()
@@ -806,8 +810,14 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             // Toast/Banner di conferma stile iOS + davez Bordeaux
             AnimatedVisibility(
                 visible = uiState.statusBanner != null,
-                enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.96f),
-                exit = fadeOut(tween(150))
+                enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) + scaleIn(
+                    initialScale = 0.94f,
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                ),
+                exit = fadeOut(tween(220, easing = FastOutLinearInEasing)) + scaleOut(
+                    targetScale = 0.96f,
+                    animationSpec = tween(220, easing = FastOutLinearInEasing)
+                )
             ) {
                 uiState.statusBanner?.let { banner ->
                     Surface(
@@ -847,8 +857,12 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
             // Barra compatta non bloccante quando un modello IA si scarica in background
             AnimatedVisibility(
                 visible = uiState.downloadProgress.isDownloading && !uiState.showFirstRunModelDialog && !showAiSettingsSheet,
-                enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.98f),
-                exit = fadeOut(tween(150))
+                enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) + expandVertically(
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                ),
+                exit = fadeOut(tween(220, easing = FastOutLinearInEasing)) + shrinkVertically(
+                    animationSpec = tween(220, easing = FastOutLinearInEasing)
+                )
             ) {
                 val prog = uiState.downloadProgress
                 val dlMb = String.format(Locale.ITALIAN, "%.1f", prog.downloadedBytes / (1024.0 * 1024.0))
@@ -1188,8 +1202,12 @@ fun UnifiedStudioBottomBar(
             // 1. POPUP SUGGERIMENTI COMANDI SLASH (/)
             AnimatedVisibility(
                 visible = isSlashMode && !isRecordingVoice,
-                enter = fadeIn(tween(160)) + expandVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium)),
-                exit = fadeOut(tween(120)) + shrinkVertically(animationSpec = tween(120))
+                enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) + expandVertically(
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                ),
+                exit = fadeOut(tween(200, easing = FastOutLinearInEasing)) + shrinkVertically(
+                    animationSpec = tween(200, easing = FastOutLinearInEasing)
+                )
             ) {
                 val typedQuery = inputFieldValue.text.removePrefix("/").trim().lowercase(Locale.ITALIAN)
                 val filtered = remember(typedQuery) {
@@ -1232,13 +1250,18 @@ fun UnifiedStudioBottomBar(
             AnimatedContent(
                 targetState = isRecordingVoice,
                 transitionSpec = {
-                    (fadeIn(tween(180)) + scaleIn(
-                        initialScale = 0.96f,
+                    (fadeIn(tween(300, easing = FastOutSlowInEasing)) + scaleIn(
+                        initialScale = 0.95f,
                         animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium
+                            dampingRatio = 0.82f,
+                            stiffness = Spring.StiffnessMediumLow
                         )
-                    )).togetherWith(fadeOut(tween(140)))
+                    )).togetherWith(
+                        fadeOut(tween(220, easing = FastOutLinearInEasing)) + scaleOut(
+                            targetScale = 0.97f,
+                            animationSpec = tween(220)
+                        )
+                    )
                 },
                 label = "unified_voice_bar_morph"
             ) { recordingActive ->
@@ -1388,13 +1411,16 @@ fun UnifiedStudioBottomBar(
                                     targetState = hasText,
                                     transitionSpec = {
                                         (scaleIn(
-                                            initialScale = 0.88f,
+                                            initialScale = 0.84f,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMedium
+                                                stiffness = Spring.StiffnessMediumLow
                                             )
-                                        ) + fadeIn(tween(150))).togetherWith(
-                                            scaleOut(targetScale = 0.88f, animationSpec = tween(120)) + fadeOut(tween(120))
+                                        ) + fadeIn(tween(260, easing = FastOutSlowInEasing))).togetherWith(
+                                            scaleOut(
+                                                targetScale = 0.84f,
+                                                animationSpec = tween(200, easing = FastOutLinearInEasing)
+                                            ) + fadeOut(tween(200))
                                         )
                                     },
                                     label = "mic_send_morph"
@@ -1460,7 +1486,7 @@ fun LiquidFluidTabDock(
                 targetValue = targetIndex.toFloat(),
                 animationSpec = spring(
                     dampingRatio = 0.82f,
-                    stiffness = Spring.StiffnessMedium
+                    stiffness = Spring.StiffnessMediumLow
                 )
             )
         }
@@ -2259,8 +2285,11 @@ fun PeritoStudioChatScreen(
         // Floating Pill "Ultimi messaggi" quando si scorre verso l'alto
         androidx.compose.animation.AnimatedVisibility(
             visible = showScrollToBottom,
-            enter = fadeIn(tween(160)) + scaleIn(initialScale = 0.92f),
-            exit = fadeOut(tween(140)) + scaleOut(targetScale = 0.92f),
+            enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) + scaleIn(
+                initialScale = 0.86f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+            ),
+            exit = fadeOut(tween(220, easing = FastOutLinearInEasing)) + scaleOut(targetScale = 0.86f, animationSpec = tween(220)),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 12.dp)
@@ -5218,6 +5247,139 @@ fun ArchiveFoldersSheetContent(
 }
 
 // =============================================================================
+// COMPONENTE TENDINA ACCORDION COMPRIMIBILE (Davez Luxury & Apple HIG)
+// =============================================================================
+@Composable
+fun SettingsTendinaCard(
+    title: String,
+    subtitle: String,
+    badgeText: String? = null,
+    badgeColor: Color = AppleBlueSoft,
+    badgeTextColor: Color = DavezBordeaux,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.78f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "tendina_chevron"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = AppleGroupedBg,
+        border = BorderStroke(
+            if (isExpanded) 1.dp else 0.5.dp,
+            if (isExpanded) DavezBordeaux.copy(alpha = 0.35f) else DavezStoneBorder.copy(alpha = 0.5f)
+        ),
+        shadowElevation = if (isExpanded) 1.5.dp else 0.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = spring<IntSize>(
+                    dampingRatio = 0.82f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Intestazione a Tendina Cliccabile
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = AppleLabelPrimary
+                        )
+                        if (badgeText != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = badgeColor
+                            ) {
+                                Text(
+                                    text = badgeText,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.5.sp
+                                    ),
+                                    color = badgeTextColor,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppleLabelSecondary,
+                        maxLines = if (isExpanded) 2 else 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Freccia Chevron animata con rotazione fluida su GPU
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(
+                            if (isExpanded) DavezBordeaux.copy(alpha = 0.12f) else AppleWhite,
+                            CircleShape
+                        )
+                        .border(
+                            0.5.dp,
+                            if (isExpanded) DavezBordeaux.copy(alpha = 0.3f) else DavezStoneBorder.copy(alpha = 0.6f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Comprimi sezione" else "Espandi sezione",
+                        tint = if (isExpanded) DavezBordeaux else AppleLabelSecondary,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer { rotationZ = chevronRotation }
+                    )
+                }
+            }
+
+            // Corpo Dettagliato a Tendina
+            if (isExpanded) {
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = DavezStoneBorder.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 14.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    content()
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
 // FOGLIO MODALE IOS INTUITIVO: IMPOSTAZIONI RAPIDE & MODELLI IA ON-DEVICE
 // =============================================================================
 @Composable
@@ -5260,6 +5422,11 @@ fun AiEngineSettingsSheetContent(
         )
     }
 
+    var expandedSections by rememberSaveable { mutableStateOf(setOf<String>()) }
+    val toggleSection: (String) -> Unit = { key ->
+        expandedSections = if (expandedSections.contains(key)) expandedSections - key else expandedSections + key
+    }
+
     var currentSubScreen by rememberSaveable { mutableStateOf("main") }
 
     BackHandler(enabled = currentSubScreen != "main") {
@@ -5270,11 +5437,19 @@ fun AiEngineSettingsSheetContent(
         targetState = currentSubScreen,
         transitionSpec = {
             if (targetState == "category_formats") {
-                slideInHorizontally { width -> width } + fadeIn() togetherWith
-                    slideOutHorizontally { width -> -width } + fadeOut()
+                slideInHorizontally(
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                ) { width -> width } + fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
+                    slideOutHorizontally(
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                    ) { width -> -width } + fadeOut(tween(240, easing = FastOutLinearInEasing))
             } else {
-                slideInHorizontally { width -> -width } + fadeIn() togetherWith
-                    slideOutHorizontally { width -> width } + fadeOut()
+                slideInHorizontally(
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                ) { width -> -width } + fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
+                    slideOutHorizontally(
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                    ) { width -> width } + fadeOut(tween(240, easing = FastOutLinearInEasing))
             }
         },
         label = "settings_subscreen_transition"
@@ -5360,793 +5535,762 @@ fun AiEngineSettingsSheetContent(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 48.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // SEZIONE 0: PERSONALIZZAZIONE FORMATO RIFERIMENTO CATEGORIE
-                    item(key = "settings_category_reference_nav_card") {
-                        Surface(
-                            onClick = { currentSubScreen = "category_formats" },
-                            shape = RoundedCornerShape(16.dp),
-                            color = AppleGroupedBg,
-                            border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.25f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(DavezBordeaux.copy(alpha = 0.1f), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = "🏷️", fontSize = 20.sp)
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Formato Riferimento Categorie",
-                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = AppleLabelPrimary
-                                    )
-                                    Text(
-                                        text = "Personalizza cosa mostrare nel titolo per ogni categoria (Orario, Tipo, Soggetto, Luogo, Note)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleLabelSecondary
-                                    )
-                                }
-
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = "Apri personalizzazione riferimenti",
-                                    tint = DavezBordeaux,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // SEZIONE 0A: PROFILO STUDIO TECNICO (Personalizzabile dal Perito)
-                    item(key = "settings_studio_profile_section") {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = AppleGroupedBg,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "🏛️ Profilo Studio Tecnico",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = AppleLabelPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = AppleBlueSoft
-                            ) {
-                                Text(
-                                    text = "Personalizzato",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = DavezBordeaux,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "Configura l'intestazione dello studio per i fascicoli, le perizie e la barra superiore.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AppleLabelSecondary
-                        )
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                            modifier = Modifier.fillMaxWidth()
+                    // TENDINA 1: PERSONALIZZAZIONE FORMATO RIFERIMENTO CATEGORIE
+                    item(key = "tendina_category_formats") {
+                        SettingsTendinaCard(
+                            title = "🏷️ Formato Riferimento Categorie",
+                            subtitle = "Personalizza cosa mostrare nel titolo per ogni categoria nell'agenda",
+                            badgeText = "${uiState.aiConfig.categoryFormats.size} Categorie",
+                            badgeColor = AppleBlueSoft,
+                            badgeTextColor = DavezBordeaux,
+                            isExpanded = expandedSections.contains("category_formats"),
+                            onToggle = { toggleSection("category_formats") }
                         ) {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                OutlinedTextField(
-                                    value = studioNameInput,
-                                    onValueChange = { studioNameInput = it },
-                                    label = { Text("Nome Studio Tecnico") },
-                                    placeholder = { Text("Es. Studio Tecnico Peritale") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DavezBordeaux,
-                                        cursorColor = DavezBordeaux
-                                    )
+                                Text(
+                                    text = "Configura l'ordine e la visibilità delle informazioni visualizzate nel riferimento degli appuntamenti (Orario, Tipo, Soggetto, Luogo, Note).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AppleLabelSecondary
                                 )
 
-                                OutlinedTextField(
-                                    value = professionistaInput,
-                                    onValueChange = { professionistaInput = it },
-                                    label = { Text("Professionista Responsabile") },
-                                    placeholder = { Text("Es. Geom. Davide Restelli") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DavezBordeaux,
-                                        cursorColor = DavezBordeaux
-                                    )
-                                )
-
-                                OutlinedTextField(
-                                    value = alboOrdineInput,
-                                    onValueChange = { alboOrdineInput = it },
-                                    label = { Text("Albo / Ordine Professionale") },
-                                    placeholder = { Text("Es. Collegio Geometri Monza e Brianza") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DavezBordeaux,
-                                        cursorColor = DavezBordeaux
-                                    )
-                                )
-
-                                OutlinedTextField(
-                                    value = cittaInput,
-                                    onValueChange = { cittaInput = it },
-                                    label = { Text("Città Sede Studio") },
-                                    placeholder = { Text("Es. Monza (MB)") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DavezBordeaux,
-                                        cursorColor = DavezBordeaux
-                                    )
-                                )
-
-                                OutlinedTextField(
-                                    value = recapitoInput,
-                                    onValueChange = { recapitoInput = it },
-                                    label = { Text("Email / PEC / Telefono") },
-                                    placeholder = { Text("Es. studio@perizierestelli.it") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = DavezBordeaux,
-                                        cursorColor = DavezBordeaux
-                                    )
-                                )
-
-                                val isModified = studioNameInput != uiState.aiConfig.studioProfile.studioName ||
-                                    professionistaInput != uiState.aiConfig.studioProfile.professionistaNome ||
-                                    alboOrdineInput != uiState.aiConfig.studioProfile.alboIscrizione ||
-                                    cittaInput != uiState.aiConfig.studioProfile.citta ||
-                                    recapitoInput != uiState.aiConfig.studioProfile.recapito
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = AppleWhite,
+                                    border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        PeritoEventCategory.values().take(4).forEach { cat ->
+                                            val format = uiState.aiConfig.categoryFormats[cat.id] ?: CategoryReferenceFormat()
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${cat.emoji} ${cat.displayName}",
+                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                    color = AppleLabelPrimary
+                                                )
+                                                val summaryParts = listOfNotNull(
+                                                    if (format.showTime) "Orario" else null,
+                                                    if (format.showSubject) "Soggetto" else null,
+                                                    if (format.showPlace) "Luogo" else null
+                                                )
+                                                Text(
+                                                    text = if (summaryParts.isEmpty()) "Solo tipo" else summaryParts.joinToString(" • "),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = DavezBordeaux,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
 
                                 Button(
-                                    onClick = {
-                                        viewModel.updateStudioProfile(
-                                            StudioProfile(
-                                                studioName = studioNameInput.trim().ifBlank { "Studio Tecnico Peritale" },
-                                                professionistaNome = professionistaInput.trim(),
-                                                alboIscrizione = alboOrdineInput.trim(),
-                                                citta = cittaInput.trim(),
-                                                recapito = recapitoInput.trim()
-                                            )
-                                        )
-                                    },
-                                    enabled = isModified && studioNameInput.isNotBlank(),
+                                    onClick = { currentSubScreen = "category_formats" },
                                     colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("💾 Salva Intestazione Studio", color = AppleWhite, fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = AppleWhite,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "Personalizza Regole e Anteprima Completa",
+                                        color = AppleWhite,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
                                 }
                             }
                         }
                     }
-                }
-            }
 
-            // SEZIONE 0: STATO SERVIZI & AUTOMAZIONI RAPIDE (1-Tap)
-            item(key = "settings_services_section") {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = AppleGroupedBg,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "⚡ Servizi & Sincronizzazione Rapida",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = AppleLabelPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        // Riga 1: Calendario Android/Google
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                            modifier = Modifier.fillMaxWidth()
+                    // TENDINA 2: PROFILO STUDIO TECNICO
+                    item(key = "tendina_studio_profile") {
+                        SettingsTendinaCard(
+                            title = "🏛️ Profilo Studio Tecnico",
+                            subtitle = "Configura l'intestazione dello studio per fascicoli, perizie e barra superiore",
+                            badgeText = if (studioNameInput.isNotBlank()) "Personalizzato" else "Predefinito",
+                            badgeColor = AppleBlueSoft,
+                            badgeTextColor = DavezBordeaux,
+                            isExpanded = expandedSections.contains("studio_profile"),
+                            onToggle = { toggleSection("studio_profile") }
                         ) {
-                            val isCalendarSyncActive = uiState.hasCalendarPermission && uiState.aiConfig.syncSystemCalendar
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "📅 Calendario Telefono (±15 min)",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = AppleLabelPrimary
-                                    )
-                                    Text(
-                                        text = when {
-                                            isCalendarSyncActive ->
-                                                "Sincronizzato con Google/Android Calendar (3 promemoria automatici)"
-                                            !uiState.hasNativeCalendarPermission ->
-                                                "Permessi non concessi • Tocca per sincronizzare col telefono"
-                                            else ->
-                                                "Scollegato • Modalità Agenda Locale attiva (nessun sync con Google Calendar)"
-                                        },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AppleLabelSecondary
-                                    )
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                if (isCalendarSyncActive) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = AppleGreenSoft
-                                        ) {
-                                            Text(
-                                                text = "✅ Attivo",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = AppleLabelPrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
-                                        }
-                                        OutlinedButton(
-                                            onClick = { viewModel.disconnectCalendar() },
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AppleRed),
-                                            border = BorderStroke(1.dp, AppleRed.copy(alpha = 0.4f)),
-                                            shape = RoundedCornerShape(10.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                            modifier = Modifier.height(34.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.LinkOff,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp),
-                                                tint = AppleRed
-                                            )
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("Scollega", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleRed)
-                                        }
-                                    }
-                                } else {
-                                    Button(
-                                        onClick = onRequestCalendarPerm,
-                                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                        modifier = Modifier.height(34.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Link,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(14.dp),
-                                            tint = AppleWhite
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Collega", fontSize = 12.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Selettore Account / Calendario specifico
-                        val isCalendarSyncActive = uiState.hasCalendarPermission && uiState.aiConfig.syncSystemCalendar
-                        if (isCalendarSyncActive) {
                             Surface(
-                                onClick = { showCalendarAccountDialog = true },
                                 shape = RoundedCornerShape(12.dp),
                                 color = AppleWhite,
                                 border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Row(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "🎯 Account Calendario Sincronizzato",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = AppleLabelPrimary
+                                    OutlinedTextField(
+                                        value = studioNameInput,
+                                        onValueChange = { studioNameInput = it },
+                                        label = { Text("Nome Studio Tecnico") },
+                                        placeholder = { Text("Es. Studio Tecnico Peritale") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = DavezBordeaux,
+                                            cursorColor = DavezBordeaux
                                         )
-                                        val calendarLabel = remember(uiState.aiConfig.selectedCalendarName, uiState.aiConfig.selectedCalendarAccount) {
-                                            val name = uiState.aiConfig.selectedCalendarName
-                                            val acc = uiState.aiConfig.selectedCalendarAccount
-                                            when {
-                                                name == null -> "Tutti gli account (sincronizzazione globale)"
-                                                acc.isNullOrBlank() || acc.equals(name, ignoreCase = true) -> name
-                                                else -> "$name ($acc)"
-                                            }
-                                        }
-                                        Text(
-                                            text = calendarLabel,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = DavezBordeaux,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Spacer(Modifier.width(8.dp))
-                                    OutlinedButton(
-                                        onClick = { showCalendarAccountDialog = true },
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(0.8.dp, DavezStoneBorder),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                        modifier = Modifier.height(34.dp)
-                                    ) {
-                                        Text("Cambia", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleLabelPrimary)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Riga 2: Briefing Mattutino ore 08:00
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "☀️ Briefing Mattutino (ore 08:00)",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = AppleLabelPrimary
-                                        )
-                                        Text(
-                                            text = "Riepilogo automatico sopralluoghi di oggi, domani e fascicoli clienti",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppleLabelSecondary
-                                        )
-                                    }
-                                    Switch(
-                                        checked = briefingEnabled,
-                                        onCheckedChange = {
-                                            briefingEnabled = it
-                                            viewModel.updateAiConfig(uiState.aiConfig.copy(morningBriefingEnabled = it))
-                                        },
-                                        colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
                                     )
-                                }
-                                if (briefingEnabled) {
-                                    Spacer(Modifier.height(6.dp))
-                                    OutlinedButton(
-                                        onClick = { viewModel.triggerTestMorningBriefing() },
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.5f)),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+
+                                    OutlinedTextField(
+                                        value = professionistaInput,
+                                        onValueChange = { professionistaInput = it },
+                                        label = { Text("Professionista Responsabile") },
+                                        placeholder = { Text("Es. Geom. Davide Restelli") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = DavezBordeaux,
+                                            cursorColor = DavezBordeaux
+                                        )
+                                    )
+
+                                    OutlinedTextField(
+                                        value = alboOrdineInput,
+                                        onValueChange = { alboOrdineInput = it },
+                                        label = { Text("Albo / Ordine Professionale") },
+                                        placeholder = { Text("Es. Collegio Geometri Monza e Brianza") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = DavezBordeaux,
+                                            cursorColor = DavezBordeaux
+                                        )
+                                    )
+
+                                    OutlinedTextField(
+                                        value = cittaInput,
+                                        onValueChange = { cittaInput = it },
+                                        label = { Text("Città Sede Studio") },
+                                        placeholder = { Text("Es. Monza (MB)") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = DavezBordeaux,
+                                            cursorColor = DavezBordeaux
+                                        )
+                                    )
+
+                                    OutlinedTextField(
+                                        value = recapitoInput,
+                                        onValueChange = { recapitoInput = it },
+                                        label = { Text("Email / PEC / Telefono") },
+                                        placeholder = { Text("Es. studio@perizierestelli.it") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = DavezBordeaux,
+                                            cursorColor = DavezBordeaux
+                                        )
+                                    )
+
+                                    val isModified = studioNameInput != uiState.aiConfig.studioProfile.studioName ||
+                                        professionistaInput != uiState.aiConfig.studioProfile.professionistaNome ||
+                                        alboOrdineInput != uiState.aiConfig.studioProfile.alboIscrizione ||
+                                        cittaInput != uiState.aiConfig.studioProfile.citta ||
+                                        recapitoInput != uiState.aiConfig.studioProfile.recapito
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateStudioProfile(
+                                                StudioProfile(
+                                                    studioName = studioNameInput.trim().ifBlank { "Studio Tecnico Peritale" },
+                                                    professionistaNome = professionistaInput.trim(),
+                                                    alboIscrizione = alboOrdineInput.trim(),
+                                                    citta = cittaInput.trim(),
+                                                    recapito = recapitoInput.trim()
+                                                )
+                                            )
+                                        },
+                                        enabled = isModified && studioNameInput.isNotBlank(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = DavezBordeaux, modifier = Modifier.size(14.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Invia Notifica Briefing di Prova", color = DavezBordeaux, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                                        Text("💾 Salva Intestazione Studio", color = AppleWhite, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
-
-                        // Riga 3: Sincronizzazione 6 Cartelle col PC (Documents/Perizie_Archivio)
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "💻 Cartella Sync PC (6 Cartelle)",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = AppleLabelPrimary
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = AppleGreenSoft
-                                    ) {
-                                        Text(
-                                            text = "📂 Mirror Attivo",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppleLabelPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = "Percorso telefono: /storage/emulated/0/Documents/Perizie_Archivio/\nPronta per sincronizzazione automatica col PC tramite Syncthing (P2P zero-cloud), OneDrive/Onesync o Dropbox/Dropsync.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = AppleLabelSecondary
-                                )
-                            }
-                        }
                     }
-                }
-            }
 
-            // SEZIONE 1: MODELLI IA ON-DEVICE STUDIO RESTELLI
-            item(key = "settings_models_section") {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = AppleGroupedBg,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    // TENDINA 3: BRIEFING MATTUTINO QUOTIDIANO
+                    item(key = "tendina_morning_briefing") {
+                        SettingsTendinaCard(
+                            title = "☀️ Briefing Mattutino Quotidiano",
+                            subtitle = "Riepilogo automatico alle 08:00 con sopralluoghi, scadenze e fascicoli",
+                            badgeText = if (briefingEnabled) "✅ Attivo ore 08:00" else "Disattivato",
+                            badgeColor = if (briefingEnabled) AppleGreenSoft else AppleSecondaryGroupedBg,
+                            badgeTextColor = if (briefingEnabled) AppleGreen else AppleLabelSecondary,
+                            isExpanded = expandedSections.contains("morning_briefing"),
+                            onToggle = { toggleSection("morning_briefing") }
                         ) {
-                            Text(
-                                text = "🧠 Motore IA & Download Modelli",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = DavezBordeaux,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (uiState.isReasoningReady) AppleGreenSoft else AppleOrangeSoft
-                            ) {
-                                Text(
-                                    text = if (uiState.isReasoningReady) "Reasoning Attivo" else "Pronto all'Uso",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (uiState.isReasoningReady) AppleGreen else AppleOrange,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            text = "Il download avviene anche in background con notifica di avanzamento nella barra di stato Android. Puoi chiudere questa finestra e continuare a usare l'app mentre scarica:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelSecondary
-                        )
-
-                        ModelDownloadCatalogList(
-                            uiState = uiState,
-                            viewModel = viewModel
-                        )
-                    }
-                }
-            }
-
-            // SEZIONE OTA: AGGIORNAMENTI & VERSIONE APP
-            item(key = "settings_ota_updates_section") {
-                val context = LocalContext.current
-
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = AppleGroupedBg,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "🔄 Aggiornamenti In-App (OTA)",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = DavezBordeaux,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = DavezBordeaux.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "v${uiState.currentAppVersionName} (${uiState.currentAppVersionCode})",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = DavezBordeaux,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "Verifica la presenza di nuove release APK e aggiorna l'app senza dover reinstallare manualmente da cavo o file manager.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelSecondary
-                        )
-
-                        // Scheda Notifica Aggiornamento Disponibile (se presente)
-                        uiState.availableUpdate?.let { update ->
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = AppleWhite,
-                                border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.4f)),
+                                border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "🚀 Nuova Versione: v${update.latestVersionName}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = DavezBordeaux
-                                        )
-                                        Text(
-                                            text = "Build ${update.latestVersionCode}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppleLabelSecondary
-                                        )
-                                    }
-
-                                    Text(
-                                        text = update.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni e stabilità." },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleLabelPrimary
-                                    )
-
-                                    if (uiState.updateDownloadProgress != null) {
-                                        val prog = uiState.updateDownloadProgress
-                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text(
-                                                    text = uiState.updateStatusMessage ?: "Download in corso...",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = AppleLabelSecondary
-                                                )
-                                                Text(
-                                                    text = "${(prog * 100).toInt()}%",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = DavezBordeaux
-                                                )
-                                            }
-                                            LinearProgressIndicator(
-                                                progress = { prog },
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(4.dp)
-                                                    .clip(RoundedCornerShape(2.dp)),
-                                                color = DavezBordeaux,
-                                                trackColor = AppleBlueSoft
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Attiva Notifica ore 08:00",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = AppleLabelPrimary
+                                            )
+                                            Text(
+                                                text = "Riepiloga automaticamente i sopralluoghi di oggi, domani e fascicoli clienti senza dover aprire l'app",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = AppleLabelSecondary
                                             )
                                         }
-                                    }
-
-                                    Button(
-                                        onClick = { viewModel.startUpdateDownloadAndInstall(context) },
-                                        enabled = uiState.updateDownloadProgress == null,
-                                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                        shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = if (uiState.updateDownloadProgress != null) "Download in corso..." else "Scarica e Installa v${update.latestVersionName}",
-                                            color = AppleWhite,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
+                                        Spacer(Modifier.width(8.dp))
+                                        Switch(
+                                            checked = briefingEnabled,
+                                            onCheckedChange = {
+                                                briefingEnabled = it
+                                                viewModel.updateAiConfig(uiState.aiConfig.copy(morningBriefingEnabled = it))
+                                            },
+                                            colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
                                         )
                                     }
-                                }
-                            }
-                        }
-
-                        // Riga Switch: Controllo automatico all'avvio
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Controllo automatico all'avvio",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = AppleLabelPrimary
-                                    )
-                                    Text(
-                                        text = "Verifica la disponibilità di nuove versioni all'apertura dell'app",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AppleLabelSecondary
-                                    )
-                                }
-                                Switch(
-                                    checked = uiState.aiConfig.autoCheckUpdatesOnStart,
-                                    onCheckedChange = { viewModel.toggleAutoCheckUpdates(it) },
-                                    colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
-                                )
-                            }
-                        }
-
-                        // Pulsante Verifica Manuale Aggiornamenti
-                        Button(
-                            onClick = { viewModel.checkForUpdates(silent = false) },
-                            enabled = !uiState.isCheckingUpdate && uiState.updateDownloadProgress == null,
-                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 42.dp)
-                        ) {
-                            if (uiState.isCheckingUpdate) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = AppleWhite,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text("Verifica in corso...", color = AppleWhite, fontSize = 13.sp)
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = AppleWhite
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("Verifica Aggiornamenti Ora", color = AppleWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            }
-                        }
-
-                        // Feedback messaggio di stato (es: "L'app è aggiornata all'ultima versione")
-                        if (!uiState.updateStatusMessage.isNullOrBlank() && uiState.availableUpdate == null) {
-                            Text(
-                                text = uiState.updateStatusMessage,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = DavezBordeaux,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                        }
-
-                        // Configurazione URL Manifest (opzionale / per sviluppatori e self-hosting)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showManifestUrlEditor = !showManifestUrlEditor },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "⚙️ Endpoint Manifest OTA",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = if (showManifestUrlEditor) "Nascondi" else "Configura",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = DavezBordeaux,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        if (showManifestUrlEditor) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                OutlinedTextField(
-                                    value = editedManifestUrl,
-                                    onValueChange = { editedManifestUrl = it },
-                                    label = { Text("URL file ota-update.json", fontSize = 11.sp) },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    TextButton(
-                                        onClick = {
-                                            editedManifestUrl = OtaUpdateManager.DEFAULT_MANIFEST_URL
-                                            viewModel.updateOtaManifestUrl(OtaUpdateManager.DEFAULT_MANIFEST_URL)
+                                    if (briefingEnabled) {
+                                        OutlinedButton(
+                                            onClick = { viewModel.triggerTestMorningBriefing() },
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(0.8.dp, DavezBordeaux.copy(alpha = 0.5f)),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                Icons.Default.NotificationsActive,
+                                                contentDescription = null,
+                                                tint = DavezBordeaux,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                "Invia Notifica Briefing di Prova Subito",
+                                                color = DavezBordeaux,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
                                         }
-                                    ) {
-                                        Text("Predefinito", fontSize = 11.sp, color = AppleLabelSecondary)
-                                    }
-                                    Spacer(Modifier.width(4.dp))
-                                    Button(
-                                        onClick = { viewModel.updateOtaManifestUrl(editedManifestUrl) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text("Salva URL", fontSize = 11.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                             }
                         }
                     }
-                }
-            }
 
-            item(key = "settings_bottom_spacer") {
-                Spacer(Modifier.height(40.dp))
-            }
+                    // TENDINA 4: CALENDARIO GOOGLE & OUTLOOK
+                    item(key = "tendina_calendar_sync") {
+                        val isCalendarSyncActive = uiState.hasCalendarPermission && uiState.aiConfig.syncSystemCalendar
+                        SettingsTendinaCard(
+                            title = "📅 Calendario Google & Outlook",
+                            subtitle = "Sincronizzazione bidirezionale col telefono e 3 promemoria automatici",
+                            badgeText = if (isCalendarSyncActive) "✅ Attivo" else "Non collegato",
+                            badgeColor = if (isCalendarSyncActive) AppleGreenSoft else AppleSecondaryGroupedBg,
+                            badgeTextColor = if (isCalendarSyncActive) AppleGreen else AppleLabelSecondary,
+                            isExpanded = expandedSections.contains("calendar_sync"),
+                            onToggle = { toggleSection("calendar_sync") }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Riga Stato Sync & Pulsante Collega/Scollega
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = AppleWhite,
+                                    border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Calendario Android / Google",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = AppleLabelPrimary
+                                            )
+                                            Text(
+                                                text = when {
+                                                    isCalendarSyncActive ->
+                                                        "Sincronizzato con Google/Android Calendar (3 promemoria automatici)"
+                                                    !uiState.hasNativeCalendarPermission ->
+                                                        "Permessi non concessi • Tocca per sincronizzare col telefono"
+                                                    else ->
+                                                        "Scollegato • Modalità Agenda Locale attiva"
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = AppleLabelSecondary
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        if (isCalendarSyncActive) {
+                                            OutlinedButton(
+                                                onClick = { viewModel.disconnectCalendar() },
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppleRed),
+                                                border = BorderStroke(1.dp, AppleRed.copy(alpha = 0.4f)),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.LinkOff,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = AppleRed
+                                                )
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("Scollega", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleRed)
+                                            }
+                                        } else {
+                                            Button(
+                                                onClick = onRequestCalendarPerm,
+                                                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Link,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = AppleWhite
+                                                )
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("Collega", fontSize = 12.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Selettore Account Sincronizzato
+                                if (isCalendarSyncActive) {
+                                    Surface(
+                                        onClick = { showCalendarAccountDialog = true },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = AppleWhite,
+                                        border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "🎯 Account Calendario Sincronizzato",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = AppleLabelPrimary
+                                                )
+                                                val calendarLabel = remember(uiState.aiConfig.selectedCalendarName, uiState.aiConfig.selectedCalendarAccount) {
+                                                    val name = uiState.aiConfig.selectedCalendarName
+                                                    val acc = uiState.aiConfig.selectedCalendarAccount
+                                                    when {
+                                                        name == null -> "Tutti gli account (sincronizzazione globale)"
+                                                        acc.isNullOrBlank() || acc.equals(name, ignoreCase = true) -> name
+                                                        else -> "$name ($acc)"
+                                                    }
+                                                }
+                                                Text(
+                                                    text = calendarLabel,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = DavezBordeaux,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            OutlinedButton(
+                                                onClick = { showCalendarAccountDialog = true },
+                                                shape = RoundedCornerShape(10.dp),
+                                                border = BorderStroke(0.8.dp, DavezStoneBorder),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Text("Cambia", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleLabelPrimary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TENDINA 5: MIRROR PC & ARCHIVIO LOCALE
+                    item(key = "tendina_pc_sync") {
+                        SettingsTendinaCard(
+                            title = "💻 Mirror PC & Archivio Locale",
+                            subtitle = "Archivio Documents/Perizie_Archivio (6 Cartelle) per sincronizzazione PC",
+                            badgeText = "📂 Mirror Attivo",
+                            badgeColor = AppleGreenSoft,
+                            badgeTextColor = AppleLabelPrimary,
+                            isExpanded = expandedSections.contains("pc_sync"),
+                            onToggle = { toggleSection("pc_sync") }
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AppleWhite,
+                                border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Cartella Archivio Locale:",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = AppleLabelPrimary
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = AppleGroupedBg,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "/storage/emulated/0/Documents/Perizie_Archivio/",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                            color = DavezBordeaux,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Tutti i fascicoli, verbali e allegati fotografici sono salvati qui in formato standard aperto, pronti per essere sincronizzati in tempo reale con il computer dello studio tramite Syncthing (P2P zero-cloud), Microsoft OneDrive o Dropbox/Dropsync.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppleLabelSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // TENDINA 6: MOTORE IA ON-DEVICE & MODELLI
+                    item(key = "tendina_ai_models") {
+                        SettingsTendinaCard(
+                            title = "🧠 Motore IA & Modelli On-Device",
+                            subtitle = "Download modelli GGUF e Whisper per elaborazione locale 100% confidenziale",
+                            badgeText = if (uiState.isReasoningReady) "Reasoning Attivo" else "Pronto all'Uso",
+                            badgeColor = if (uiState.isReasoningReady) AppleGreenSoft else AppleOrangeSoft,
+                            badgeTextColor = if (uiState.isReasoningReady) AppleGreen else AppleOrange,
+                            isExpanded = expandedSections.contains("ai_models"),
+                            onToggle = { toggleSection("ai_models") }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = "Il download avviene anche in background con notifica di avanzamento nella barra di stato Android. Puoi chiudere questa finestra e continuare a usare l'app mentre scarica:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AppleLabelSecondary
+                                )
+                                ModelDownloadCatalogList(
+                                    uiState = uiState,
+                                    viewModel = viewModel
+                                )
+                            }
+                        }
+                    }
+
+                    // TENDINA 7: AGGIORNAMENTI IN-APP (OTA)
+                    item(key = "tendina_ota_updates") {
+                        val context = LocalContext.current
+                        SettingsTendinaCard(
+                            title = "🔄 Aggiornamenti Software In-App (OTA)",
+                            subtitle = "Verifica release APK e aggiorna direttamente l'app senza passaggi manuali",
+                            badgeText = "v${uiState.currentAppVersionName} (${uiState.currentAppVersionCode})",
+                            badgeColor = DavezBordeaux.copy(alpha = 0.12f),
+                            badgeTextColor = DavezBordeaux,
+                            isExpanded = expandedSections.contains("ota_updates"),
+                            onToggle = { toggleSection("ota_updates") }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = "Verifica la presenza di nuove release e aggiorna l'app senza dover reinstallare manualmente.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AppleLabelSecondary
+                                )
+
+                                // Scheda Notifica Aggiornamento Disponibile (se presente)
+                                uiState.availableUpdate?.let { update ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = AppleWhite,
+                                        border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.4f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "🚀 Nuova Versione: v${update.latestVersionName}",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = DavezBordeaux
+                                                )
+                                                Text(
+                                                    text = "Build ${update.latestVersionCode}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = AppleLabelSecondary
+                                                )
+                                            }
+
+                                            Text(
+                                                text = update.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni e stabilità." },
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = AppleLabelPrimary
+                                            )
+
+                                            if (uiState.updateDownloadProgress != null) {
+                                                val prog = uiState.updateDownloadProgress
+                                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Text(
+                                                            text = uiState.updateStatusMessage ?: "Download in corso...",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = AppleLabelSecondary
+                                                        )
+                                                        Text(
+                                                            text = "${(prog * 100).toInt()}%",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = DavezBordeaux
+                                                        )
+                                                    }
+                                                    LinearProgressIndicator(
+                                                        progress = { prog },
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(4.dp)
+                                                            .clip(RoundedCornerShape(2.dp)),
+                                                        color = DavezBordeaux,
+                                                        trackColor = AppleBlueSoft
+                                                    )
+                                                }
+                                            }
+
+                                            Button(
+                                                onClick = { viewModel.startUpdateDownloadAndInstall(context) },
+                                                enabled = uiState.updateDownloadProgress == null,
+                                                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                                                shape = RoundedCornerShape(10.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = if (uiState.updateDownloadProgress != null) "Download in corso..." else "Scarica e Installa v${update.latestVersionName}",
+                                                    color = AppleWhite,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Riga Switch: Controllo automatico all'avvio
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = AppleWhite,
+                                    border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Controllo automatico all'avvio",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = AppleLabelPrimary
+                                            )
+                                            Text(
+                                                text = "Verifica nuove versioni all'apertura dell'app",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = AppleLabelSecondary
+                                            )
+                                        }
+                                        Switch(
+                                            checked = uiState.aiConfig.autoCheckUpdatesOnStart,
+                                            onCheckedChange = { viewModel.toggleAutoCheckUpdates(it) },
+                                            colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
+                                        )
+                                    }
+                                }
+
+                                // Pulsante Verifica Manuale Aggiornamenti
+                                Button(
+                                    onClick = { viewModel.checkForUpdates(silent = false) },
+                                    enabled = !uiState.isCheckingUpdate && uiState.updateDownloadProgress == null,
+                                    colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 42.dp)
+                                ) {
+                                    if (uiState.isCheckingUpdate) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            color = AppleWhite,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Verifica in corso...", color = AppleWhite, fontSize = 13.sp)
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = AppleWhite
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Verifica Aggiornamenti Ora", color = AppleWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    }
+                                }
+
+                                // Feedback messaggio di stato
+                                if (!uiState.updateStatusMessage.isNullOrBlank() && uiState.availableUpdate == null) {
+                                    Text(
+                                        text = uiState.updateStatusMessage,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = DavezBordeaux,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                    )
+                                }
+
+                                // Configurazione URL Manifest (opzionale)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showManifestUrlEditor = !showManifestUrlEditor },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "⚙️ Endpoint Manifest OTA",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = AppleLabelSecondary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (showManifestUrlEditor) "Nascondi" else "Configura",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = DavezBordeaux,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                if (showManifestUrlEditor) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        OutlinedTextField(
+                                            value = editedManifestUrl,
+                                            onValueChange = { editedManifestUrl = it },
+                                            label = { Text("URL file ota-update.json", fontSize = 11.sp) },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            TextButton(
+                                                onClick = {
+                                                    editedManifestUrl = OtaUpdateManager.DEFAULT_MANIFEST_URL
+                                                    viewModel.updateOtaManifestUrl(OtaUpdateManager.DEFAULT_MANIFEST_URL)
+                                                }
+                                            ) {
+                                                Text("Predefinito", fontSize = 11.sp, color = AppleLabelSecondary)
+                                            }
+                                            Spacer(Modifier.width(4.dp))
+                                            Button(
+                                                onClick = { viewModel.updateOtaManifestUrl(editedManifestUrl) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("Salva URL", fontSize = 11.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "settings_bottom_spacer") {
+                        Spacer(Modifier.height(40.dp))
+                    }
         }
     }
     }
