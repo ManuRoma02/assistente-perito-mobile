@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 13,
-  "latestVersionName": "1.0.12",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.12/app-release.apk",
-  "releaseNotes": "• Nuova Interfaccia Impostazioni a Tendina (Accordions): Tutte le sezioni (Profilo Studio, Categorie, Calendario, Briefing, Modelli IA, OTA) sono ora organizzate in eleganti tendine comprimibili con rotazione chevron e animazioni fluide su GPU\n• Perfezionamento Animazioni Emil Kowalski: Ricalibrate tutte le curve temporali troppo rapide (<180ms) portandole a 280-350ms con fisica a molla organica (StiffnessMediumLow, damping 0.8) per una percezione visiva fluida e naturale\n• Personalizzazione Riferimento Categorie nell'Agenda: Configurazione flessibile delle informazioni nel titolo per ogni categoria di appuntamento (orario, cliente, luogo, note)",
+  "latestVersionCode": 14,
+  "latestVersionName": "1.0.13",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.13/app-release.apk",
+  "releaseNotes": "• Fix Layout Badge Tendine Impostazioni: Risolto il wrapping verticale del badge versione e stato nelle schede a tendina, garantendo rendering orizzontale compatto e privo di distorsioni visive\n• Titoli Sezioni Ottimizzati: Intestazione Aggiornamenti In-App e Briefing resa più pulita e aderente al design system\n• Aggiornamenti OTA Istantanei: Allineamento e verifica immediata in-app",
   "mandatory": false,
-  "publishedAt": "2026-10-21T11:25:00Z"
+  "publishedAt": "2026-10-21T12:05:00Z"
 }
