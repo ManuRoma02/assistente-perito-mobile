@@ -35,6 +35,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.unit.IntSize
 import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
+import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
+import com.example.assistenteperitomobile.domain.defaultCategoriesList
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -4055,6 +4057,7 @@ fun PeritoStudioMessageBubble(
     val coroutineScope = rememberCoroutineScope()
     var isCopied by remember { mutableStateOf(false) }
     var showRescheduleDialog by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val textSelectionColors = remember(isUser) {
         TextSelectionColors(
@@ -4399,6 +4402,7 @@ fun PeritoStudioMessageBubble(
             if (showRescheduleDialog) {
                 RescheduleAppointmentDialog(
                     event = ev,
+                    availableCategories = uiState.aiConfig.categories,
                     onDismiss = { showRescheduleDialog = false },
                     onConfirm = { newTitle, newCategory, newStartIso, newEndIso, newNotes ->
                         viewModel.updateCalendarEvent(
@@ -5466,6 +5470,15 @@ fun AiEngineSettingsSheetContent(
                 },
                 onResetDefaults = {
                     viewModel.resetCategoryReferenceFormats()
+                },
+                onAddCategory = { name, emoji, defaultTitle, keywords ->
+                    viewModel.addCustomCategory(name, emoji, defaultTitle, keywords)
+                },
+                onUpdateCategory = { id, name, emoji, defaultTitle, keywords ->
+                    viewModel.updateCustomCategory(id, name, emoji, defaultTitle, keywords)
+                },
+                onDeleteCategory = { id ->
+                    viewModel.deleteCustomCategory(id)
                 },
                 onBack = { currentSubScreen = "main" }
             )
@@ -7003,6 +7016,7 @@ fun FirstRunModelDownloadDialog(
 @Composable
 fun RescheduleAppointmentDialog(
     event: CalendarEventItem,
+    availableCategories: List<PeritoCategoryDefinition> = defaultCategoriesList(),
     onDismiss: () -> Unit,
     onConfirm: (newTitle: String, newCategory: String, newStartIso: String, newEndIso: String, newNotes: String) -> Unit
 ) {
@@ -7027,9 +7041,14 @@ fun RescheduleAppointmentDialog(
         java.time.Duration.between(initialDt, initialEndDt).toMinutes().coerceAtLeast(15L)
     }
 
-    var selectedCategory by remember {
-        mutableStateOf(PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo }))
+    val initialCat = remember(event, availableCategories) {
+        val catStr = event.categoria.ifBlank { event.titolo }.trim()
+        availableCategories.find { it.id.equals(catStr, ignoreCase = true) || it.displayName.equals(catStr, ignoreCase = true) }
+            ?: availableCategories.find { it.id == PeritoEventCategory.fromString(catStr).id }
+            ?: availableCategories.firstOrNull()
+            ?: PeritoCategoryDefinition(id = "altro", displayName = "Altro", emoji = "📌", defaultPrefix = "Appuntamento")
     }
+    var selectedCategory by remember { mutableStateOf(initialCat) }
     var titleText by remember { mutableStateOf(event.titolo) }
     var notesText by remember { mutableStateOf(event.note) }
     var selectedDate by remember { mutableStateOf(initialDt.toLocalDate()) }
@@ -7103,8 +7122,8 @@ fun RescheduleAppointmentDialog(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        PeritoEventCategory.entries.forEach { cat ->
-                            val isSelected = selectedCategory == cat
+                        availableCategories.forEach { cat ->
+                            val isSelected = selectedCategory.id == cat.id
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
