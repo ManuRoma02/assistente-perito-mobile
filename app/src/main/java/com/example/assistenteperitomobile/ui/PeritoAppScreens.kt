@@ -6100,9 +6100,13 @@ fun AiEngineSettingsSheetContent(
                                             }
 
                                             Text(
-                                                text = update.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni e stabilità." },
+                                                text = formatPeritoMessageText(
+                                                    update.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni e stabilità." },
+                                                    isUser = false
+                                                ),
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = AppleLabelPrimary
+                                                color = AppleLabelPrimary,
+                                                lineHeight = 18.sp
                                             )
 
                                             if (uiState.updateDownloadProgress != null) {
@@ -7499,7 +7503,10 @@ fun AppUpdateDialog(
                             )
                         }
                         Text(
-                            text = manifest.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni, stabilità e correzioni di bug." },
+                            text = formatPeritoMessageText(
+                                manifest.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni, stabilità e correzioni di bug." },
+                                isUser = false
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = AppleLabelPrimary,
                             lineHeight = 18.sp
