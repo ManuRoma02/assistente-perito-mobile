@@ -157,6 +157,88 @@ enum class PeritoEventCategory(
 
 @Immutable
 @Serializable
+data class CategoryReferenceFormat(
+    val showTime: Boolean = false,
+    val showType: Boolean = true,
+    val showSubject: Boolean = true,
+    val showPlace: Boolean = true,
+    val showNotes: Boolean = false
+) {
+    fun formatTitle(
+        startTimeIso: String?,
+        categoryType: String,
+        subject: String,
+        place: String,
+        notes: String
+    ): String {
+        val parts = mutableListOf<String>()
+        if (showTime && !startTimeIso.isNullOrBlank()) {
+            val h = startTimeIso.drop(11).take(5)
+            if (h.isNotBlank()) parts.add(h)
+        }
+        if (showType && categoryType.isNotBlank()) {
+            parts.add(categoryType)
+        }
+        if (showSubject && subject.isNotBlank() && subject != "Cliente") {
+            parts.add(subject)
+        }
+
+        var base = parts.joinToString(" - ")
+        if (base.isBlank()) {
+            base = if (categoryType.isNotBlank()) categoryType else "Impegno"
+        }
+
+        val extras = mutableListOf<String>()
+        if (showPlace && place.isNotBlank() && place != "Da definire") {
+            extras.add(place)
+        }
+        if (showNotes && notes.isNotBlank()) {
+            extras.add(notes)
+        }
+
+        return if (extras.isNotEmpty()) {
+            "$base (${extras.joinToString(" • ")})"
+        } else {
+            base
+        }
+    }
+}
+
+fun defaultCategoryFormats(): Map<String, CategoryReferenceFormat> = mapOf(
+    PeritoEventCategory.SOPRALLUOGO.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.RILIEVO.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.UNIONCASA.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.AGENZIA_ORSO.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.COMUNE.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.TRIBUNALE.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = false, showNotes = true
+    ),
+    PeritoEventCategory.RIUNIONE.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.CLIENTE.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.PERSONALE.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = false, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.ALTRO.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    )
+)
+
+@Immutable
+@Serializable
 data class SystemCalendarInfo(
     val id: Long,
     val name: String,
@@ -250,5 +332,6 @@ data class AiEngineConfig(
     val selectedCalendarName: String? = null,
     val otaManifestUrl: String = "https://raw.githubusercontent.com/ManuRoma02/assistente-perito-mobile/main/ota-update.json",
     val autoCheckUpdatesOnStart: Boolean = true,
-    val studioProfile: StudioProfile = StudioProfile()
+    val studioProfile: StudioProfile = StudioProfile(),
+    val categoryFormats: Map<String, CategoryReferenceFormat> = defaultCategoryFormats()
 )
