@@ -39,3 +39,8 @@ re-read whole files.
 After big code changes, refresh the graph with `graft build` (deterministic,
 no API key, $0).
 <!-- graft:end -->
+
+## Convenzioni Note di Rilascio & Log Aggiornamenti (OTA)
+- **Sintesi estrema**: i log degli aggiornamenti (`ota-update.json`, dialoghi in-app e changelog) devono essere brevi, compatti e strutturati a punti (1 riga per punto).
+- **Grassetto per le parole chiave**: evidenziare sempre i termini chiave in grassetto Markdown (`**Parola Chiave**: ...`).
+- **Nessun testo prolisso**: evitare descrizioni lunghe o spiegazioni ridondanti.
