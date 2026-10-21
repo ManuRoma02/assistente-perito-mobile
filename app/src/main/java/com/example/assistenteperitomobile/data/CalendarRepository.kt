@@ -118,6 +118,8 @@ class CalendarRepository(private val context: Context) {
 
         val activityType = if (proposed.titolo.isNotBlank() && proposed.titolo.contains(" - ")) {
             proposed.titolo.substringBefore(" - ").trim()
+        } else if (proposed.titolo == "Sopralluogo APE" || proposed.categoria == "APE") {
+            "Sopralluogo APE"
         } else if (proposed.categoria.isNotBlank()) {
             proposed.categoria
         } else {
@@ -132,7 +134,7 @@ class CalendarRepository(private val context: Context) {
                 place = proposed.luogo,
                 notes = proposed.note
             )
-        } else if (proposed.titolo.isNotBlank() && (proposed.titolo.contains(" - ") || proposed.titolo.contains(" / "))) {
+        } else if (proposed.titolo.isNotBlank() && (proposed.titolo.contains(" - ") || proposed.titolo.contains(" / ") || proposed.titolo == "Sopralluogo APE")) {
             proposed.titolo
         } else if (proposed.titolo.isNotBlank() && proposed.titolo != proposed.categoria) {
             "${proposed.titolo} - $resolvedSubject"

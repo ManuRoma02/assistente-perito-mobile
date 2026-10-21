@@ -41,6 +41,7 @@ import com.example.assistenteperitomobile.domain.MainAppTab
 import com.example.assistenteperitomobile.domain.PendingConflictState
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
+import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.StudioProfile
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
@@ -753,8 +754,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     notifyOrStopBackgroundService("🚨 Conflitto d'Agenda Rilevato", "Conflitto per ${parsed.titolo} con impegni esistenti")
                 } else {
-                    val catEnum = PeritoEventCategory.fromString(parsed.categoria.ifBlank { parsed.titolo })
-                    val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+                    val catFormat = getCategoryFormat(parsed.categoria.ifBlank { parsed.titolo })
                     val created = calendarRepo.createEvent(parsed, catFormat)
                     lastCreatedEvent = created
                     refreshAllData()
@@ -783,8 +783,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun resolveConflictReplace(messageId: String, conflictState: PendingConflictState) {
         viewModelScope.launch {
-            val catEnum = PeritoEventCategory.fromString(conflictState.proposed.categoria.ifBlank { conflictState.proposed.titolo })
-            val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+            val catFormat = getCategoryFormat(conflictState.proposed.categoria.ifBlank { conflictState.proposed.titolo })
             val created = calendarRepo.replaceConflictsAndCreate(
                 conflicts = conflictState.conflictingEvents,
                 proposed = conflictState.proposed,
@@ -807,8 +806,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun resolveConflictForce(messageId: String, conflictState: PendingConflictState) {
         viewModelScope.launch {
-            val catEnum = PeritoEventCategory.fromString(conflictState.proposed.categoria.ifBlank { conflictState.proposed.titolo })
-            val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+            val catFormat = getCategoryFormat(conflictState.proposed.categoria.ifBlank { conflictState.proposed.titolo })
             val created = calendarRepo.createEvent(conflictState.proposed, catFormat)
             lastCreatedEvent = created
             clearConflictButtonsOnMessage(messageId)
@@ -1186,6 +1184,81 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Aggiunge una nuova categoria personalizzata definita dall'utente.
+     */
+    fun addCustomCategory(name: String, emoji: String, defaultTitle: String, keywords: List<String>) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) return
+        val rawSlug = cleanName.lowercase(Locale.ITALIAN).replace(Regex("""[^a-z0-9_]+"""), "_").trim('_')
+        val id = if (rawSlug.isNotBlank()) "${rawSlug}_${UUID.randomUUID().toString().take(6)}" else "cat_${UUID.randomUUID().toString().take(6)}"
+        val newDef = PeritoCategoryDefinition(
+            id = id,
+            displayName = cleanName,
+            emoji = emoji.trim().ifBlank { "📌" },
+            defaultPrefix = defaultTitle.trim().ifBlank { cleanName },
+            keywords = keywords.map { it.trim().lowercase(Locale.ITALIAN) }.filter { it.isNotBlank() },
+            isSystem = false
+        )
+        val currentCategories = _uiState.value.aiConfig.categories
+        val currentFormats = _uiState.value.aiConfig.categoryFormats.toMutableMap()
+        currentFormats[id] = CategoryReferenceFormat()
+        val updatedConfig = _uiState.value.aiConfig.copy(
+            categories = currentCategories + newDef,
+            categoryFormats = currentFormats
+        )
+        updateAiConfig(updatedConfig)
+    }
+
+    /**
+     * Modifica una categoria esistente (mantenendo inalterato il suo ID).
+     */
+    fun updateCustomCategory(id: String, name: String, emoji: String, defaultTitle: String, keywords: List<String>) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) return
+        val currentCategories = _uiState.value.aiConfig.categories
+        val existing = currentCategories.firstOrNull { it.id == id } ?: return
+        val updatedDef = existing.copy(
+            displayName = cleanName,
+            emoji = emoji.trim().ifBlank { existing.emoji },
+            defaultPrefix = defaultTitle.trim().ifBlank { cleanName },
+            keywords = keywords.map { it.trim().lowercase(Locale.ITALIAN) }.filter { it.isNotBlank() }
+        )
+        val updatedCategories = currentCategories.map { if (it.id == id) updatedDef else it }
+        val updatedConfig = _uiState.value.aiConfig.copy(categories = updatedCategories)
+        updateAiConfig(updatedConfig)
+    }
+
+    /**
+     * Elimina una categoria personalizzata (non è consentito eliminare categorie di sistema).
+     */
+    fun deleteCustomCategory(id: String) {
+        val currentCategories = _uiState.value.aiConfig.categories
+        val target = currentCategories.firstOrNull { it.id == id } ?: return
+        if (target.isSystem) return
+
+        val updatedCategories = currentCategories.filter { it.id != id }
+        val currentFormats = _uiState.value.aiConfig.categoryFormats.toMutableMap()
+        currentFormats.remove(id)
+        val updatedConfig = _uiState.value.aiConfig.copy(
+            categories = updatedCategories,
+            categoryFormats = currentFormats
+        )
+        updateAiConfig(updatedConfig)
+    }
+
+    /**
+     * Recupera il formato di visualizzazione associato a una determinata categoria o titolo.
+     */
+    fun getCategoryFormat(categoryOrTitle: String): CategoryReferenceFormat? {
+        val catDef = _uiState.value.aiConfig.categories.firstOrNull {
+            it.id.equals(categoryOrTitle, ignoreCase = true) ||
+            it.displayName.equals(categoryOrTitle, ignoreCase = true)
+        }
+        val catId = catDef?.id ?: PeritoEventCategory.fromString(categoryOrTitle).id
+        return _uiState.value.aiConfig.categoryFormats[catId]
+    }
+
+    /**
      * Aggiorna la configurazione di visualizzazione del riferimento per una specifica categoria.
      */
     fun updateCategoryReferenceFormat(categoryId: String, format: CategoryReferenceFormat) {
@@ -1208,9 +1281,14 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      * configurate dall'utente per la categoria associata.
      */
     fun formatEventReference(event: CalendarEventItem): String {
+        val catDef = _uiState.value.aiConfig.categories.firstOrNull {
+            it.id.equals(event.categoria, ignoreCase = true) ||
+            it.displayName.equals(event.categoria, ignoreCase = true)
+        }
         val catEnum = PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
-        val format = _uiState.value.aiConfig.categoryFormats[catEnum.id] ?: CategoryReferenceFormat()
-        val defaultType = catEnum.defaultPrefix
+        val catId = catDef?.id ?: catEnum.id
+        val format = _uiState.value.aiConfig.categoryFormats[catId] ?: CategoryReferenceFormat()
+        val defaultType = catDef?.defaultPrefix ?: catEnum.defaultPrefix
 
         val subject = if (event.cliente.isNotBlank() && event.cliente != "Cliente") {
             event.cliente
@@ -1223,7 +1301,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         val effectiveSubject = if (subject.isBlank() && event.titolo.isNotBlank() &&
-            !event.titolo.equals(catEnum.displayName, ignoreCase = true) &&
+            !event.titolo.equals(catDef?.displayName ?: catEnum.displayName, ignoreCase = true) &&
             !event.titolo.equals(defaultType, ignoreCase = true)
         ) {
             if (event.titolo.contains(" - ")) {
@@ -1353,8 +1431,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             if (maybeAppointment.has_appointment && !maybeAppointment.is_ambiguo && maybeAppointment.data_inizio_iso != null) {
                 val conflicts = calendarRepo.checkConflicts(maybeAppointment)
                 if (conflicts.isEmpty()) {
-                    val catEnum = PeritoEventCategory.fromString(maybeAppointment.categoria.ifBlank { maybeAppointment.titolo })
-                    val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+                    val catFormat = getCategoryFormat(maybeAppointment.categoria.ifBlank { maybeAppointment.titolo })
                     val created = calendarRepo.createEvent(maybeAppointment, catFormat)
                     lastCreatedEvent = created
                     refreshAllData()
@@ -1554,8 +1631,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     cliente = lastEv.cliente,
                     note = lastEv.note
                 )
-                val catEnum = PeritoEventCategory.fromString(updatedProposal.categoria.ifBlank { updatedProposal.titolo })
-                val catFormat = _uiState.value.aiConfig.categoryFormats[catEnum.id]
+                val catFormat = getCategoryFormat(updatedProposal.categoria.ifBlank { updatedProposal.titolo })
                 val updated = calendarRepo.createEvent(updatedProposal, catFormat)
                 lastCreatedEvent = updated
                 refreshAllData()
