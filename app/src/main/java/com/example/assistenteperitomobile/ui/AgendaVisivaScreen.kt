@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.assistenteperitomobile.domain.CalendarEventItem
+import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.theme.AppleBlueDark
 import com.example.assistenteperitomobile.theme.AppleBlueSoft
@@ -432,7 +433,8 @@ fun AgendaVisivaScreen(
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev)
+                        formattedTitle = viewModel.formatEventReference(ev),
+                        categories = uiState.aiConfig.categories
                     )
                 }
             }
@@ -460,7 +462,8 @@ fun AgendaVisivaScreen(
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev)
+                        formattedTitle = viewModel.formatEventReference(ev),
+                        categories = uiState.aiConfig.categories
                     )
                 }
             }
@@ -501,7 +504,8 @@ fun AgendaVisivaScreen(
                                 },
                                 onReschedule = { eventToReschedule = ev },
                                 onDelete = { viewModel.deleteCalendarEvent(ev) },
-                                formattedTitle = viewModel.formatEventReference(ev)
+                                formattedTitle = viewModel.formatEventReference(ev),
+                                categories = uiState.aiConfig.categories
                             )
                         }
                     }
@@ -538,7 +542,8 @@ fun AgendaVisivaScreen(
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev)
+                        formattedTitle = viewModel.formatEventReference(ev),
+                        categories = uiState.aiConfig.categories
                     )
                 }
             }
@@ -562,7 +567,8 @@ fun AgendaVisivaScreen(
                         },
                         onReschedule = { eventToReschedule = ev },
                         onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev)
+                        formattedTitle = viewModel.formatEventReference(ev),
+                        categories = uiState.aiConfig.categories
                     )
                 }
             }
@@ -572,6 +578,7 @@ fun AgendaVisivaScreen(
     eventToReschedule?.let { ev ->
         RescheduleAppointmentDialog(
             event = ev,
+            availableCategories = uiState.aiConfig.categories,
             onDismiss = { eventToReschedule = null },
             onConfirm = { newTitle, newCategory, newStartIso, newEndIso, newNotes ->
                 viewModel.updateCalendarEvent(
@@ -631,7 +638,8 @@ fun NextWeekExpandableEventCard(
     onOpenMap: () -> Unit,
     onReschedule: () -> Unit,
     onDelete: () -> Unit,
-    formattedTitle: String? = null
+    formattedTitle: String? = null,
+    categories: List<PeritoCategoryDefinition> = emptyList()
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -655,8 +663,19 @@ fun NextWeekExpandableEventCard(
         }.getOrDefault(dateIso)
     }
 
-    val catEnum = remember(event.categoria, event.titolo) {
-        PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
+    val (catEmoji, catName) = remember(event.categoria, event.titolo, categories) {
+        val catStr = event.categoria.ifBlank { event.titolo }.trim()
+        val match = categories.firstOrNull {
+            it.id.equals(catStr, ignoreCase = true) ||
+            it.displayName.equals(catStr, ignoreCase = true) ||
+            it.keywords.any { kw -> catStr.contains(kw, ignoreCase = true) }
+        }
+        if (match != null) {
+            match.emoji to match.displayName
+        } else {
+            val fallback = PeritoEventCategory.fromString(catStr)
+            fallback.emoji to fallback.displayName
+        }
     }
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -735,7 +754,7 @@ fun NextWeekExpandableEventCard(
                             border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.25f))
                         ) {
                             Text(
-                                text = "${catEnum.emoji} ${catEnum.displayName}",
+                                text = "$catEmoji $catName",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                                 color = AppleBlueDark,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -902,11 +921,27 @@ fun AgendaEventCard(
     onOpenMap: () -> Unit,
     onReschedule: () -> Unit,
     onDelete: () -> Unit,
-    formattedTitle: String? = null
+    formattedTitle: String? = null,
+    categories: List<PeritoCategoryDefinition> = emptyList()
 ) {
     val startTime = event.startIso.drop(11).take(5)
     val endTime = event.endIso.drop(11).take(5)
     val dateLabel = event.startIso.take(10)
+
+    val (catEmoji, catName) = remember(event.categoria, event.titolo, categories) {
+        val catStr = event.categoria.ifBlank { event.titolo }.trim()
+        val match = categories.firstOrNull {
+            it.id.equals(catStr, ignoreCase = true) ||
+            it.displayName.equals(catStr, ignoreCase = true) ||
+            it.keywords.any { kw -> catStr.contains(kw, ignoreCase = true) }
+        }
+        if (match != null) {
+            match.emoji to match.displayName
+        } else {
+            val fallback = PeritoEventCategory.fromString(catStr)
+            fallback.emoji to fallback.displayName
+        }
+    }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -1000,14 +1035,13 @@ fun AgendaEventCard(
                 Spacer(Modifier.height(4.dp))
 
                 // Categoria Badge
-                val catEnum = PeritoEventCategory.fromString(event.categoria.ifBlank { event.titolo })
                 Surface(
                     shape = RoundedCornerShape(6.dp),
                     color = DavezBordeaux.copy(alpha = 0.10f),
                     border = BorderStroke(0.6.dp, DavezBordeaux.copy(alpha = 0.30f))
                 ) {
                     Text(
-                        text = "${catEnum.emoji} ${catEnum.displayName}",
+                        text = "$catEmoji $catName",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = DavezBordeaux,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
