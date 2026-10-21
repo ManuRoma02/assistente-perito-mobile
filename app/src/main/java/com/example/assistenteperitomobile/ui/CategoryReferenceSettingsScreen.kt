@@ -543,6 +543,7 @@ private fun CategoryLivePreviewBox(
     val sampleSubject = when (category) {
         PeritoEventCategory.UNIONCASA -> "Unioncasa"
         PeritoEventCategory.AGENZIA_ORSO -> "Agenzia Orso"
+        PeritoEventCategory.APE -> "Unioncasa"
         PeritoEventCategory.SOPRALLUOGO -> "Ing. Ferrari"
         PeritoEventCategory.RILIEVO -> "Geom. Bianchi"
         PeritoEventCategory.TRIBUNALE -> "Tribunale Civile"

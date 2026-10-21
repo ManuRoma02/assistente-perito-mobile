@@ -123,6 +123,7 @@ enum class PeritoEventCategory(
 ) {
     SOPRALLUOGO("sopralluogo", "Sopralluogo", "🔍", "Sopralluogo"),
     RILIEVO("rilievo", "Rilievo", "📐", "Rilievo Tecnico"),
+    APE("ape", "APE", "⚡", "Sopralluogo APE"),
     UNIONCASA("unioncasa", "Unioncasa", "🏠", "Incontro Unioncasa"),
     AGENZIA_ORSO("agenzia_orso", "Agenzia Orso", "🐻", "Appuntamento Agenzia Orso"),
     COMUNE("comune", "Comune", "🏛️", "Incontro Comune"),
@@ -140,6 +141,7 @@ enum class PeritoEventCategory(
                 it.id.equals(norm, ignoreCase = true) ||
                 it.displayName.equals(norm, ignoreCase = true)
             } ?: when {
+                norm.contains("ape") || norm.contains("prestazione energetica") || norm.contains("attestato energetico") -> APE
                 norm.contains("unioncasa") || norm.contains("union casa") -> UNIONCASA
                 norm.contains("agenzia orso") || norm.contains("orso") -> AGENZIA_ORSO
                 norm.contains("riliev") || norm.contains("misuraz") || norm.contains("misure") -> RILIEVO
@@ -154,6 +156,109 @@ enum class PeritoEventCategory(
         }
     }
 }
+
+@Immutable
+@Serializable
+data class PeritoCategoryDefinition(
+    val id: String,
+    val displayName: String,
+    val emoji: String,
+    val defaultPrefix: String,
+    val keywords: List<String> = emptyList(),
+    val isSystem: Boolean = false,
+    val colorHex: String? = null
+)
+
+fun defaultCategoriesList(): List<PeritoCategoryDefinition> = listOf(
+    PeritoCategoryDefinition(
+        id = "sopralluogo",
+        displayName = "Sopralluogo",
+        emoji = "🔍",
+        defaultPrefix = "Sopralluogo",
+        keywords = listOf("sopralluogo", "visita", "collaudo"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "rilievo",
+        displayName = "Rilievo",
+        emoji = "📐",
+        defaultPrefix = "Rilievo Tecnico",
+        keywords = listOf("rilievo", "rilievi", "misurazioni", "misure"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "ape",
+        displayName = "APE",
+        emoji = "⚡",
+        defaultPrefix = "Sopralluogo APE",
+        keywords = listOf("ape", "a.p.e.", "prestazione energetica", "certificazione energetica", "attestato energetico"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "comune",
+        displayName = "Comune",
+        emoji = "🏛️",
+        defaultPrefix = "Incontro Comune",
+        keywords = listOf("comune", "accesso atti", "accesso agli atti", "ufficio tecnico", "edilizia privata", "cila", "scia", "pdc"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "tribunale",
+        displayName = "Tribunale",
+        emoji = "⚖️",
+        defaultPrefix = "Udienza / Tribunale",
+        keywords = listOf("tribunale", "udienza", "giuramento", "ctu", "giudice", "cancelleria"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "riunione",
+        displayName = "Riunione",
+        emoji = "🏢",
+        defaultPrefix = "Riunione Studio",
+        keywords = listOf("riunione", "studio", "meeting", "ufficio"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "unioncasa",
+        displayName = "Unioncasa",
+        emoji = "🏠",
+        defaultPrefix = "Incontro Unioncasa",
+        keywords = listOf("unioncasa", "union casa"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "agenzia_orso",
+        displayName = "Agenzia Orso",
+        emoji = "🐻",
+        defaultPrefix = "Appuntamento Agenzia Orso",
+        keywords = listOf("agenzia orso", "orso"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "cliente",
+        displayName = "Cliente",
+        emoji = "👤",
+        defaultPrefix = "Appuntamento Cliente",
+        keywords = listOf("cliente", "appuntamento", "chiamata", "firma", "consegna"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "personale",
+        displayName = "Personale",
+        emoji = "☕",
+        defaultPrefix = "Personale",
+        keywords = listOf("colazione", "pranzo", "cena", "caffè", "caffe", "aperitivo"),
+        isSystem = true
+    ),
+    PeritoCategoryDefinition(
+        id = "altro",
+        displayName = "Altro",
+        emoji = "📅",
+        defaultPrefix = "Impegno",
+        keywords = listOf("impegno"),
+        isSystem = true
+    )
+)
 
 @Immutable
 @Serializable
@@ -210,6 +315,9 @@ fun defaultCategoryFormats(): Map<String, CategoryReferenceFormat> = mapOf(
     ),
     PeritoEventCategory.RILIEVO.id to CategoryReferenceFormat(
         showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
+    ),
+    PeritoEventCategory.APE.id to CategoryReferenceFormat(
+        showTime = false, showType = true, showSubject = false, showPlace = true, showNotes = false
     ),
     PeritoEventCategory.UNIONCASA.id to CategoryReferenceFormat(
         showTime = false, showType = true, showSubject = true, showPlace = true, showNotes = false
@@ -333,5 +441,8 @@ data class AiEngineConfig(
     val otaManifestUrl: String = "https://raw.githubusercontent.com/ManuRoma02/assistente-perito-mobile/main/ota-update.json",
     val autoCheckUpdatesOnStart: Boolean = true,
     val studioProfile: StudioProfile = StudioProfile(),
-    val categoryFormats: Map<String, CategoryReferenceFormat> = defaultCategoryFormats()
+    val categoryFormats: Map<String, CategoryReferenceFormat> = defaultCategoryFormats(),
+    val categories: List<PeritoCategoryDefinition> = defaultCategoriesList()
 )
+
+typealias PeritoAiConfig = AiEngineConfig
