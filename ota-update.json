@@ -1,8 +1,8 @@
 {
-  "latestVersionCode": 14,
-  "latestVersionName": "1.0.13",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.13/app-release.apk",
-  "releaseNotes": "• **Badge impostazioni**: risolto wrapping verticale e allineamento orizzontale\n• **Titoli tendine**: interfaccia più pulita e leggibile\n• **Aggiornamento OTA**: verifica e installazione istantanea in-app",
+  "latestVersionCode": 15,
+  "latestVersionName": "1.0.14",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.14/app-release.apk",
+  "releaseNotes": "• **Categoria APE**: sopralluogo energetico dedicato con titolo predefinito 'Sopralluogo APE'\n• **Gestione Categorie**: aggiunta, modifica ed eliminazione categorie personalizzate con parole chiave\n• **Parser Potenziato**: riconoscimento agenzie cliente ('Unioncasa', 'Orso'), note e sigle studio ('RD', 'STA')\n• **Orari e Date**: supporto intervalli estesi ('dalle 9 alle 13') e giorni del mese",
   "mandatory": false,
-  "publishedAt": "2026-10-21T12:05:00Z"
+  "publishedAt": "2026-10-21T21:30:00Z"
 }
