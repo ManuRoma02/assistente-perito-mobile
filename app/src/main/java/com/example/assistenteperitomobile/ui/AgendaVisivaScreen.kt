@@ -423,7 +423,8 @@ fun AgendaVisivaScreen(
                             viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) }
+                        onDelete = { viewModel.deleteCalendarEvent(ev) },
+                        formattedTitle = viewModel.formatEventReference(ev)
                     )
                 }
             }
@@ -450,7 +451,8 @@ fun AgendaVisivaScreen(
                             viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) }
+                        onDelete = { viewModel.deleteCalendarEvent(ev) },
+                        formattedTitle = viewModel.formatEventReference(ev)
                     )
                 }
             }
@@ -490,7 +492,8 @@ fun AgendaVisivaScreen(
                                     viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                                 },
                                 onReschedule = { eventToReschedule = ev },
-                                onDelete = { viewModel.deleteCalendarEvent(ev) }
+                                onDelete = { viewModel.deleteCalendarEvent(ev) },
+                                formattedTitle = viewModel.formatEventReference(ev)
                             )
                         }
                     }
@@ -526,7 +529,8 @@ fun AgendaVisivaScreen(
                             viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) }
+                        onDelete = { viewModel.deleteCalendarEvent(ev) },
+                        formattedTitle = viewModel.formatEventReference(ev)
                     )
                 }
             }
@@ -549,7 +553,8 @@ fun AgendaVisivaScreen(
                             viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
                         },
                         onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) }
+                        onDelete = { viewModel.deleteCalendarEvent(ev) },
+                        formattedTitle = viewModel.formatEventReference(ev)
                     )
                 }
             }
@@ -617,7 +622,8 @@ fun NextWeekExpandableEventCard(
     event: CalendarEventItem,
     onOpenMap: () -> Unit,
     onReschedule: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    formattedTitle: String? = null
 ) {
     var isExpanded by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -732,7 +738,7 @@ fun NextWeekExpandableEventCard(
 
                     // Titolo sintetico
                     Text(
-                        text = event.titolo,
+                        text = formattedTitle ?: event.titolo,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.1).sp
@@ -887,7 +893,8 @@ fun AgendaEventCard(
     isToday: Boolean,
     onOpenMap: () -> Unit,
     onReschedule: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    formattedTitle: String? = null
 ) {
     val startTime = event.startIso.drop(11).take(5)
     val endTime = event.endIso.drop(11).take(5)
@@ -1004,7 +1011,7 @@ fun AgendaEventCard(
 
                 // Titolo
                 Text(
-                    text = event.titolo,
+                    text = formattedTitle ?: event.titolo,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Serif,

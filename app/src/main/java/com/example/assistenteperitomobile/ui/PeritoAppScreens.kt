@@ -20,6 +20,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.widget.Toast
 import com.example.assistenteperitomobile.data.MorningBriefingWorker
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -31,6 +32,9 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -5256,77 +5260,156 @@ fun AiEngineSettingsSheetContent(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.92f)
-            .background(AppleWhite)
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        // Header FISSO in alto con Brand PeritoAI e pulsante di chiusura Apple HIG
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f, fill = false)
-            ) {
-                PeritoAiBrandEmblem(size = 36.dp, showOnlineBadge = false)
-                Column {
-                    Text(
-                        text = "Impostazioni & Modelli IA",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AppleLabelPrimary,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "PeritoAI • Download in Background & Privacy",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DavezBordeaux,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+    var currentSubScreen by rememberSaveable { mutableStateOf("main") }
+
+    BackHandler(enabled = currentSubScreen != "main") {
+        currentSubScreen = "main"
+    }
+
+    AnimatedContent(
+        targetState = currentSubScreen,
+        transitionSpec = {
+            if (targetState == "category_formats") {
+                slideInHorizontally { width -> width } + fadeIn() togetherWith
+                    slideOutHorizontally { width -> -width } + fadeOut()
+            } else {
+                slideInHorizontally { width -> -width } + fadeIn() togetherWith
+                    slideOutHorizontally { width -> width } + fadeOut()
             }
-            Surface(
-                onClick = onClose,
-                shape = CircleShape,
-                color = AppleSecondaryGroupedBg.copy(alpha = 0.85f),
+        },
+        label = "settings_subscreen_transition"
+    ) { screen ->
+        if (screen == "category_formats") {
+            CategoryReferenceSettingsContent(
+                config = uiState.aiConfig,
+                onUpdateFormat = { catId, format ->
+                    viewModel.updateCategoryReferenceFormat(catId, format)
+                },
+                onResetDefaults = {
+                    viewModel.resetCategoryReferenceFormats()
+                },
+                onBack = { currentSubScreen = "main" }
+            )
+        } else {
+            Column(
                 modifier = Modifier
-                    .size(32.dp)
-                    .semantics { contentDescription = "Chiudi impostazioni" }
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.92f)
+                    .background(AppleWhite)
+                    .navigationBarsPadding()
+                    .imePadding()
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Chiudi impostazioni",
-                        tint = AppleLabelPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                // Header FISSO in alto con Brand PeritoAI e pulsante di chiusura Apple HIG
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        PeritoAiBrandEmblem(size = 36.dp, showOnlineBadge = false)
+                        Column {
+                            Text(
+                                text = "Impostazioni & Modelli IA",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = AppleLabelPrimary,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "PeritoAI • Download in Background & Privacy",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DavezBordeaux,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Surface(
+                        onClick = onClose,
+                        shape = CircleShape,
+                        color = AppleSecondaryGroupedBg.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .size(32.dp)
+                            .semantics { contentDescription = "Chiudi impostazioni" }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Chiudi impostazioni",
+                                tint = AppleLabelPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
-            }
-        }
 
-        HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
+                HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
 
-        // Contenuto scorrevole fluido a 60fps con LazyColumn (nessun conflitto col BottomSheet grazie a sheetGesturesEnabled=false)
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // SEZIONE 0A: PROFILO STUDIO TECNICO (Personalizzabile dal Perito)
-            item(key = "settings_studio_profile_section") {
+                // Contenuto scorrevole fluido a 60fps con LazyColumn (nessun conflitto col BottomSheet grazie a sheetGesturesEnabled=false)
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 48.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // SEZIONE 0: PERSONALIZZAZIONE FORMATO RIFERIMENTO CATEGORIE
+                    item(key = "settings_category_reference_nav_card") {
+                        Surface(
+                            onClick = { currentSubScreen = "category_formats" },
+                            shape = RoundedCornerShape(16.dp),
+                            color = AppleGroupedBg,
+                            border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(DavezBordeaux.copy(alpha = 0.1f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = "🏷️", fontSize = 20.sp)
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Formato Riferimento Categorie",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = AppleLabelPrimary
+                                    )
+                                    Text(
+                                        text = "Personalizza cosa mostrare nel titolo per ogni categoria (Orario, Tipo, Soggetto, Luogo, Note)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppleLabelSecondary
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Apri personalizzazione riferimenti",
+                                    tint = DavezBordeaux,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // SEZIONE 0A: PROFILO STUDIO TECNICO (Personalizzabile dal Perito)
+                    item(key = "settings_studio_profile_section") {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = AppleGroupedBg,
@@ -6066,6 +6149,8 @@ fun AiEngineSettingsSheetContent(
             }
         }
     }
+    }
+}
 }
 
 @Composable
