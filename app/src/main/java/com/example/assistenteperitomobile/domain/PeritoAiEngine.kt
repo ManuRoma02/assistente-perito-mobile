@@ -225,14 +225,15 @@ class PeritoAiEngine(private val context: Context? = null) {
     suspend fun parseAppointment(
         messageText: String,
         now: LocalDateTime = LocalDateTime.now(),
-        config: AiEngineConfig = AiEngineConfig()
+        config: AiEngineConfig = AiEngineConfig(),
+        categories: List<PeritoCategoryDefinition> = config.categories
     ): AppointmentParseResult = withContext(Dispatchers.Default) {
         val cleaned = messageText.trim()
         if (cleaned.isEmpty()) {
             return@withContext AppointmentParseResult(has_appointment = false)
         }
 
-        val deterministic = parseAppointmentDeterministic(cleaned, now)
+        val deterministic = parseAppointmentDeterministic(cleaned, now, categories)
         if (!deterministic.has_appointment) {
             return@withContext deterministic
         }
@@ -246,7 +247,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         if (needsLlmEnrichment) {
             val llmJson = tryCallLocalLlm(
-                prompt = buildAppointmentPrompt(cleaned, now, config),
+                prompt = buildAppointmentPrompt(cleaned, now, config, categories),
                 config = config
             )
             if (llmJson != null) {
@@ -271,7 +272,9 @@ class PeritoAiEngine(private val context: Context? = null) {
                     } else {
                         validLlmCliente ?: deterministic.cliente
                     }
-                    val mergedTitolo = if (deterministic.titolo == "Appuntamento" || deterministic.titolo == "Appuntamento Tecnico") {
+                    val mergedTitolo = if (deterministic.categoria == "APE" || deterministic.titolo == "Sopralluogo APE") {
+                        "Sopralluogo APE"
+                    } else if (deterministic.titolo == "Appuntamento" || deterministic.titolo == "Appuntamento Tecnico") {
                         validLlmTitolo ?: deterministic.titolo
                     } else if (mergedLuogo != "Da definire" && !deterministic.titolo.contains(mergedLuogo)) {
                         "${deterministic.titolo} ($mergedLuogo)"
@@ -493,9 +496,57 @@ class PeritoAiEngine(private val context: Context? = null) {
     // 2. ESTRAZIONE APPUNTAMENTI, AUTO-CORREZIONE ("ANZI NO") E AMBIGUITÀ
     // =========================================================================
 
+    fun matchCategoryDefinition(
+        text: String,
+        categories: List<PeritoCategoryDefinition>
+    ): PeritoCategoryDefinition? {
+        val lower = text.lowercase(Locale.ITALIAN)
+
+        fun matchesKeywords(def: PeritoCategoryDefinition): Boolean {
+            return def.keywords.any { kw ->
+                val cleanKw = kw.trim().lowercase(Locale.ITALIAN)
+                if (cleanKw.isEmpty()) return@any false
+                val startBoundary = if (cleanKw.first().isLetterOrDigit()) """(?:\b|^)""" else ""
+                val endBoundary = if (cleanKw.last().isLetterOrDigit()) """(?:\b|$)""" else ""
+                Regex("""$startBoundary${Regex.escape(cleanKw)}$endBoundary""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+            }
+        }
+
+        // 1. Categorie personalizzate dell'utente (priorità massima)
+        val customDefs = categories.filter { !it.isSystem }
+        customDefs.firstOrNull { matchesKeywords(it) }?.let { return it }
+
+        // 2. Attività tecniche specifiche (APE, Rilievo, Comune, Tribunale)
+        val specificIds = listOf("ape", "rilievo", "comune", "tribunale")
+        for (id in specificIds) {
+            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+        }
+
+        // 3. Agenzie partner (Unioncasa, Agenzia Orso)
+        val agencyIds = listOf("unioncasa", "agenzia_orso")
+        for (id in agencyIds) {
+            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+        }
+
+        // 4. Attività studio e personali (Personale, Riunione)
+        val studioIds = listOf("personale", "riunione")
+        for (id in studioIds) {
+            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+        }
+
+        // 5. Categorie generiche fallback (Sopralluogo, Cliente, Altro)
+        val genericIds = listOf("sopralluogo", "cliente", "altro")
+        for (id in genericIds) {
+            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+        }
+
+        return null
+    }
+
     fun parseAppointmentDeterministic(
         rawMessage: String,
-        now: LocalDateTime = LocalDateTime.now()
+        now: LocalDateTime = LocalDateTime.now(),
+        categories: List<PeritoCategoryDefinition> = defaultCategoriesList()
     ): AppointmentParseResult {
         val normalized = rawMessage.trim()
         val lower = normalized.lowercase(Locale.ITALIAN)
@@ -504,7 +555,7 @@ class PeritoAiEngine(private val context: Context? = null) {
         val appointmentTriggers = listOf(
             "sopralluogo", "appuntamento", "incontro", "ci vediamo", "vediamoci", "vedersi",
             "fissa", "fissiamo", "segna", "agenda", "calendario", "udienza",
-            "riunione", "perizia", "visita", "rilievo", "collaudo",
+            "riunione", "perizia", "visita", "rilievo", "collaudo", "ape", "sanatoria",
             "domani", "dopodomani", "luned", "marted", "mercoled", "gioved", "venerd", "sabat", "domenic",
             "alle ", "ore ",
             "colazione", "pranzo", "cena", "caffè", "caffe", "aperitivo",
@@ -565,21 +616,40 @@ class PeritoAiEngine(private val context: Context? = null) {
             ?: extractAppointmentClient(normalized)
             ?: "Cliente"
 
-        val detectedCat = when {
-            lower.contains("unioncasa") || lower.contains("union casa") -> PeritoEventCategory.UNIONCASA
-            lower.contains("agenzia orso") || lower.contains("orso") -> PeritoEventCategory.AGENZIA_ORSO
-            lower.contains("rilievo") || lower.contains("rilievi") || lower.contains("misuraz") -> PeritoEventCategory.RILIEVO
-            lower.contains("comune") || lower.contains("catasto") || lower.contains("ufficio tecnico") || lower.contains("accesso atti") || lower.contains("accesso agli atti") || lower.contains("sportello unico") || lower.contains("edilizia privata") -> PeritoEventCategory.COMUNE
-            lower.contains("udienza") || lower.contains("tribunale") || lower.contains("giuramento") || lower.contains("giudice") || lower.contains("cancelleria") || lower.contains("ctu") -> PeritoEventCategory.TRIBUNALE
-            lower.contains("riunione") || lower.contains("studio") -> PeritoEventCategory.RIUNIONE
-            lower.contains("colazione") || lower.contains("pranzo") || lower.contains("cena") || lower.contains("caffè") || lower.contains("caffe") || lower.contains("aperitivo") -> PeritoEventCategory.PERSONALE
-            lower.contains("chiamata") || lower.contains("telefonata") || lower.contains("videochiamata") || lower.contains("call") || lower.contains("zoom") || lower.contains("meet") || lower.contains("teams") -> PeritoEventCategory.CLIENTE
-            lower.contains("firma") || lower.contains("firmare") || lower.contains("consegna") -> PeritoEventCategory.CLIENTE
-            lower.contains("sopralluogo") || lower.contains("perizia") || lower.contains("collaudo") || lower.contains("visita") -> PeritoEventCategory.SOPRALLUOGO
-            else -> PeritoEventCategory.SOPRALLUOGO
+        val matchedDef = matchCategoryDefinition(lower, categories)
+        val detectedCat = when (matchedDef?.id) {
+            "ape" -> PeritoEventCategory.APE
+            "rilievo" -> PeritoEventCategory.RILIEVO
+            "comune" -> PeritoEventCategory.COMUNE
+            "tribunale" -> PeritoEventCategory.TRIBUNALE
+            "riunione" -> PeritoEventCategory.RIUNIONE
+            "unioncasa" -> PeritoEventCategory.UNIONCASA
+            "agenzia_orso" -> PeritoEventCategory.AGENZIA_ORSO
+            "personale" -> PeritoEventCategory.PERSONALE
+            "cliente" -> PeritoEventCategory.CLIENTE
+            "sopralluogo" -> PeritoEventCategory.SOPRALLUOGO
+            else -> {
+                when {
+                    lower.contains("rilievo") || lower.contains("rilievi") || lower.contains("misuraz") -> PeritoEventCategory.RILIEVO
+                    lower.contains("ape") || lower.contains("prestazione energetica") -> PeritoEventCategory.APE
+                    lower.contains("comune") || lower.contains("catasto") || lower.contains("ufficio tecnico") || lower.contains("accesso atti") || lower.contains("accesso agli atti") || lower.contains("sportello unico") || lower.contains("edilizia privata") -> PeritoEventCategory.COMUNE
+                    lower.contains("udienza") || lower.contains("tribunale") || lower.contains("giuramento") || lower.contains("giudice") || lower.contains("cancelleria") || lower.contains("ctu") -> PeritoEventCategory.TRIBUNALE
+                    lower.contains("unioncasa") || lower.contains("union casa") -> PeritoEventCategory.UNIONCASA
+                    lower.contains("agenzia orso") || lower.contains("orso") -> PeritoEventCategory.AGENZIA_ORSO
+                    lower.contains("riunione") || lower.contains("studio") -> PeritoEventCategory.RIUNIONE
+                    lower.contains("colazione") || lower.contains("pranzo") || lower.contains("cena") || lower.contains("caffè") || lower.contains("caffe") || lower.contains("aperitivo") -> PeritoEventCategory.PERSONALE
+                    lower.contains("chiamata") || lower.contains("telefonata") || lower.contains("videochiamata") || lower.contains("call") || lower.contains("zoom") || lower.contains("meet") || lower.contains("teams") -> PeritoEventCategory.CLIENTE
+                    lower.contains("firma") || lower.contains("firmare") || lower.contains("consegna") -> PeritoEventCategory.CLIENTE
+                    lower.contains("sopralluogo") || lower.contains("perizia") || lower.contains("collaudo") || lower.contains("visita") -> PeritoEventCategory.SOPRALLUOGO
+                    else -> PeritoEventCategory.SOPRALLUOGO
+                }
+            }
         }
+        val categoryDisplayName = matchedDef?.displayName ?: detectedCat.displayName
 
         val activityType = when {
+            matchedDef != null && !matchedDef.isSystem -> matchedDef.defaultPrefix
+            detectedCat == PeritoEventCategory.APE || matchedDef?.id == "ape" -> "Sopralluogo APE"
             lower.contains("rilievo") || lower.contains("rilievi") || lower.contains("misuraz") -> {
                 if (lower.contains("misure") || lower.contains("misuraz")) "Misurazioni e Rilievo" else "Rilievo Tecnico"
             }
@@ -607,7 +677,7 @@ class PeritoAiEngine(private val context: Context? = null) {
             lower.contains("firm") -> "Firma Documenti"
             lower.contains("consegn") -> "Consegna Documenti"
             lower.contains("incontro") || lower.contains("vediamoci") || lower.contains("ci vediamo") -> "Incontro"
-            else -> when (detectedCat) {
+            else -> matchedDef?.defaultPrefix ?: when (detectedCat) {
                 PeritoEventCategory.UNIONCASA -> "Incontro"
                 PeritoEventCategory.AGENZIA_ORSO -> "Appuntamento"
                 PeritoEventCategory.APE -> "Sopralluogo APE"
@@ -624,9 +694,9 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         val effectiveSubject = when {
             cliente.isNotBlank() && cliente != "Cliente" -> cliente
+            detectedCat == PeritoEventCategory.COMUNE -> if (luogo != "Da definire") luogo else "Ufficio Tecnico"
             detectedCat == PeritoEventCategory.UNIONCASA -> "Unioncasa"
             detectedCat == PeritoEventCategory.AGENZIA_ORSO -> "Agenzia Orso"
-            detectedCat == PeritoEventCategory.COMUNE -> "Ufficio Tecnico"
             detectedCat == PeritoEventCategory.TRIBUNALE -> "Tribunale"
             detectedCat == PeritoEventCategory.RIUNIONE -> "Studio"
             luogo != "Da definire" -> luogo
@@ -638,19 +708,20 @@ class PeritoAiEngine(private val context: Context? = null) {
         val topic = extractMeetingTopic(correctedClause ?: normalized)
 
         // Formato titolo conforme alla richiesta utente: "<Tipo Appuntamento> - <Persona o Agenzia>"
-        val baseTitle = if (effectiveSubject.isNotBlank() && !activityType.contains(effectiveSubject, ignoreCase = true)) {
-            "$activityType - $effectiveSubject"
+        // Per APE, il titolo è semplicemente "Sopralluogo APE"
+        val titolo = if (detectedCat == PeritoEventCategory.APE || matchedDef?.id == "ape") {
+            "Sopralluogo APE"
         } else {
-            activityType
-        }
-
-        val titolo = buildString {
-            append(baseTitle)
-            if (!topic.isNullOrBlank() && !baseTitle.contains(topic, ignoreCase = true)) {
-                append(" — $topic")
+            val baseTitle = if (effectiveSubject.isNotBlank() && !activityType.contains(effectiveSubject, ignoreCase = true)) {
+                "$activityType - $effectiveSubject"
+            } else {
+                activityType
             }
-            if (luogo != "Da definire" && !baseTitle.contains(luogo, ignoreCase = true) && !effectiveSubject.equals(luogo, ignoreCase = true)) {
-                append(" ($luogo)")
+            buildString {
+                append(baseTitle)
+                if (!topic.isNullOrBlank() && !baseTitle.contains(topic, ignoreCase = true) && !activityType.contains(topic, ignoreCase = true)) {
+                    append(" — $topic")
+                }
             }
         }
 
@@ -676,7 +747,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                 note = extractedNote,
                 is_ambiguo = true,
                 motivo_ambiguita = "È stata indicata 'settimana prossima' ma mancano il giorno esatto e l'orario.",
-                categoria = detectedCat.displayName
+                categoria = categoryDisplayName
             )
         }
 
@@ -695,7 +766,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                     note = extractedNote,
                     is_ambiguo = true,
                     motivo_ambiguita = "È stata indicata l'attività peritale ma mancano la data e l'orario (es. 'domani alle 10:30').",
-                    categoria = detectedCat.displayName
+                    categoria = categoryDisplayName
                 )
             }
             return AppointmentParseResult(has_appointment = false)
@@ -712,7 +783,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                 note = extractedNote,
                 is_ambiguo = true,
                 motivo_ambiguita = "Manca il giorno dell'appuntamento (es. domani, martedì 14 ottobre).",
-                categoria = detectedCat.displayName
+                categoria = categoryDisplayName
             )
         }
 
@@ -732,7 +803,7 @@ class PeritoAiEngine(private val context: Context? = null) {
                 note = extractedNote,
                 is_ambiguo = true,
                 motivo_ambiguita = reason,
-                categoria = detectedCat.displayName
+                categoria = categoryDisplayName
             )
         }
 
@@ -752,7 +823,7 @@ class PeritoAiEngine(private val context: Context? = null) {
             note = extractedNote,
             is_ambiguo = false,
             motivo_ambiguita = "",
-            categoria = detectedCat.displayName
+            categoria = categoryDisplayName
         )
     }
 
@@ -801,6 +872,24 @@ class PeritoAiEngine(private val context: Context? = null) {
             }
         }
 
+        // Giorno della settimana con numero esplicito del mese: "lunedì 26", "martedì 14"
+        val dayOfWeekWithDayNumber = Regex("""\b(luned[ìi]|marted[ìi]|mercoled[ìi]|gioved[ìi]|venerd[ìi]|sabato|domenica)\s+(\d{1,2})\b""", RegexOption.IGNORE_CASE)
+        dayOfWeekWithDayNumber.find(lower)?.let { m ->
+            val dayNum = m.groupValues[2].toIntOrNull()
+            if (dayNum != null && dayNum in 1..31) {
+                val candidateDate = try {
+                    if (dayNum >= today.dayOfMonth) {
+                        today.withDayOfMonth(dayNum)
+                    } else {
+                        today.plusMonths(1).withDayOfMonth(dayNum)
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+                if (candidateDate != null) return candidateDate
+            }
+        }
+
         // Giorni della settimana: "lunedì", "martedì", ecc.
         val daysMap = listOf(
             "luned" to DayOfWeek.MONDAY,
@@ -837,10 +926,10 @@ class PeritoAiEngine(private val context: Context? = null) {
         }
 
         // 1. Range orario avanzato:
-        // "alle 17:45 fino alle 20", "dalle 17:45 fino alle 20", "dalle 10:30 alle 12:00", "dalle 15 alle 17",
+        // "alle 17:45 fino alle 20", "dalle 17:45 fino alle 20", "ore 9 fino alle 13.00", "dalle 10:30 alle 12:00", "dalle 15 alle 17",
         // "da 17:45 a 20:00", "dalle 17:45 a 20", "17:45 - 20:00", "tra le 17:45 e le 20"
         val rangeRegex = Regex(
-            """\b(?:dalle|alle|da)\s+(\d{1,2})(?:[:.;,](\d{2}))?\s+(?:fino\s+alle|fino\s+a|alle|\ba\b)\s+(\d{1,2})(?:[:.;,](\d{2}))?\b"""
+            """\b(?:dalle|alle|da|ore)\s+(\d{1,2})(?:[:.;,](\d{2}))?\s+(?:fino\s+alle|fino\s+a|alle|\ba\b)\s+(\d{1,2})(?:[:.;,](\d{2}))?\b"""
         )
         for (m in rangeRegex.findAll(lower)) {
             val fullMatch = m.value
@@ -961,7 +1050,7 @@ class PeritoAiEngine(private val context: Context? = null) {
         if (text.isBlank()) return null
 
         val stopBoundary = Regex(
-            """\b(?:incontro|riunione|sopralluogo|appuntamento|udienza|rilievo|collaudo|con|insieme\s+a|che\s+dobbiamo|dobbiamo|che\s+devo|per\s+scrivere|per\s+fare|per\s+vedere|per\s+il|per\s+la|alle\s+ore|alle|ore|dalle\s+ore|dalle|h\.?|verso\s+le|verso|per\s+le|anzi|scusa|domani|dopodomani|luned|marted|mercoled|gioved|venerd|sabat|domenic)\b""",
+            """\b(?:cliente|committente|note|nota|appunto|promemoria|incontro|riunione|sopralluogo|appuntamento|udienza|rilievo|collaudo|con|insieme\s+a|che\s+dobbiamo|dobbiamo|che\s+devo|per\s+(?:un\s+|una\s+)?(?:accesso|rilievo|sopralluogo|pratica|visione|atti|ritiro|deposito)|per\s+scrivere|per\s+fare|per\s+vedere|per\s+il|per\s+la|alle\s+ore|alle|ore|dalle\s+ore|dalle|h\.?|verso\s+le|verso|per\s+le|anzi|scusa|domani|dopodomani|luned|marted|mercoled|gioved|venerd|sabat|domenic)\b""",
             RegexOption.IGNORE_CASE
         )
 
@@ -977,7 +1066,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         // 2. Indirizzi stradali (Via, Viale, Piazza, Corso, ecc.) anche scritti in minuscolo
         val streetRegex = Regex(
-            """\b((?:via|viale|piazza|piazzale|corso|largo|vicolo|strada|contrada|localit[aà]|v\.le|p\.zza)\s+[A-ZÀ-Úa-zà-ú0-9][A-ZÀ-Úa-zà-ú0-9\s',.-]{2,45}?)(?:\s+(?:a|in|ad)\s+([A-ZÀ-Úa-zà-ú]{2,25}))?(?=""" + stopBoundary.pattern + """|$)""",
+            """\b((?:via|viale|piazza|piazzale|corso|largo|vicolo|strada|contrada|localit[aà]|v\.le|p\.zza)\s+[A-ZÀ-Úa-zà-ú0-9][A-ZÀ-Úa-zà-ú0-9\s',.-]{2,45}?)(?:\s+(?:a|in|ad)\s+([A-ZÀ-Úa-zà-ú]{2,25}))?(?=[,\.;:\s]*(?:""" + stopBoundary.pattern + """|$))""",
             RegexOption.IGNORE_CASE
         )
         streetRegex.find(text)?.let { m ->
@@ -989,7 +1078,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         // 3. Luoghi tecnici/professionali (Immobile, Condominio, Tribunale, Studio, Ufficio, Comune, Catasto, Villa, Palazzo, Appartamento)
         val siteRegex = Regex(
-            """\b((?:immobile|fabbricato|condominio|tribunale|studio\s+tecnico|studio\s+legale|studio|ufficio\s+tecnico|ufficio|comune|catasto|villa|palazzo|appartamento)\s+(?:di|in|a|del|della)?\s*[A-ZÀ-Úa-zà-ú0-9\s']{1,35}?)(?=""" + stopBoundary.pattern + """|$)""",
+            """\b((?:immobile|fabbricato|condominio|tribunale|studio\s+tecnico|studio\s+legale|studio|ufficio\s+tecnico|ufficio|comune|catasto|villa|palazzo|appartamento)\s+(?:di|in|a|del|della)?\s*[A-ZÀ-Úa-zà-ú0-9\s']{1,35}?)(?=[,\.;:\s]*(?:""" + stopBoundary.pattern + """|$))""",
             RegexOption.IGNORE_CASE
         )
         siteRegex.find(text)?.let { m ->
@@ -999,7 +1088,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         // 4. "presso <Luogo>" / "in studio" / "in ufficio" / "al sopralluogo"
         val pressoRegex = Regex(
-            """\bpresso\s+((?:il\s+|lo\s+|la\s+|l'\s*)?[A-ZÀ-Úa-zà-ú0-9][A-ZÀ-Úa-zà-ú0-9\s',.-]{2,35}?)(?=""" + stopBoundary.pattern + """|$)""",
+            """\bpresso\s+((?:il\s+|lo\s+|la\s+|l'\s*)?[A-ZÀ-Úa-zà-ú0-9][A-ZÀ-Úa-zà-ú0-9\s',.-]{2,35}?)(?=[,\.;:\s]*(?:""" + stopBoundary.pattern + """|$))""",
             RegexOption.IGNORE_CASE
         )
         pressoRegex.find(text)?.let { m ->
@@ -1026,7 +1115,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         // 6. Locali commerciali specifici con categoria (bar, pasticceria, ristorante, pizzeria, trattoria, bistrot, hotel, pub, locale)
         val catRegex = Regex(
-            """\b(?:a|al|allo|alla|all'|in|da|presso)\s+((?:bar|pasticceria|ristorante|trattoria|pizzeria|bistrot|caffetteria|caff[eè]|hotel|albergo|pub|locale)\s+[A-ZÀ-Úa-zà-ú0-9\s']{2,35}?)(?:\s+(?:di|a|in|ad)\s+([A-ZÀ-Úa-zà-ú]{2,25}))?(?=""" + stopBoundary.pattern + """|$)""",
+            """\b(?:a|al|allo|alla|all'|in|da|presso)\s+((?:bar|pasticceria|ristorante|trattoria|pizzeria|bistrot|caffetteria|caff[eè]|hotel|albergo|pub|locale)\s+[A-ZÀ-Úa-zà-ú0-9\s']{2,35}?)(?:\s+(?:di|a|in|ad)\s+([A-ZÀ-Úa-zà-ú]{2,25}))?(?=[,\.;:\s]*(?:""" + stopBoundary.pattern + """|$))""",
             RegexOption.IGNORE_CASE
         )
         catRegex.find(cleanedText)?.let { m ->
@@ -1038,7 +1127,7 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         // 7. Luogo / Locale introdotto da preposizione (a / al / alla / da / presso / in): es. "a non solo dolce di Albate"
         val generalVenueRegex = Regex(
-            """\b(?:a|al|allo|alla|all'|da|presso|in)\s+([A-ZÀ-Úa-zà-ú0-9'][A-ZÀ-Úa-zà-ú0-9\s']{1,35}?)(?:\s+(?:di|a|in|ad)\s+([A-ZÀ-Úa-zà-ú]{2,25}))?(?=""" + stopBoundary.pattern + """|$)""",
+            """\b(?:a|al|allo|alla|all'|da|presso|in)\s+([A-ZÀ-Úa-zà-ú0-9'][A-ZÀ-Úa-zà-ú0-9\s']{1,35}?)(?:\s+(?:di|a|in|ad)\s+([A-ZÀ-Úa-zà-ú]{2,25}))?(?=[,\.;:\s]*(?:""" + stopBoundary.pattern + """|$))""",
             RegexOption.IGNORE_CASE
         )
         val actionWords = setOf(
@@ -1059,11 +1148,11 @@ class PeritoAiEngine(private val context: Context? = null) {
 
         // 8. Città / Comune singolo introdotto da 'a', 'ad', 'in' prima del confine temporale (es. "ad Albate alle 9:30", "a Como alle 10:30")
         val townRegex = Regex(
-            """\b(?:ad?|in)\s+([A-ZÀ-Úa-zà-ú]{3,25})(?=""" + stopBoundary.pattern + """|$)""",
+            """\b(?:ad?|in)\s+([A-ZÀ-Úa-zà-ú]{3,25})(?=[,\.;:\s]*(?:""" + stopBoundary.pattern + """|$))""",
             RegexOption.IGNORE_CASE
         )
         townRegex.find(cleanedText)?.let { m ->
-            val candTown = m.groupValues[1].trim()
+            val candTown = m.groupValues[1].trim().trimEnd(',', '.', ';', ':')
             if (candTown.lowercase(Locale.ITALIAN) !in actionWords && candTown.length >= 3) {
                 return formatLocationDisplayName(candTown)
             }
@@ -1073,8 +1162,20 @@ class PeritoAiEngine(private val context: Context? = null) {
     }
 
     private fun formatLocationDisplayName(raw: String): String {
+        var clean = raw.trim().trimEnd(',', '.', ';', ':')
+        clean = clean.replace(Regex("""\bper\s+(?:un\s+|una\s+)?(?:accesso|rilievo|sopralluogo|pratica|visione|atti)\b.*$""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\b(?:cliente|committente|note|nota)\s*:.*$""", RegexOption.IGNORE_CASE), "")
+            .trim().trimEnd(',', '.', ';', ':')
+
+        val comunePattern = Regex("""^(?:in\s+)?comune\s+(?:a|in)\s+([A-ZÀ-Úa-zà-ú0-9']+)""", RegexOption.IGNORE_CASE)
+        val comuneMatch = comunePattern.find(clean)
+        if (comuneMatch != null) {
+            val town = comuneMatch.groupValues[1].lowercase(Locale.ITALIAN).replaceFirstChar { it.titlecase(Locale.ITALIAN) }
+            return "Comune di $town"
+        }
+
         val lowerParticles = setOf("di", "del", "della", "dei", "degli", "delle", "da", "in", "a", "ad", "al", "allo", "alla", "all'", "il", "lo", "la")
-        return raw.trim().split(Regex("""\s+""")).mapIndexed { index, word ->
+        return clean.split(Regex("""\s+""")).mapIndexed { index, word ->
             val lowerWord = word.lowercase(Locale.ITALIAN)
             if (index > 0 && lowerWord in lowerParticles) {
                 lowerWord
@@ -1087,6 +1188,19 @@ class PeritoAiEngine(private val context: Context? = null) {
     private fun extractAppointmentClient(text: String): String? {
         if (text.isBlank()) return null
         val lower = text.lowercase(Locale.ITALIAN)
+
+        // Controllo prefisso esplicito "cliente: <Nome>" o "committente: <Nome>"
+        val explicitClientRegex = Regex(
+            """\b(?:cliente|committente)\s*:\s*(.*?)(?=\s+\b(?:note|nota|appunto|promemoria|avviso)\s*:|[,\.\n;]|$)""",
+            RegexOption.IGNORE_CASE
+        )
+        val explicitClientMatch = explicitClientRegex.find(text)
+        if (explicitClientMatch != null) {
+            val cand = explicitClientMatch.groupValues[1].trim()
+            if (cand.isNotBlank()) {
+                return formatLocationDisplayName(cand)
+            }
+        }
 
         // Riconoscimento immediato agenzie e committenti prioritari
         if (lower.contains("unioncasa") || lower.contains("union casa")) {
@@ -1148,14 +1262,14 @@ class PeritoAiEngine(private val context: Context? = null) {
     fun extractExplicitNote(text: String): String {
         if (text.isBlank()) return ""
         val noteRegexes = listOf(
-            Regex("""\b(?:note|nota|appunto|promemoria|avviso)\s*:\s*(.+)$""", RegexOption.IGNORE_CASE),
+            Regex("""\b(?:note|nota|appunto|promemoria|avviso)\s*:\s*(.*?)(?=\s+\b(?:cliente|committente)\s*:|$)""", RegexOption.IGNORE_CASE),
             Regex("""\b(?:ricorda\s+di|ricordami\s+di|ricordati\s+di)\s+(.+)$""", RegexOption.IGNORE_CASE),
             Regex("""\bnota\s+bene\s*:\s*(.+)$""", RegexOption.IGNORE_CASE)
         )
         for (r in noteRegexes) {
             val match = r.find(text)
             if (match != null) {
-                val candidate = match.groupValues[1].trim()
+                val candidate = match.groupValues[1].trim().trimEnd('.', ';', ',')
                 if (candidate.isNotBlank()) {
                     return candidate
                 }
@@ -1473,25 +1587,38 @@ LINEE GUIDA RIGIDE:
     fun buildAppointmentPrompt(
         text: String,
         now: LocalDateTime,
-        config: AiEngineConfig = AiEngineConfig()
+        config: AiEngineConfig = AiEngineConfig(),
+        categories: List<PeritoCategoryDefinition> = config.categories
     ): String {
         val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
         val refDate = now.toLocalDate()
         val tomorrow = refDate.plusDays(1)
         val dayAfterTomorrow = refDate.plusDays(2)
         val dayOfWeek = now.dayOfWeek.name
+        val catListStr = categories.joinToString(", ") { "${it.displayName} (${it.keywords.joinToString("/")})" }
         return """
             Sei l'assistente agenda intelligente di $studio.
             Data e ora di riferimento: $now ($dayOfWeek, oggi: $refDate, domani: $tomorrow, dopodomani: $dayAfterTomorrow).
             Il tuo compito è estrarre con la massima precisione i dati di qualsiasi appuntamento, incontro di lavoro, sopralluogo tecnico o incontro personale/informale (colazione, pranzo, caffè, cena, riunione, udienza).
             
+            Categorie disponibili: $catListStr.
+            
+            ABBREVIAZIONI E DOMINIO PERITALE:
+            - "RD": Davide Restelli (il perito / utente). Non impostarlo come cliente terzo.
+            - "STA": Studio Tecnico Associato (lo studio di lavoro).
+            - "APE": Attestato di Prestazione Energetica (categoria "APE", titolo "Sopralluogo APE").
+            - "CILA", "SCIA", "DOCFA": pratiche edilizie / catastali.
+            - Se il testo contiene esplicitamente "cliente: <Nome>" o "committente: <Nome>", assegna quel nome al campo "cliente".
+            - Se il testo contiene esplicitamente "note: <Testo>" o "nota: <Testo>", assegna quel testo al campo "note".
+            
             REGOLE DI ESTRAZIONE:
             - "has_appointment": true se il messaggio contiene un evento con riferimento temporale, false altrimenti.
-            - "titolo": formato obbligatorio: "<Tipo Appuntamento> - <Persona o Agenzia>" (es. "Sopralluogo - Unioncasa", "Rilievo Tecnico - Geom. Bianchi", "Incontro - Agenzia Orso", "Udienza - CTU", "Colazione - Deiv"). Non omettere MAI la persona/agenzia e non usare mai solo il tipo di appuntamento da solo. Se è un incontro informale (colazione/pranzo/caffè/cena), indica esattamente l'attività (es. "Colazione - Deiv").
-            - "cliente": nome del cliente, collega, agenzia (es. "Unioncasa", "Agenzia Orso") o interlocutore incontrato (es. "Deiv", "Marco", "Arch. Verdi"). Se non menzionato, usa "Cliente".
-            - "luogo": indirizzo, locale, bar, ristorante o comune specificato (es. "Non Solo Dolce di Albate", "Via Roma 10 Como", "Milano"). Se non specificato, usa "Da definire".
+            - "titolo": formato obbligatorio: "<Tipo Appuntamento> - <Persona o Agenzia>" (es. "Sopralluogo - Unioncasa", "Rilievo Tecnico - Geom. Bianchi", "Incontro - Agenzia Orso", "Udienza - CTU", "Colazione - Deiv"). Per la categoria "APE", il titolo deve essere esattamente "Sopralluogo APE".
+            - "cliente": nome del cliente, collega, agenzia (es. "Unioncasa", "Agenzia Orso") o interlocutore incontrato (es. "Deiv", "Marco", "Arch. Verdi"). Se indicato esplicitamente "cliente: X", usa "X". Se non menzionato, usa "Cliente".
+            - "luogo": indirizzo, locale, bar, ristorante o comune specificato (es. "Non Solo Dolce di Albate", "Via Roma 10 Como", "Comune di Grandate", "Milano"). Pulisci il luogo da frasi di scopo come "per un accesso agli atti". Se non specificato, usa "Da definire".
             - "data_inizio_iso": data e ora d'inizio in formato ISO-8601 (YYYY-MM-DDTHH:mm:ss). Calcola la data a partire dalla data di riferimento: oggi=$refDate, domani=$tomorrow, dopodomani=$dayAfterTomorrow.
-            - "data_fine_iso": data e ora di fine in formato ISO-8601. Se è specificato un orario di fine (es. "dalle 17 alle 19", "fino alle 20"), usalo. Altrimenti, imposta la fine a 1 ora dopo data_inizio_iso.
+            - "data_fine_iso": data e ora di fine in formato ISO-8601. Se è specificato un intervallo (es. "ore 9 fino alle 13.00", "dalle 17 alle 19"), imposta esattamente l'orario di fine indicato. Altrimenti, imposta la fine a 1 ora dopo data_inizio_iso.
+            - "note": note aggiuntive specificate (es. "note: Mercuri" -> "Mercuri"). Se assenti, stringa vuota "".
             - "is_ambiguo": true se manca l'orario o il giorno è incerto, altrimenti false.
             - "motivo_ambiguita": descrizione breve dell'ambiguità se is_ambiguo è true, altrimenti stringa vuota "".
             - REGOLA ANTI-ALLUCINAZIONE: NON inventare mai giorni, orari, persone o luoghi non presenti nel testo. Se il testo non menziona alcun appuntamento o incontro, restituisci {"has_appointment": false}.
@@ -1500,19 +1627,23 @@ LINEE GUIDA RIGIDE:
             ESEMPI:
             <esempio>
             Input: "Lunedì prossimo alle 10:30 sopralluogo peritale con Ing. Bianchi in via Milano 15 a Varese"
-            JSON: {"has_appointment": true, "titolo": "Sopralluogo Peritale - Ing. Bianchi", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.MONDAY))}T10:30:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.MONDAY))}T11:30:00", "luogo": "Via Milano 15, Varese", "cliente": "Ing. Bianchi", "is_ambiguo": false, "motivo_ambiguita": ""}
+            JSON: {"has_appointment": true, "titolo": "Sopralluogo Peritale - Ing. Bianchi", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.MONDAY))}T10:30:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.MONDAY))}T11:30:00", "luogo": "Via Milano 15, Varese", "cliente": "Ing. Bianchi", "note": "", "is_ambiguo": false, "motivo_ambiguita": ""}
             </esempio>
             <esempio>
             Input: "Domani alle 9 deiv a fare colazione a non solo dolce di Albate"
-            JSON: {"has_appointment": true, "titolo": "Colazione - Deiv", "data_inizio_iso": "${tomorrow}T09:00:00", "data_fine_iso": "${tomorrow}T10:00:00", "luogo": "Non Solo Dolce di Albate", "cliente": "Deiv", "is_ambiguo": false, "motivo_ambiguita": ""}
+            JSON: {"has_appointment": true, "titolo": "Colazione - Deiv", "data_inizio_iso": "${tomorrow}T09:00:00", "data_fine_iso": "${tomorrow}T10:00:00", "luogo": "Non Solo Dolce di Albate", "cliente": "Deiv", "note": "", "is_ambiguo": false, "motivo_ambiguita": ""}
             </esempio>
             <esempio>
             Input: "Giovedì dalle 17:45 fino alle 20 palestra con Tedo a Lurate Caccivio"
-            JSON: {"has_appointment": true, "titolo": "Palestra - Tedo", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.THURSDAY))}T17:45:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.THURSDAY))}T20:00:00", "luogo": "Lurate Caccivio", "cliente": "Tedo", "is_ambiguo": false, "motivo_ambiguita": ""}
+            JSON: {"has_appointment": true, "titolo": "Palestra - Tedo", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.THURSDAY))}T17:45:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.THURSDAY))}T20:00:00", "luogo": "Lurate Caccivio", "cliente": "Tedo", "note": "", "is_ambiguo": false, "motivo_ambiguita": ""}
+            </esempio>
+            <esempio>
+            Input: "venerdì alle 11.30 ho un sopralluogo APE. cliente: Unioncasa note: Mercuri"
+            JSON: {"has_appointment": true, "titolo": "Sopralluogo APE", "data_inizio_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.FRIDAY))}T11:30:00", "data_fine_iso": "${refDate.with(TemporalAdjusters.next(DayOfWeek.FRIDAY))}T12:30:00", "luogo": "Da definire", "cliente": "Unioncasa", "note": "Mercuri", "is_ambiguo": false, "motivo_ambiguita": ""}
             </esempio>
             <esempio>
             Input: "Ricordati di inviare la relazione tecnica all'avvocato Rossi via PEC"
-            JSON: {"has_appointment": false, "titolo": "", "data_inizio_iso": null, "data_fine_iso": null, "luogo": "Da definire", "cliente": "Cliente", "is_ambiguo": false, "motivo_ambiguita": ""}
+            JSON: {"has_appointment": false, "titolo": "", "data_inizio_iso": null, "data_fine_iso": null, "luogo": "Da definire", "cliente": "Cliente", "note": "", "is_ambiguo": false, "motivo_ambiguita": ""}
             </esempio>
             
             Messaggio utente:

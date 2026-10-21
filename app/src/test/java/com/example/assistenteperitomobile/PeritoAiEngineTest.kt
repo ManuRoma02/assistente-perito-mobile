@@ -3,7 +3,9 @@ package com.example.assistenteperitomobile
 import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
+import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.domain.defaultCategoriesList
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -633,6 +635,58 @@ class PeritoAiEngineTest {
         assertTrue(colazione.titolo.startsWith("Colazione"))
         assertTrue(colazione.titolo.contains("Deiv"))
         assertEquals("Deiv", colazione.cliente)
+    }
+
+    @Test
+    fun `test parse APE with Unioncasa agency and Mercuri note`() = runTest {
+        val input = "venerdì alle 11.30 ho un sopralluogo APE. cliente: Unioncasa note: Mercuri"
+        val res = engine.parseAppointment(input, refNow)
+        assertTrue(res.has_appointment)
+        assertEquals("APE", res.categoria)
+        assertEquals("Sopralluogo APE", res.titolo)
+        assertEquals("Unioncasa", res.cliente)
+        assertEquals("Mercuri", res.note)
+        assertEquals("2026-10-16T11:30:00", res.data_inizio_iso)
+        assertEquals("2026-10-16T12:30:00", res.data_fine_iso)
+    }
+
+    @Test
+    fun `test parse Comune access with clean location`() = runTest {
+        val input = "lunedì ore 10 sono in comune a Grandate per un accesso agli atti"
+        val res = engine.parseAppointment(input, refNow)
+        assertTrue(res.has_appointment)
+        assertEquals("Comune", res.categoria)
+        assertEquals("Comune di Grandate", res.luogo)
+        assertEquals("Accesso Atti - Comune di Grandate", res.titolo)
+        assertFalse(res.titolo.contains("per un accesso agli atti", ignoreCase = true))
+    }
+
+    @Test
+    fun `test parse Rilievo with explicit end time and client`() = runTest {
+        val input = "rilievo lunedì 26 ore 9 fino alle 13.00 a Como. cliente: Raiola"
+        val res = engine.parseAppointment(input, refNow)
+        assertTrue(res.has_appointment)
+        assertEquals("Rilievo", res.categoria)
+        assertEquals("Raiola", res.cliente)
+        assertEquals("Como", res.luogo)
+        assertEquals("2026-10-26T09:00:00", res.data_inizio_iso)
+        assertEquals("2026-10-26T13:00:00", res.data_fine_iso)
+        assertEquals("Rilievo Tecnico - Raiola", res.titolo)
+    }
+
+    @Test
+    fun `test parse dynamic custom category`() = runTest {
+        val customList = defaultCategoriesList() + PeritoCategoryDefinition(
+            id = "sanatoria",
+            displayName = "Sanatoria",
+            emoji = "📋",
+            defaultPrefix = "Pratica Sanatoria",
+            keywords = listOf("sanatoria", "condono", "abuso")
+        )
+        val input = "martedì alle 15 sanatoria in via Roma con Geom. Neri"
+        val res = engine.parseAppointment(input, refNow, categories = customList)
+        assertEquals("Sanatoria", res.categoria)
+        assertTrue(res.titolo.startsWith("Pratica Sanatoria"))
     }
 }
 
