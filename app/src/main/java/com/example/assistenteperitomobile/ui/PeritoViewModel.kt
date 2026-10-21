@@ -3,8 +3,12 @@ package com.example.assistenteperitomobile.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.CalendarContract
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
@@ -247,6 +251,10 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             val customPath = _uiState.value.aiConfig.mediaPipeModelPath
             val reasoningReady = modelDownloadManager.isPrimaryReasoningDownloaded(customPath)
             val allReady = modelDownloadManager.areAllModelsDownloaded(customPath)
+
+            if (calendarRepo.hasNativeCalendarPermissions()) {
+                registerCalendarObserver()
+            }
 
             _uiState.update {
                 it.copy(
@@ -1142,7 +1150,15 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updateAiConfig(newConfig: AiEngineConfig) {
+        val oldConfig = _uiState.value.aiConfig
         saveConfig(newConfig)
+        if (newConfig.morningBriefingEnabled != oldConfig.morningBriefingEnabled) {
+            if (newConfig.morningBriefingEnabled) {
+                MorningBriefingWorker.scheduleDailyBriefing(appContext)
+            } else {
+                MorningBriefingWorker.cancelDailyBriefing(appContext)
+            }
+        }
         val reasoningReady = modelDownloadManager.isPrimaryReasoningDownloaded(newConfig.mediaPipeModelPath)
         val allReady = modelDownloadManager.areAllModelsDownloaded(newConfig.mediaPipeModelPath)
         _uiState.update {
@@ -1883,6 +1899,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun selectTab(tab: MainAppTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+        if (tab == MainAppTab.AGENDA) {
+            refreshAllData()
+        }
     }
 
     fun selectFascicoloFilter(id: String?) {
@@ -2528,5 +2547,65 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         val updatedConfig = _uiState.value.aiConfig.copy(autoCheckUpdatesOnStart = enabled)
         saveConfig(updatedConfig)
         _uiState.update { it.copy(aiConfig = updatedConfig) }
+    }
+
+    private var calendarContentObserver: ContentObserver? = null
+
+    fun registerCalendarObserver() {
+        if (calendarContentObserver != null) return
+        if (!calendarRepo.hasNativeCalendarPermissions()) return
+        try {
+            val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                private var lastRefreshTime = 0L
+                override fun onChange(selfChange: Boolean) {
+                    super.onChange(selfChange)
+                    val now = System.currentTimeMillis()
+                    if (now - lastRefreshTime > 1500L) {
+                        lastRefreshTime = now
+                        refreshAllData()
+                    }
+                }
+            }
+            appContext.contentResolver.registerContentObserver(
+                CalendarContract.Events.CONTENT_URI,
+                true,
+                observer
+            )
+            calendarContentObserver = observer
+        } catch (e: Throwable) {
+            Log.w("PeritoViewModel", "Unable to register calendar content observer", e)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        calendarContentObserver?.let {
+            try {
+                appContext.contentResolver.unregisterContentObserver(it)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    fun triggerTestMorningBriefing() {
+        viewModelScope.launch {
+            MorningBriefingWorker.triggerImmediateBriefing(appContext)
+            _uiState.update { it.copy(statusBanner = "☀️ Notifica Briefing Mattutino inviata!") }
+        }
+    }
+
+    fun checkAndTriggerMorningBriefingOnFirstLaunch() {
+        if (!_uiState.value.aiConfig.morningBriefingEnabled) return
+        val now = LocalTime.now()
+        if (now.hour in 7..12) {
+            val todayStr = LocalDate.now().toString()
+            val prefs = appContext.getSharedPreferences("perito_briefing_prefs", Context.MODE_PRIVATE)
+            val lastBriefingDay = prefs.getString("last_briefing_date", null)
+            if (lastBriefingDay != todayStr) {
+                prefs.edit().putString("last_briefing_date", todayStr).apply()
+                viewModelScope.launch {
+                    MorningBriefingWorker.sendBriefingNotification(appContext)
+                }
+            }
+        }
     }
 }

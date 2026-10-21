@@ -54,6 +54,12 @@ class MainActivity : ComponentActivity() {
         isAppInForeground = true
     }
 
+    override fun onResume() {
+        super.onResume()
+        peritoViewModel.refreshAllData()
+        peritoViewModel.checkAndTriggerMorningBriefingOnFirstLaunch()
+    }
+
     override fun onStop() {
         super.onStop()
         isAppInForeground = false
