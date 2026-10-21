@@ -40,19 +40,11 @@ Create a persistent data class for category definitions:
 
 ```kotlin
 @Serializable
-enum class CategoryKind {
-    ACTIVITY,   // Technical activities (APE, Rilievo, Comune, Tribunale, Sanatoria, etc.) - Priority 1
-    AGENCY,     // Partner agencies / brokers (Unioncasa, Agenzia Orso, etc.) - Priority 2
-    PERSONAL    // Meetings, meals, personal, other - Priority 3
-}
-
-@Serializable
 data class PeritoCategoryDefinition(
     val id: String,
     val displayName: String,
     val emoji: String,
     val defaultPrefix: String,
-    val kind: CategoryKind = CategoryKind.ACTIVITY,
     val keywords: List<String> = emptyList(),
     val isSystem: Boolean = false,
     val colorHex: String? = null
