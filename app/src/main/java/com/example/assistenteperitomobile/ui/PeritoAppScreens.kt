@@ -5299,13 +5299,15 @@ fun SettingsTendinaCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = AppleLabelPrimary
+                            color = AppleLabelPrimary,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         if (badgeText != null) {
                             Surface(
@@ -5316,10 +5318,12 @@ fun SettingsTendinaCard(
                                     text = badgeText,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 10.5.sp
+                                        fontSize = 10.sp
                                     ),
                                     color = badgeTextColor,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -5743,7 +5747,7 @@ fun AiEngineSettingsSheetContent(
                         SettingsTendinaCard(
                             title = "☀️ Briefing Mattutino Quotidiano",
                             subtitle = "Riepilogo automatico alle 08:00 con sopralluoghi, scadenze e fascicoli",
-                            badgeText = if (briefingEnabled) "✅ Attivo ore 08:00" else "Disattivato",
+                            badgeText = if (briefingEnabled) "Attivo (08:00)" else "Disattivato",
                             badgeColor = if (briefingEnabled) AppleGreenSoft else AppleSecondaryGroupedBg,
                             badgeTextColor = if (briefingEnabled) AppleGreen else AppleLabelSecondary,
                             isExpanded = expandedSections.contains("morning_briefing"),
@@ -6047,7 +6051,7 @@ fun AiEngineSettingsSheetContent(
                     item(key = "tendina_ota_updates") {
                         val context = LocalContext.current
                         SettingsTendinaCard(
-                            title = "🔄 Aggiornamenti Software In-App (OTA)",
+                            title = "🔄 Aggiornamenti In-App (OTA)",
                             subtitle = "Verifica release APK e aggiorna direttamente l'app senza passaggi manuali",
                             badgeText = "v${uiState.currentAppVersionName} (${uiState.currentAppVersionCode})",
                             badgeColor = DavezBordeaux.copy(alpha = 0.12f),
