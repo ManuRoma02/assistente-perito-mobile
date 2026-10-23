@@ -1,0 +1,7 @@
+@echo off
+:: Configurazione locale Telegram per invio APK
+:: Rinomina questo file in "telegram_config.bat" e inserisci i tuoi valori.
+:: NON committare "telegram_config.bat" su Git (è già in .gitignore).
+
+set "TG_BOT_TOKEN=INSERISCI_QUI_IL_TOKEN_BOT"
+set "TG_CHAT_ID=INSERISCI_QUI_IL_TUO_CHAT_ID"

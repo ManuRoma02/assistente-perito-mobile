@@ -1,7 +1,7 @@
 # Design Spec: Custom Categories & NLP Appointment Parser Overhaul
 
 ## 1. Intent & Context
-During real-world field testing of the PeritoAI mobile app by Mario Rossi (Perito Industriale Edile, "RD"), several key requirements and parser friction points were identified:
+During real-world field testing of the PeritoAI mobile app by the technical surveyor team ("RD"), several key requirements and parser friction points were identified:
 1. **Lack of an APE Category**: Energy performance inspections (*Attestato di Prestazione Energetica*, APE) are a core service for the surveyor. Dictating "sopralluogo APE" lacked a dedicated category.
 2. **Agency Hijacking Category**: Mentioning partner agencies (e.g. *Unioncasa*, *Agenzia Orso*) prematurely classified appointments into generic "Incontro Unioncasa" instead of keeping the specific technical activity (e.g., APE, Rilievo).
 3. **Explicit Fields Ignored**: Explicit voice/text dictations like `cliente: Raiola` or `note: Mercuri` were not captured, leading to fallback hallucinations like "Studio" instead of "Raiola".
@@ -21,7 +21,7 @@ During real-world field testing of the PeritoAI mobile app by Mario Rossi (Perit
 - **Comprehensive Time Range Parsing**: Support `ore <H> fino alle <H2>` and `dalle <H> fino alle <H2>`.
 - **Location Purpose Stripping**: Strip purpose prepositions (e.g. `per un accesso agli atti`, `per rilievo`) from extracted location strings.
 - **Surveyor Technical Jargon in Prompt**: Teach the LLM prompt and regex heuristics about:
-  - `RD`: Mario Rossi (surveyor personal assignment).
+  - `RD`: Technical surveyor personal assignment.
   - `STA`: Studio Tecnico Associato (studio office assignment).
   - `APE`: Attestato di Prestazione Energetica.
   - `CILA`, `SCIA`, `PdC`: Pratiche edilizie comunali.

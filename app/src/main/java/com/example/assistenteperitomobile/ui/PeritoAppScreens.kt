@@ -364,7 +364,7 @@ fun Modifier.cartoonPressSquash(
 // 2. 3D PERSPECTIVE NEURAL ORB & ARCHITECTURAL PRISM (/threejs + davez Palette)
 // Real-time 60fps 3D scene graph with Fibonacci sphere nodes, isometric house
 // prism wireframe, z-depth sorting, radial bloom & touch OrbitControls in the
-// exact Mario Rossi ("davez") Bordeaux (#4F0B18) & Alabaster (#F8F4F1) style!
+// exact luxury architectural ("davez") Bordeaux (#4F0B18) & Alabaster (#F8F4F1) style!
 // =============================================================================
 private data class Vec3(val x: Float, val y: Float, val z: Float)
 
@@ -1115,10 +1115,18 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
 
         // Dialogo di Aggiornamento In-App OTA
         if (uiState.showUpdateDialog && uiState.availableUpdate != null) {
+            val currentCode = remember {
+                try {
+                    androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                        context.packageManager.getPackageInfo(context.packageName, 0)
+                    ).toInt()
+                } catch (_: Throwable) { 1 }
+            }
             AppUpdateDialog(
                 manifest = uiState.availableUpdate!!,
                 downloadProgress = uiState.updateDownloadProgress,
                 statusMessage = uiState.updateStatusMessage,
+                currentVersionCode = currentCode,
                 onUpdateNow = { viewModel.startUpdateDownloadAndInstall(context) },
                 onContinueWithOldVersion = { viewModel.dismissUpdateDialog() }
             )
@@ -2168,7 +2176,7 @@ fun AgenticThinkingBubble(label: String) {
 }
 
 // =============================================================================
-// SCHERMATA UNICA TIMELINE CON REGISTRATORE VOCALE IN-APP (STUDIO RESTelli),
+// SCHERMATA UNICA TIMELINE CON REGISTRATORE VOCALE IN-APP (STUDIO PERITALE),
 // FOTOCAMERA SCANNER 3D E TRAY ALLEGATI MODERNO SQUIRCLE
 // =============================================================================
 // =============================================================================
@@ -3341,7 +3349,7 @@ fun ModernAttachmentSheet(
                 }
             }
 
-            // Griglia 2x2 Bento Squircle Responsive stile Apple HIG & Studio Tecnico
+            // Griglia 2x2 Bento Squircle Responsive stile Apple HIG & Studio Peritale
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val isCompact = maxWidth < 340.dp
                 val tileSpacing = if (isCompact) 8.dp else 12.dp
@@ -6084,6 +6092,14 @@ fun AiEngineSettingsSheetContent(
 
                                 // Scheda Notifica Aggiornamento Disponibile (se presente)
                                 uiState.availableUpdate?.let { update ->
+                                    val currentCode = remember {
+                                        try {
+                                            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                                                context.packageManager.getPackageInfo(context.packageName, 0)
+                                            ).toInt()
+                                        } catch (_: Throwable) { 1 }
+                                    }
+                                    val isNewer = update.latestVersionCode > currentCode
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = AppleWhite,
@@ -6100,13 +6116,13 @@ fun AiEngineSettingsSheetContent(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = "🚀 Nuova Versione: v${update.latestVersionName}",
+                                                    text = if (isNewer) "🚀 Nuova Versione: v${update.latestVersionName}" else "📦 Release Disponibile: v${update.latestVersionName}",
                                                     style = MaterialTheme.typography.labelMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     color = DavezBordeaux
                                                 )
                                                 Text(
-                                                    text = "Build ${update.latestVersionCode}",
+                                                    text = if (isNewer) "Build ${update.latestVersionCode} (Nuova)" else "Build ${update.latestVersionCode} (Reinstalla)",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = AppleLabelSecondary
                                                 )
@@ -6161,7 +6177,13 @@ fun AiEngineSettingsSheetContent(
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
                                                 Text(
-                                                    text = if (uiState.updateDownloadProgress != null) "Download in corso..." else "Scarica e Installa v${update.latestVersionName}",
+                                                    text = if (uiState.updateDownloadProgress != null) {
+                                                        "Download in corso..."
+                                                    } else if (isNewer) {
+                                                        "Scarica e Installa v${update.latestVersionName}"
+                                                    } else {
+                                                        "Scarica e Reinstalla v${update.latestVersionName}"
+                                                    },
                                                     color = AppleWhite,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 13.sp
@@ -7419,16 +7441,19 @@ fun AppUpdateDialog(
     downloadProgress: Float?,
     statusMessage: String?,
     onUpdateNow: () -> Unit,
-    onContinueWithOldVersion: () -> Unit
+    onContinueWithOldVersion: () -> Unit,
+    currentVersionCode: Int = 0
 ) {
     val isDownloading = downloadProgress != null
+    val isReinstall = currentVersionCode > 0 && manifest.latestVersionCode <= currentVersionCode
+    val isBlocking = manifest.mandatory && !isReinstall
     Dialog(
         onDismissRequest = {
-            if (!isDownloading) onContinueWithOldVersion()
+            if (!isDownloading && !isBlocking) onContinueWithOldVersion()
         },
         properties = DialogProperties(
-            dismissOnBackPress = !isDownloading,
-            dismissOnClickOutside = !isDownloading,
+            dismissOnBackPress = !isDownloading && !isBlocking,
+            dismissOnClickOutside = !isDownloading && !isBlocking,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -7469,13 +7494,13 @@ fun AppUpdateDialog(
                         }
                         Column {
                             Text(
-                                text = "Aggiornamento Disponibile",
+                                text = if (isReinstall) "Release Disponibile" else "Aggiornamento Disponibile",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = AppleLabelPrimary
                             )
                             Text(
-                                text = "Nuova release Assistente Perito",
+                                text = if (isReinstall) "Pacchetto ufficiale Assistente Perito" else "Nuova release Assistente Perito",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = AppleLabelSecondary
                             )
@@ -7579,6 +7604,15 @@ fun AppUpdateDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val buttonLabel = when {
+                        isDownloading -> "Download in corso..."
+                        manifest.fileSize > 0 -> {
+                            val sizeStr = String.format(java.util.Locale.ITALIAN, "%.1f MB", manifest.fileSize / (1024.0 * 1024.0))
+                            if (isReinstall) "Scarica e Reinstalla ($sizeStr)" else "Scarica e Installa Ora ($sizeStr)"
+                        }
+                        isReinstall -> "Scarica e Reinstalla"
+                        else -> "Scarica e Installa Ora"
+                    }
                     Button(
                         onClick = onUpdateNow,
                         enabled = !isDownloading,
@@ -7589,14 +7623,14 @@ fun AppUpdateDialog(
                             .heightIn(min = 46.dp)
                     ) {
                         Text(
-                            text = if (isDownloading) "Download in corso..." else "Scarica e Installa Ora",
+                            text = buttonLabel,
                             color = AppleWhite,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
                     }
 
-                    if (!isDownloading) {
+                    if (!isDownloading && !isBlocking) {
                         OutlinedButton(
                             onClick = onContinueWithOldVersion,
                             shape = RoundedCornerShape(14.dp),
@@ -7606,12 +7640,20 @@ fun AppUpdateDialog(
                                 .heightIn(min = 44.dp)
                         ) {
                             Text(
-                                text = "Continua con la versione vecchia",
+                                text = if (isReinstall) "Chiudi" else "Continua con la versione vecchia",
                                 color = AppleLabelSecondary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
                         }
+                    } else if (isBlocking) {
+                        Text(
+                            text = "⚠️ Aggiornamento obbligatorio per continuare",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DavezBordeaux,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
                     }
                 }
             }

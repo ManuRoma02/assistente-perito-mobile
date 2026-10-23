@@ -38,6 +38,7 @@ import com.example.assistenteperitomobile.domain.DocumentClassificationResult
 import com.example.assistenteperitomobile.domain.Fascicolo
 import com.example.assistenteperitomobile.domain.FascicoloStato
 import com.example.assistenteperitomobile.domain.MainAppTab
+import com.example.assistenteperitomobile.domain.agents.AgentPipelineOrchestrator
 import com.example.assistenteperitomobile.domain.PendingConflictState
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
@@ -108,6 +109,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     private val appContext = application.applicationContext
     val aiEngine = PeritoAiEngine(appContext)
+    val agentOrchestrator = AgentPipelineOrchestrator(aiEngine)
     val archiveRepo = ArchiveRepository(appContext, aiEngine)
     val calendarRepo = CalendarRepository(appContext)
     val docProcessor = DocumentProcessor(appContext)
@@ -655,11 +657,14 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     cleanedForAppointment
                 }
 
-                val parsed = aiEngine.parseAppointment(
+                val traceId = agentOrchestrator.newTraceId()
+                val parsedResp = agentOrchestrator.extractAppointment(
                     messageText = effectiveInput,
                     now = LocalDateTime.now(),
-                    config = _uiState.value.aiConfig
+                    config = _uiState.value.aiConfig,
+                    traceId = traceId
                 )
+                val parsed = parsedResp.getOrNull() ?: AppointmentParseResult(has_appointment = false)
 
                 if (!parsed.has_appointment) {
                     // Se non è un appuntamento, prova a vedere se corrisponde a un documento in archivio
@@ -675,10 +680,12 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         )
                         notifyOrStopBackgroundService("📂 Documenti Trovati", "Trovati ${fallbackDocs.size} documenti in archivio")
                     } else {
-                        val generalAnswer = aiEngine.askReasoningAssistant(
+                        val generalResp = agentOrchestrator.askReasoning(
                             question = text,
-                            config = _uiState.value.aiConfig
+                            config = _uiState.value.aiConfig,
+                            traceId = traceId
                         )
+                        val generalAnswer = generalResp.getOrNull()
                         if (!generalAnswer.isNullOrBlank()) {
                             appendAssistantMessage(
                                 ChatMessage(
@@ -1380,11 +1387,18 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 data_documento = LocalDate.now().toString()
             )
         } else {
-            aiEngine.classifyDocument(
+            val classifyResp = agentOrchestrator.classifyDocument(
                 docText = extractedText,
                 originalFileName = cleanFileName,
                 referenceDate = LocalDate.now(),
-                config = _uiState.value.aiConfig
+                config = _uiState.value.aiConfig,
+                traceId = agentOrchestrator.newTraceId()
+            )
+            classifyResp.getOrNull() ?: DocumentClassificationResult(
+                categoria = PeritoCategory.DA_CLASSIFICARE_MANUALMENTE.folderName,
+                cliente_o_controparte = "Generico",
+                oggetto_sintetico = "Documento",
+                data_documento = LocalDate.now().toString()
             )
         }
 
@@ -2550,7 +2564,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     // OTA UPDATE ENGINE (In-App Updates)
     // ==========================================
 
-    fun checkForUpdates(silent: Boolean = false) {
+    fun checkForUpdates(silent: Boolean = false, force: Boolean = true) {
         viewModelScope.launch {
             _uiState.update { it.copy(isCheckingUpdate = true, updateStatusMessage = "Verifica aggiornamenti in corso...") }
             val rawUrl = _uiState.value.aiConfig.otaManifestUrl
@@ -2559,26 +2573,41 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 rawUrl.ifBlank { OtaUpdateManager.DEFAULT_MANIFEST_URL }
             }
-            val result = otaUpdateManager.checkForUpdate(manifestUrl = url)
+            val result = otaUpdateManager.checkForUpdate(manifestUrl = url, alwaysAvailable = force)
+            val manifest = result.manifest
+            val currentCode = result.currentVersionCode
+            val isNewer = manifest != null && manifest.latestVersionCode > currentCode
+
             when (result.status) {
                 UpdateCheckStatus.UPDATE_AVAILABLE -> {
+                    val statusMsg = if (isNewer) {
+                        "Nuova versione v${manifest.latestVersionName} disponibile!"
+                    } else {
+                        "Versione v${manifest?.latestVersionName} pronta (Reinstallazione/Aggiornamento)"
+                    }
                     _uiState.update {
                         it.copy(
-                            availableUpdate = result.manifest,
-                            showUpdateDialog = true,
+                            availableUpdate = manifest,
+                            showUpdateDialog = if (silent) isNewer else true,
                             isCheckingUpdate = false,
-                            updateStatusMessage = "Nuova versione v${result.manifest?.latestVersionName} disponibile!"
+                            updateStatusMessage = statusMsg
                         )
                     }
                     if (!silent) {
+                        val header = if (isNewer) "🚀 **Nuova Versione Disponibile!**" else "📦 **Aggiornamento / Reinstallazione Disponibile**"
+                        val actionDesc = if (isNewer) {
+                            "Puoi scaricarla subito dalla finestra di aggiornamento o dalle impostazioni (⚙️)."
+                        } else {
+                            "Stai usando la build $currentCode. Puoi reinstallare o aggiornare il pacchetto APK ufficiale dalla finestra o dalle impostazioni (⚙️)."
+                        }
                         appendAssistantMessage(
                             ChatMessage(
                                 id = UUID.randomUUID().toString(),
                                 isUser = false,
-                                text = "🚀 **Nuova Versione Disponibile!**\n\n" +
-                                    "• Versione: **v${result.manifest?.latestVersionName}** (Build ${result.manifest?.latestVersionCode})\n" +
-                                    "• Note di rilascio:\n${result.manifest?.releaseNotes ?: "Miglioramenti delle prestazioni e stabilità"}\n\n" +
-                                    "Puoi scaricarla subito dalla finestra di aggiornamento o dalle impostazioni (⚙️)."
+                                text = "$header\n\n" +
+                                    "• Versione: **v${manifest?.latestVersionName}** (Build ${manifest?.latestVersionCode})\n" +
+                                    "• Note di rilascio:\n${manifest?.releaseNotes ?: "Miglioramenti delle prestazioni e stabilità"}\n\n" +
+                                    actionDesc
                             )
                         )
                     }
@@ -2586,10 +2615,10 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 UpdateCheckStatus.UP_TO_DATE -> {
                     _uiState.update {
                         it.copy(
-                            availableUpdate = null,
-                            showUpdateDialog = false,
+                            availableUpdate = manifest,
+                            showUpdateDialog = !silent,
                             isCheckingUpdate = false,
-                            updateStatusMessage = "L'app è aggiornata all'ultima versione (v${result.currentVersionName})"
+                            updateStatusMessage = "Versione corrente: v${result.currentVersionName} (Build ${result.currentVersionCode})"
                         )
                     }
                     if (!silent) {
@@ -2597,7 +2626,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                             ChatMessage(
                                 id = UUID.randomUUID().toString(),
                                 isUser = false,
-                                text = "✅ **L'app è già aggiornata!**\n\nStai utilizzando la versione più recente (v${result.currentVersionName}, Build ${result.currentVersionCode})."
+                                text = "✅ **L'app è aggiornata (v${result.currentVersionName}, Build ${result.currentVersionCode})**\n\n" +
+                                    "Il pacchetto APK è sempre disponibile per il download o la reinstallazione dalla finestra di aggiornamento o dalle impostazioni (⚙️)."
                             )
                         )
                     }
@@ -2640,7 +2670,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             val targetCtx = context ?: appContext
             val result = otaUpdateManager.downloadApk(
                 downloadUrl = manifest.downloadUrl,
-                targetVersionCode = manifest.latestVersionCode
+                targetVersionCode = manifest.latestVersionCode,
+                expectedSha256 = manifest.sha256
             ) { progress, _, _ ->
                 _uiState.update {
                     it.copy(

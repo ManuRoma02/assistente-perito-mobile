@@ -1,5 +1,5 @@
 # 📂 Guida Completa alla Sincronizzazione delle 6 Cartelle (Telefono Android ↔ PC Windows)
-**Progetto:** PeritoAI — Studio Tecnico Restelli (`Assistente_Perito_Mobile`)
+**Progetto:** PeritoAI — Studio Tecnico Peritale (`Assistente_Perito_Mobile`)
 
 ---
 

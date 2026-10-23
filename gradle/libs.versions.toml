@@ -15,7 +15,6 @@ nav3Core = "1.0.1"
 lifecycleViewmodelNav3 = "2.10.0"
 serializationJson = "1.8.0"
 mlkitTextRecognition = "16.0.1"
-mediapipeGenai = "0.10.22"
 workRuntime = "2.10.0"
 cameraX = "1.4.1"
 llamatik = "1.10.1"
@@ -44,7 +43,6 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitTextRecognition" }
-mediapipe-tasks-genai = { module = "com.google.mediapipe:tasks-genai", version.ref = "mediapipeGenai" }
 llamatik-android = { module = "com.llamatik:library-android", version.ref = "llamatik" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntime" }
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraX" }

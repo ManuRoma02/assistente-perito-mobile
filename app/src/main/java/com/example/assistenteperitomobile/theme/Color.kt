@@ -2,8 +2,8 @@ package com.example.assistenteperitomobile.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Mario Rossi ("davez") Architectural Palette + Apple HIG Light Mode Craft (/apple-design)
-// Extracted directly from C:\Users\manue\Dropbox\davez\src\styles.css & homepage.component.css:
+// Architectural Palette + Apple HIG Light Mode Craft (/apple-design)
+// Semantic Color Palette:
 //   --brand-color: #4f0b18 | --brand-color-hover: #6a1628 | --brand-color-soft: #7d2a3b
 //   .wing-edilizia: #5c3a40 | .wing-fotografia: #3a4f5c
 //   --background-color-1: #f8f4f1 | --background-color-2: #efe7e2 | --background-color-3: #d7c9bf

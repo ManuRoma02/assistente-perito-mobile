@@ -63,13 +63,13 @@ class PeritoStressBenchmarkTest {
         ),
         HardDocCase(
             3, "Atto Tribunale - Ricorso ATP ex art 696 cpc",
-            "tribunale ordinario ricorso per accertamento tecnico preventivo ex art 696 cpc geom restelli incarico peritale ctu contro immobiliare alfa",
+            "tribunale ordinario ricorso per accertamento tecnico preventivo ex art 696 cpc geom perito incarico peritale ctu contro immobiliare alfa",
             PeritoCategory.ATTI_TRIBUNALE.folderName,
             "Gergo Tecnico Giudiziario"
         ),
         HardDocCase(
             4, "Atto Tribunale - Decreto e ordinanza liquidazione spese",
-            "ordinanza del tribunale di monza r g 1202 2026 liquidazione compenso ctu perito geom carlo restelli decreto ingiuntivo provvisoriamente esecutivo",
+            "ordinanza del tribunale di monza r g 1202 2026 liquidazione compenso ctu perito geom carlo perito decreto ingiuntivo provvisoriamente esecutivo",
             PeritoCategory.ATTI_TRIBUNALE.folderName,
             "Contiene parole di spesa ma è Atto"
         ),
@@ -83,7 +83,7 @@ class PeritoStressBenchmarkTest {
         ),
         HardDocCase(
             6, "Perizia Tecnica - Perizia asseverata senza punteggiatura",
-            "perizia tecnica asseverata e giurata geom restelli cause del dissesto statico fondazioni cedimento differenziale terreno fessurazioni muri portanti",
+            "perizia tecnica asseverata e giurata geom perito cause del dissesto statico fondazioni cedimento differenziale terreno fessurazioni muri portanti",
             PeritoCategory.PERIZIE_TECNICHE.folderName,
             "Assenza Punteggiatura"
         ),
@@ -95,7 +95,7 @@ class PeritoStressBenchmarkTest {
         ),
         HardDocCase(
             8, "Perizia Tecnica - Osservazioni CTP alla bozza CTU",
-            "osservazioni tecniche alla bozza di perizia ctu geom restelli per conto della parte attrice controdeduzioni su vizi occulti impermeabilizzazione",
+            "osservazioni tecniche alla bozza di perizia ctu geom perito per conto della parte attrice controdeduzioni su vizi occulti impermeabilizzazione",
             PeritoCategory.PERIZIE_TECNICHE.folderName,
             "Misto Perizia/Tribunale"
         ),
@@ -129,7 +129,7 @@ class PeritoStressBenchmarkTest {
         // FATTURE_PREVENTIVI (Parcelle, ritenute, IVA, preventivi, bonifici)
         HardDocCase(
             13, "Fatture Preventivi - Fattura proforma con cifre e IBAN",
-            "fattura proforma n 23 2026 geom restelli cassa naz geometri cipag 5 perc imponibile 2400 iva 22 perc totale fattura 3054 ritenuta d acconto 20 perc saldo a mezzo bonifico iban it60x0542811101000000123456",
+            "fattura proforma n 23 2026 geom perito cassa naz geometri cipag 5 perc imponibile 2400 iva 22 perc totale fattura 3054 ritenuta d acconto 20 perc saldo a mezzo bonifico iban it60x0542811101000000123456",
             PeritoCategory.FATTURE_PREVENTIVI.folderName,
             "Dati Fiscali e IBAN"
         ),
@@ -262,7 +262,7 @@ class PeritoStressBenchmarkTest {
         ),
         AppointmentCase(
             10, "Orario 'alle 8 e mezza'",
-            "dopodomani alle 8 e mezza di mattina al sopralluogo con geom restelli",
+            "dopodomani alle 8 e mezza di mattina al sopralluogo con geom perito",
             expectAppointment = true, expectAmbiguous = false, expectedTime = "2026-10-12T08:30:00",
             stressType = "Orario Colloquiale '8 e mezza'"
         ),

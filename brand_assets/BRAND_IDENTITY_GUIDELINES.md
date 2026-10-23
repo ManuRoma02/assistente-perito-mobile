@@ -1,5 +1,5 @@
 # 🏛️ BRAND IDENTITY & MARKETING SYSTEM — PERITO AI
-### Studio Tecnico Restelli & Partner • Assistente Tecnico & Giudiziario On-Device
+### Studio Tecnico Peritale • Assistente Tecnico & Giudiziario On-Device
 
 ---
 
@@ -7,7 +7,7 @@
 
 | Elemento | Definizione Strategica |
 | :--- | :--- |
-| **Entità Istituzionale** | **Studio Tecnico Restelli & Partner** (Mario Rossi, Geometra & CTU) |
+| **Entità Istituzionale** | **Studio Tecnico Peritale** (Geometra & CTU) |
 | **Nome Prodotto** | **PeritoAI** |
 | **Payoff Istituzionale** | *L'Intelligenza Artificiale Forense che non esce mai dal tuo dispositivo.* |
 | **Proposta di Valore (UVP)** | **100% Privacy Locale & Zero Cloud**: Nessun dato giudiziario, foto di sopralluogo o perizia riservata viene inviata a server esterni o terze parti. Il modello linguistico (Qwen 2B GGUF) ragiona direttamente sull'hardware dello smartphone in background. |
@@ -22,7 +22,7 @@ Ispirata all'estetica editoriale svizzera e al rigore degli studi notarili e per
 ```
 [#6B1724] DavezBordeaux      — Autorevolezza, rigore forense, timbro peritale e brand primario.
 [#F8F4F1] DavezAlabaster      — Fondo gesso caldo antiriflesso (perfetto sotto la luce diretta durante i rilievi tecnici).
-[#D4AF37] DavezGoldSlate     — Monogramma istituzionale RD, calibro di precisione, rilievi millimetrici.
+[#D4AF37] DavezGoldSlate     — Monogramma istituzionale peritale, calibro di precisione, rilievi millimetrici.
 [#1E293B] DavezSlateDark     — Testo ad alto contrasto per verbali e contratti.
 [#34C759] AppleGreen         — Validazione senza conflitti, appuntamento confermato, archivio allineato.
 [#FF3B30] AppleRed           — Conflitto orario in agenda (±15 min), cancellazione fascicolo, avviso udienza.
@@ -66,4 +66,4 @@ Conforme alle linee guida di `app-icon-and-logo-designer`:
 7. **Slide 7 — Scanner Peritale & Decrittazione .p7m**: Scansione ottica ad alto contrasto di documenti cartacei e sbustamento crittografico istantaneo di atti firmati digitalmente.
 8. **Slide 8 — Reasoning in Background Senza Interruzioni**: Notifiche heads-up con CPU WakeLock attivo anche se l'app viene chiusa o lo schermo si spegne.
 9. **Slide 9 — Sincronizzazione Locale Studio-Mobile**: Archiviazione su cartella pubblica USB accessibile immediatamente dal PC dell'ufficio senza passare da internet.
-10. **Slide 10 — Contatti & Riferimenti**: *Studio Tecnico Restelli & Partner — Innovazione, Rigore e Precisione Forense.*
+10. **Slide 10 — Contatti & Riferimenti**: *Studio Tecnico Peritale — Innovazione, Rigore e Precisione Forense.*

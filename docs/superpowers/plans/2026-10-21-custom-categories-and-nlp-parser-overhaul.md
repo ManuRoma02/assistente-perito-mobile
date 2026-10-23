@@ -219,7 +219,7 @@ Expected: FAIL on the 4 new tests.
    - If category is `APE`, format title as `"Sopralluogo APE"`.
 7. **Prompt Enrichment**:
    - Add surveyor technical abbreviations to the LLM system prompt:
-     `RD = Mario Rossi (assegnato a lui)`
+     `RD = Sigla perito (assegnato a lui)`
      `STA = Studio Tecnico Associato`
      `APE = Attestato di Prestazione Energetica (Sopralluogo APE)`
      `CILA / SCIA / PdC = Pratiche Edilizie`
