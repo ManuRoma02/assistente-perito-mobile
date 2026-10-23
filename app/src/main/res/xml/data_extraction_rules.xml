@@ -1,19 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
+<?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Esclude dal cloud backup automatico tutti i dati sensibili delle perizie e dei clienti -->
+        <exclude domain="file" path="Perizie_Archivio" />
+        <exclude domain="file" path="fascicoli_studio.json" />
+        <exclude domain="file" path="chat_history.json" />
+        <exclude domain="file" path="calendar_events.json" />
+        <exclude domain="file" path="ai_engine_config.json" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="Perizie_Archivio" />
+        <exclude domain="file" path="fascicoli_studio.json" />
+        <exclude domain="file" path="chat_history.json" />
+        <exclude domain="file" path="calendar_events.json" />
+        <exclude domain="file" path="ai_engine_config.json" />
     </device-transfer>
-    -->
 </data-extraction-rules>

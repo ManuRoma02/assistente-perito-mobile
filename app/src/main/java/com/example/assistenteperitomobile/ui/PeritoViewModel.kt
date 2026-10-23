@@ -102,7 +102,8 @@ data class PeritoUiState(
     val updateStatusMessage: String? = null,
     val showUpdateDialog: Boolean = false,
     val currentAppVersionName: String = "1.0",
-    val currentAppVersionCode: Int = 1
+    val currentAppVersionCode: Int = 1,
+    val pendingSharedText: String? = null
 )
 
 class PeritoViewModel(application: Application) : AndroidViewModel(application) {
@@ -2548,7 +2549,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             if (type == "text/plain") {
                 val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
                 if (!sharedText.isNullOrBlank()) {
-                    sendUserMessage(sharedText)
+                    // Sicurezza: non eseguire comandi o eliminazioni automaticamente da Intent esterni (CWE-926 / OWASP LLM06).
+                    // Il testo viene passato alla UI come bozza precompilata nel campo chat per revisione e conferma dell'utente.
+                    _uiState.update { it.copy(pendingSharedText = sharedText, selectedTab = MainAppTab.CHAT) }
                 }
             } else {
                 @Suppress("DEPRECATION")
@@ -2558,6 +2561,10 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+    }
+
+    fun clearPendingSharedText() {
+        _uiState.update { it.copy(pendingSharedText = null) }
     }
 
     // ==========================================

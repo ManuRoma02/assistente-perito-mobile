@@ -784,6 +784,14 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
         }
     }
 
+    LaunchedEffect(uiState.pendingSharedText) {
+        val pending = uiState.pendingSharedText
+        if (!pending.isNullOrBlank()) {
+            prefillCommandInChat(pending)
+            viewModel.clearPendingSharedText()
+        }
+    }
+
     Scaffold(
         containerColor = DavezAlabaster,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- Cartella interna per le 6 cartelle delle perizie condivise o aperte -->
     <files-path name="perizie_archivio" path="Perizie_Archivio/" />
-    <files-path name="internal_files" path="." />
-    <cache-path name="camera_cache" path="." />
-    <external-files-path name="external_files" path="." />
+    <!-- Cache temporanea per foto e scansioni fotocamera -->
+    <cache-path name="camera_cache" path="camera_cache/" />
+    <!-- Cache isolata per il download e installazione pacchetti APK OTA -->
+    <cache-path name="ota_updates" path="updates/" />
 </paths>
