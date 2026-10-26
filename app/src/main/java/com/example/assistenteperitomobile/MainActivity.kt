@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         isAppInForeground = true
+        peritoViewModel.refreshEasterEggForAppOpen()
     }
 
     override fun onResume() {

@@ -877,6 +877,52 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
                 }
             }
 
+            AnimatedVisibility(
+                visible = uiState.selectedTab == MainAppTab.CHAT && uiState.easterEggMessage != null,
+                enter = fadeIn(tween(240)) + expandVertically(),
+                exit = fadeOut(tween(180)) + shrinkVertically()
+            ) {
+                uiState.easterEggMessage?.let { message ->
+                    Surface(
+                        color = DavezBordeaux.copy(alpha = 0.055f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.12f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = "🤏", style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DavezBordeauxSoft,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = viewModel::dismissEasterEgg,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Chiudi battuta",
+                                    tint = DavezBordeauxSoft,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Barra compatta non bloccante quando un modello IA si scarica in background
             AnimatedVisibility(
                 visible = uiState.downloadProgress.isDownloading && !uiState.showFirstRunModelDialog && !showAiSettingsSheet,

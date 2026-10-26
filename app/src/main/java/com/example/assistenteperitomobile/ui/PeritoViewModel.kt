@@ -46,6 +46,7 @@ import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.domain.PeritoEasterEggs
 import com.example.assistenteperitomobile.domain.detectCategoryCorrection
 import com.example.assistenteperitomobile.domain.StudioProfile
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
@@ -110,7 +111,8 @@ data class PeritoUiState(
     val pendingSharedText: String? = null,
     val archiveErrorMessage: String? = null,
     val isReasoningFallback: Boolean = false,
-    val effectiveReasoningModelLabel: String = ""
+    val effectiveReasoningModelLabel: String = "",
+    val easterEggMessage: String? = null
 )
 
 class PeritoViewModel(application: Application) : AndroidViewModel(application) {
@@ -136,6 +138,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + coroutineExceptionHandler)
 
     private val configFile = File(appContext.filesDir, "ai_config.json")
+    private val easterEggPreferences = appContext.getSharedPreferences("perito_easter_eggs", Context.MODE_PRIVATE)
+    private val lastEasterEggIndexKey = "last_message_index"
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val isoFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
@@ -145,6 +149,21 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _uiState = MutableStateFlow(PeritoUiState())
     val uiState: StateFlow<PeritoUiState> = _uiState.asStateFlow()
+
+    fun refreshEasterEggForAppOpen() {
+        val messages = PeritoEasterEggs.messages
+        if (messages.isEmpty()) return
+
+        val previousIndex = easterEggPreferences.getInt(lastEasterEggIndexKey, -1)
+        val candidates = messages.indices.filter { it != previousIndex }.ifEmpty { messages.indices.toList() }
+        val nextIndex = candidates.random()
+        easterEggPreferences.edit().putInt(lastEasterEggIndexKey, nextIndex).apply()
+        _uiState.update { it.copy(easterEggMessage = messages[nextIndex]) }
+    }
+
+    fun dismissEasterEgg() {
+        _uiState.update { it.copy(easterEggMessage = null) }
+    }
 
     init {
         val (purgedNames, freedBytes) = modelDownloadManager.purgeObsoleteModels()
