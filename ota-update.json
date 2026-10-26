@@ -2,7 +2,7 @@
   "latestVersionCode": 18,
   "latestVersionName": "1.0.17",
   "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.17/app-release.apk",
-  "releaseNotes": "• **Easter egg**: 251 battute a rotazione all'apertura dell'app.\n• **Bug fix**: rimossi doppioni e battute che attribuivano all'app azioni mai eseguite.",
+  "releaseNotes": "• **Bug fix**: miglioramenti generali di stabilità e affidabilità.",
   "mandatory": false,
   "publishedAt": "2026-10-26T14:13:54Z",
   "sha256": "65244027abefd67d6b0b57b07766e12d96f6e8e09735d7c88b2c0bb419618def",
