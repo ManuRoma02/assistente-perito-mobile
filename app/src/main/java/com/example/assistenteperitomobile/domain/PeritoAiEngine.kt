@@ -41,6 +41,116 @@ class PeritoAiEngine(private val context: Context? = null) {
 
     private var loadedGgufPath: String? = null
 
+    @Volatile
+    var currentResolution: ReasoningModelResolution? = null
+        private set
+
+    fun getLoadedGgufPath(): String? = loadedGgufPath
+    fun isUsingFallbackModel(): Boolean = currentResolution?.isFallback ?: false
+
+    private fun isClassifierModel(file: File): Boolean {
+        val name = file.name.lowercase()
+        return name.contains("rizzo") || name.contains("flow-lora") || name.contains("classifier")
+    }
+
+    fun resolveReasoningModel(
+        config: AiEngineConfig,
+        overrideModelsDir: File? = null
+    ): ReasoningModelResolution {
+        val selectedId = config.reasoningModelId.ifBlank { "qwen35_2b_gpt51_highiq_q4km" }
+        val modelsDir = overrideModelsDir ?: context?.let { File(it.filesDir, "models") }
+        if (modelsDir == null && config.mediaPipeModelPath.isBlank()) {
+            return ReasoningModelResolution(
+                selectedModelId = selectedId,
+                resolvedFile = null,
+                isFallback = false,
+                effectiveModelId = null,
+                effectiveLabel = "Nessun modello disponibile"
+            )
+        }
+
+        val target4b = modelsDir?.let { File(it, "Qwen_Qwen3.5-4B-Q4_K_M.gguf") }
+        val target4bLegacy = modelsDir?.let { File(it, "Qwen3.5-4B-Q4_K_M.gguf") }
+        val file4b = when {
+            target4b != null && target4b.exists() && target4b.length() > 10_000_000L -> target4b
+            target4bLegacy != null && target4bLegacy.exists() && target4bLegacy.length() > 10_000_000L -> target4bLegacy
+            else -> null
+        }
+        val target2b = modelsDir?.let { File(it, "Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT.i1-Q4_K_M.gguf") }
+        val file2b = if (target2b != null && target2b.exists() && target2b.length() > 10_000_000L) target2b else null
+
+        val isSelected4b = selectedId == "qwen35_4b_instruct_q4km"
+
+        if (isSelected4b) {
+            if (file4b != null) {
+                return ReasoningModelResolution(
+                    selectedModelId = selectedId,
+                    resolvedFile = file4b,
+                    isFallback = false,
+                    effectiveModelId = "qwen35_4b_instruct_q4km",
+                    effectiveLabel = "Qwen 3.5 4B Potenziato"
+                )
+            }
+            if (file2b != null) {
+                return ReasoningModelResolution(
+                    selectedModelId = selectedId,
+                    resolvedFile = file2b,
+                    isFallback = true,
+                    effectiveModelId = "qwen35_2b_gpt51_highiq_q4km",
+                    effectiveLabel = "Qwen 3.5 2B (Q4_K_M) [Fallback]"
+                )
+            }
+        } else {
+            if (file2b != null) {
+                return ReasoningModelResolution(
+                    selectedModelId = selectedId,
+                    resolvedFile = file2b,
+                    isFallback = false,
+                    effectiveModelId = "qwen35_2b_gpt51_highiq_q4km",
+                    effectiveLabel = "Qwen 3.5 2B (Q4_K_M)"
+                )
+            }
+            if (file4b != null) {
+                return ReasoningModelResolution(
+                    selectedModelId = selectedId,
+                    resolvedFile = file4b,
+                    isFallback = true,
+                    effectiveModelId = "qwen35_4b_instruct_q4km",
+                    effectiveLabel = "Qwen 3.5 4B Potenziato [Fallback]"
+                )
+            }
+        }
+
+        // Supporto modelli personalizzati (esclusi modelli di sola classificazione/decisione come Rizzo Flow)
+        if (config.mediaPipeModelPath.isNotBlank()) {
+            val f = File(config.mediaPipeModelPath)
+            if (f.exists() && f.isFile && f.name.lowercase().endsWith(".gguf") && f.length() > 10_000_000L && !isClassifierModel(f)) {
+                return ReasoningModelResolution(
+                    selectedModelId = selectedId,
+                    resolvedFile = f,
+                    isFallback = true,
+                    effectiveModelId = null,
+                    effectiveLabel = "${f.name} [Personalizzato]"
+                )
+            }
+        }
+
+        // Nessun fallback arbitrario a file .gguf generici: modelli di classificazione come Rizzo Flow
+        // non devono essere caricati come motore di reasoning!
+        return ReasoningModelResolution(
+            selectedModelId = selectedId,
+            resolvedFile = null,
+            isFallback = false,
+            effectiveModelId = null,
+            effectiveLabel = "Nessun modello disponibile"
+        )
+    }
+
+    fun getActiveReasoningModelLabel(config: AiEngineConfig? = null): String {
+        val res = if (config != null) resolveReasoningModel(config) else (currentResolution ?: return "Nessun modello disponibile")
+        return res.effectiveLabel
+    }
+
     /**
      * Inizializza o aggiorna il motore nativo llama.cpp (LlamaBridge) per i modelli .gguf
      * (Qwen 3.5 2B GPT-5.1 HighIQ Q4_K_M GGUF) scaricati sul dispositivo.
@@ -48,46 +158,16 @@ class PeritoAiEngine(private val context: Context? = null) {
     @Synchronized
     fun ensureGgufLoaded(config: AiEngineConfig): Boolean {
         if (!config.useMediaPipeOnDevice) return false
-        val ctx = context ?: return false
-
-        val candidateFile: File? = run {
-            val modelsDir = File(ctx.filesDir, "models")
-            val target4b = File(modelsDir, "Qwen_Qwen3.5-4B-Q4_K_M.gguf")
-            val target4bLegacy = File(modelsDir, "Qwen3.5-4B-Q4_K_M.gguf")
-            val target2b = File(modelsDir, "Qwen3.5-2B-GPT-5.1-HighIQ-INSTRUCT.i1-Q4_K_M.gguf")
-
-            // Priorità 1: Modello attivamente selezionato dall'utente
-            if (config.reasoningModelId == "qwen35_4b_instruct_q4km") {
-                if (target4b.exists() && target4b.length() > 10_000_000L) return@run target4b
-                if (target4bLegacy.exists() && target4bLegacy.length() > 10_000_000L) return@run target4bLegacy
-            } else {
-                if (target2b.exists() && target2b.length() > 10_000_000L) return@run target2b
-            }
-
-            // Priorità 2: Fallback intelligente su qualsiasi versione di Qwen scaricata
-            if (target4b.exists() && target4b.length() > 10_000_000L) return@run target4b
-            if (target4bLegacy.exists() && target4bLegacy.length() > 10_000_000L) return@run target4bLegacy
-            if (target2b.exists() && target2b.length() > 10_000_000L) return@run target2b
-
-            if (config.mediaPipeModelPath.isNotBlank()) {
-                val f = File(config.mediaPipeModelPath)
-                if (f.exists() && f.isFile && f.name.lowercase().endsWith(".gguf") && f.length() > 10_000_000L) {
-                    return@run f
-                }
-            }
-            modelsDir.listFiles()?.firstOrNull {
-                it.isFile && it.name.lowercase().endsWith(".gguf") && it.length() > 10_000_000L
-            }
-        }
-
-        val modelFile = candidateFile ?: return false
+        val resolution = resolveReasoningModel(config)
+        currentResolution = resolution
+        val modelFile = resolution.resolvedFile ?: return false
         if (loadedGgufPath == modelFile.absolutePath) return true
 
         return try {
             val threads = 4
             // Parametri ultra-ottimizzati per smartphone Android ARMv8/v9 con Q4_K_M:
-            // 1. maxTokens = 256 (risposte esaurienti senza troncamenti, si ferma al token <|im_end|>)
-            // 2. contextLength = 1024 (spazio ampio per prompt contestuale e storico, ~40MB KV cache)
+            // 1. maxTokens = 1024 (risposte esaurienti senza troncamenti, si ferma al token <|im_end|>)
+            // 2. contextLength = 2048 (spazio ampio per prompt contestuale e storico, ~80MB KV cache)
             // 3. flashAttention = false (stabilità garantita al 100% su CPU ARM senza hang)
             // 4. repeatPenalty = 1.12f (previene ripetizioni mantenendo fluidità espressiva)
             // 5. batchSize = 128 e gpuLayers = 0 (zero crash, massima efficienza core NEON)
@@ -499,49 +579,7 @@ class PeritoAiEngine(private val context: Context? = null) {
     fun matchCategoryDefinition(
         text: String,
         categories: List<PeritoCategoryDefinition>
-    ): PeritoCategoryDefinition? {
-        val lower = text.lowercase(Locale.ITALIAN)
-
-        fun matchesKeywords(def: PeritoCategoryDefinition): Boolean {
-            return def.keywords.any { kw ->
-                val cleanKw = kw.trim().lowercase(Locale.ITALIAN)
-                if (cleanKw.isEmpty()) return@any false
-                val startBoundary = if (cleanKw.first().isLetterOrDigit()) """(?:\b|^)""" else ""
-                val endBoundary = if (cleanKw.last().isLetterOrDigit()) """(?:\b|$)""" else ""
-                Regex("""$startBoundary${Regex.escape(cleanKw)}$endBoundary""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
-            }
-        }
-
-        // 1. Categorie personalizzate dell'utente (priorità massima)
-        val customDefs = categories.filter { !it.isSystem }
-        customDefs.firstOrNull { matchesKeywords(it) }?.let { return it }
-
-        // 2. Attività tecniche specifiche (APE, Rilievo, Comune, Tribunale)
-        val specificIds = listOf("ape", "rilievo", "comune", "tribunale")
-        for (id in specificIds) {
-            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
-        }
-
-        // 3. Agenzie partner (Unioncasa, Agenzia Orso)
-        val agencyIds = listOf("unioncasa", "agenzia_orso")
-        for (id in agencyIds) {
-            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
-        }
-
-        // 4. Attività studio e personali (Personale, Riunione)
-        val studioIds = listOf("personale", "riunione")
-        for (id in studioIds) {
-            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
-        }
-
-        // 5. Categorie generiche fallback (Sopralluogo, Cliente, Altro)
-        val genericIds = listOf("sopralluogo", "cliente", "altro")
-        for (id in genericIds) {
-            categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
-        }
-
-        return null
-    }
+    ): PeritoCategoryDefinition? = com.example.assistenteperitomobile.domain.matchCategoryDefinition(text, categories)
 
     fun parseAppointmentDeterministic(
         rawMessage: String,

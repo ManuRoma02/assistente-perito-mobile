@@ -11,6 +11,7 @@ import com.example.assistenteperitomobile.domain.ArchivedDocument
 import com.example.assistenteperitomobile.domain.DocumentClassificationResult
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -220,24 +221,37 @@ class ArchiveRepository(
         }
     }
 
-    fun loadAllDocuments(forceRefresh: Boolean = false): List<ArchivedDocument> {
+    suspend fun loadAllDocumentsResult(forceRefresh: Boolean = false): Result<List<ArchivedDocument>> = withContext(Dispatchers.IO) {
         val cached = cachedDocuments
         if (!forceRefresh && cached != null) {
-            return cached
+            return@withContext Result.success(cached)
         }
-        if (!indexFile.exists()) {
-            cachedDocuments = emptyList()
-            return emptyList()
+        mutex.withLock {
+            val lockedCached = cachedDocuments
+            if (!forceRefresh && lockedCached != null) {
+                return@withContext Result.success(lockedCached)
+            }
+            if (!indexFile.exists()) {
+                cachedDocuments = emptyList()
+                return@withContext Result.success(emptyList())
+            }
+            try {
+                val list = json.decodeFromString<List<ArchivedDocument>>(indexFile.readText())
+                val filtered = list.filter { File(it.filePath).exists() }
+                    .sortedByDescending { it.createdAtMillis }
+                cachedDocuments = filtered
+                Result.success(filtered)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Result.failure(e)
+            }
         }
-        return try {
-            val list = json.decodeFromString<List<ArchivedDocument>>(indexFile.readText())
-            val filtered = list.filter { File(it.filePath).exists() }
-                .sortedByDescending { it.createdAtMillis }
-            cachedDocuments = filtered
-            filtered
-        } catch (_: Throwable) {
-            emptyList()
-        }
+    }
+
+    suspend fun loadAllDocuments(forceRefresh: Boolean = false): List<ArchivedDocument> {
+        val result = loadAllDocumentsResult(forceRefresh)
+        return result.getOrNull() ?: cachedDocuments ?: emptyList()
     }
 
     fun invalidateCache() {
@@ -247,15 +261,15 @@ class ArchiveRepository(
     /**
      * Ricerca Fuzzy nell'archivio (per nome file, cliente, oggetto, categoria o testo OCR estratto).
      */
-    fun searchDocuments(query: String): List<ArchivedDocument> {
+    suspend fun searchDocuments(query: String): List<ArchivedDocument> = withContext(Dispatchers.IO) {
         val all = loadAllDocuments()
         val cleaned = query.trim().lowercase(Locale.ITALIAN)
-        if (cleaned.isEmpty()) return all
+        if (cleaned.isEmpty()) return@withContext all
 
         val tokens = cleaned.split(Regex("""[\s_]+""")).filter { it.length >= 2 }
-        if (tokens.isEmpty()) return all
+        if (tokens.isEmpty()) return@withContext all
 
-        return all.mapNotNull { doc ->
+        all.mapNotNull { doc ->
             val searchable = "${doc.fileName} ${doc.cliente} ${doc.oggetto} ${doc.category.displayTitle} ${doc.extractedTextSnippet}"
                 .lowercase(Locale.ITALIAN)
             var score = 0
@@ -272,16 +286,16 @@ class ArchiveRepository(
     /**
      * Trova tutti i documenti nel fascicolo di uno specifico Cliente/Perizia per il Briefing Mattutino.
      */
-    fun findClientDossier(clientName: String, location: String = ""): List<ArchivedDocument> {
+    suspend fun findClientDossier(clientName: String, location: String = ""): List<ArchivedDocument> = withContext(Dispatchers.IO) {
         val rawTokens = "$clientName $location"
             .replace(Regex("""\b(Ing\.|Arch\.|Avv\.|Geom\.|Dott\.|Sig\.|Cliente|Da definire|Via|Piazza|Corso|Viale)\b""", RegexOption.IGNORE_CASE), " ")
             .lowercase(Locale.ITALIAN)
             .split(Regex("""[\s_,.-]+"""))
             .filter { it.length >= 3 }
 
-        if (rawTokens.isEmpty()) return emptyList()
+        if (rawTokens.isEmpty()) return@withContext emptyList()
 
-        return loadAllDocuments().filter { doc ->
+        loadAllDocuments().filter { doc ->
             val target = "${doc.cliente} ${doc.fileName} ${doc.extractedTextSnippet}".lowercase(Locale.ITALIAN)
             rawTokens.any { token -> target.contains(token) }
         }.take(5)
@@ -315,22 +329,19 @@ class ArchiveRepository(
         }
     }
 
-    fun getDocumentsForFascicolo(fascicoloId: String): List<ArchivedDocument> {
-        return loadAllDocuments().filter { it.fascicoloId == fascicoloId }
+    suspend fun getDocumentsForFascicolo(fascicoloId: String): List<ArchivedDocument> = withContext(Dispatchers.IO) {
+        loadAllDocuments().filter { it.fascicoloId == fascicoloId }
     }
 
     private fun saveIndex(docs: List<ArchivedDocument>) {
         cachedDocuments = docs.filter { File(it.filePath).exists() }
             .sortedByDescending { it.createdAtMillis }
-        try {
-            val serialized = json.encodeToString(docs)
-            val tmp = File(archiveRootDir, "archive_index.json.tmp")
-            tmp.writeText(serialized, Charsets.UTF_8)
-            if (tmp.exists()) {
-                if (indexFile.exists()) indexFile.delete()
-                tmp.renameTo(indexFile)
-            }
-        } catch (_: Throwable) {
+        val serialized = json.encodeToString(docs)
+        val tmp = File(archiveRootDir, "archive_index.json.tmp")
+        tmp.writeText(serialized, Charsets.UTF_8)
+        if (tmp.exists()) {
+            if (indexFile.exists()) indexFile.delete()
+            tmp.renameTo(indexFile)
         }
     }
 }

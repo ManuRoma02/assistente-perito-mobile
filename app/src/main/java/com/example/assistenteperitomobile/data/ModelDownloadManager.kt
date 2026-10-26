@@ -10,7 +10,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.SystemClock
 import androidx.compose.runtime.Immutable
 import androidx.core.app.NotificationCompat
 import com.example.assistenteperitomobile.MainActivity
@@ -224,13 +223,16 @@ class ModelDownloadService : Service() {
     }
 }
 
-class ModelDownloadManager(private val context: Context) {
+class ModelDownloadManager(
+    private val context: Context? = null,
+    private val overrideModelsDir: File? = null
+) {
 
     /**
      * Cartella privata interna dell'app (/data/user/0/com.example.assistenteperitomobile/files/models).
      */
     val modelsDir: File
-        get() = File(context.filesDir, "models").apply {
+        get() = overrideModelsDir ?: File(context!!.filesDir, "models").apply {
             if (!exists()) mkdirs()
         }
 
@@ -311,11 +313,12 @@ class ModelDownloadManager(private val context: Context) {
         return f.exists() && f.length() > 10_000_000L
     }
 
-    fun isPrimaryReasoningDownloaded(customPath: String? = null, modelId: String? = null): Boolean {
-        if (!modelId.isNullOrBlank()) {
-            val m = reasoningModels.find { it.id == modelId }
-            if (m != null && isModelDownloaded(m)) return true
-        }
+    fun isReasoningModelDownloaded(modelId: String): Boolean {
+        val m = reasoningModels.find { it.id == modelId } ?: return false
+        return isModelDownloaded(m)
+    }
+
+    fun hasAnyReasoningModelDownloaded(customPath: String? = null): Boolean {
         if (reasoningModels.any { isModelDownloaded(it) }) return true
         if (!customPath.isNullOrBlank()) {
             val customFile = File(customPath)
@@ -326,9 +329,48 @@ class ModelDownloadManager(private val context: Context) {
         return false
     }
 
+    fun isPrimaryReasoningDownloaded(customPath: String? = null, modelId: String? = null): Boolean {
+        if (!modelId.isNullOrBlank()) {
+            if (isReasoningModelDownloaded(modelId)) return true
+            if (!customPath.isNullOrBlank()) {
+                val customFile = File(customPath)
+                if (customFile.exists() && customFile.isFile && customFile.length() > 10_000_000L) {
+                    return true
+                }
+            }
+            return false
+        }
+        return hasAnyReasoningModelDownloaded(customPath)
+    }
+
     fun areAllModelsDownloaded(customReasoningPath: String? = null): Boolean {
         return isPrimaryReasoningDownloaded(customReasoningPath) &&
             fixedTaskModels.all { isModelDownloaded(it) }
+    }
+
+    fun getMissingModels(reasoningModelId: String, customPath: String? = null): List<DownloadableAiModel> {
+        val activeReasoning = getActiveReasoningModel(reasoningModelId)
+        val targetSuite = buildList {
+            if (!isModelDownloaded(activeReasoning) && !isPrimaryReasoningDownloaded(customPath, activeReasoning.id)) {
+                add(activeReasoning)
+            }
+            addAll(fixedTaskModels)
+        }
+        return targetSuite.filterNot { isModelDownloaded(it) }
+    }
+
+    fun getAvailableStorageBytes(): Long {
+        return modelsDir.usableSpace
+    }
+
+    fun formatByteSize(bytes: Long): String {
+        val gb = bytes / (1024.0 * 1024.0 * 1024.0)
+        return if (gb >= 1.0) {
+            String.format(Locale.ITALIAN, "%.2f GB", gb)
+        } else {
+            val mb = bytes / (1024.0 * 1024.0)
+            String.format(Locale.ITALIAN, "%.1f MB", mb)
+        }
     }
 
     fun getDownloadedModelFile(model: DownloadableAiModel): File {
@@ -389,8 +431,9 @@ class ModelDownloadManager(private val context: Context) {
         isFirstStart: Boolean = false,
         bytesPerSecond: Long = 0L
     ) {
+        val ctx = context ?: return
         runCatching {
-            ModelDownloadService.ensureChannels(context)
+            ModelDownloadService.ensureChannels(ctx)
             val queueTag = if (queueTotal > 1) " ($queueIndex/$queueTotal)" else ""
             val title = "⬇️ Download$queueTag: $modelTitle"
             val dlMb = String.format(Locale.ITALIAN, "%.1f MB", downloadedBytes / (1024.0 * 1024.0))
@@ -412,7 +455,7 @@ class ModelDownloadManager(private val context: Context) {
             val indeterminate = downloadedBytes <= 0L
 
             if (isFirstStart) {
-                val serviceIntent = Intent(context, ModelDownloadService::class.java).apply {
+                val serviceIntent = Intent(ctx, ModelDownloadService::class.java).apply {
                     action = ModelDownloadService.ACTION_START_OR_UPDATE
                     putExtra(ModelDownloadService.EXTRA_TITLE, title)
                     putExtra(ModelDownloadService.EXTRA_SUBTITLE, subtitle)
@@ -420,14 +463,14 @@ class ModelDownloadManager(private val context: Context) {
                     putExtra(ModelDownloadService.EXTRA_INDETERMINATE, indeterminate)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
+                    ctx.startForegroundService(serviceIntent)
                 } else {
-                    context.startService(serviceIntent)
+                    ctx.startService(serviceIntent)
                 }
             } else {
-                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val notif = ModelDownloadService.buildProgressNotification(
-                    context = context,
+                    context = ctx,
                     title = title,
                     subtitle = subtitle,
                     percent = percent,
@@ -442,27 +485,28 @@ class ModelDownloadManager(private val context: Context) {
      * Ferma il Foreground Service di download e mostra una notifica finale di completamento o pausa.
      */
     fun notifyDownloadFinished(title: String, message: String, isSuccess: Boolean) {
+        val ctx = context ?: return
         runCatching {
-            ModelDownloadService.ensureChannels(context)
-            val stopIntent = Intent(context, ModelDownloadService::class.java).apply {
+            ModelDownloadService.ensureChannels(ctx)
+            val stopIntent = Intent(ctx, ModelDownloadService::class.java).apply {
                 action = ModelDownloadService.ACTION_STOP_SERVICE
             }
-            context.startService(stopIntent)
+            ctx.startService(stopIntent)
 
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(ModelDownloadService.NOTIFICATION_ID_PROGRESS)
 
-            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            val openAppIntent = Intent(ctx, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             val openPending = PendingIntent.getActivity(
-                context,
+                ctx,
                 0,
                 openAppIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val doneNotif = NotificationCompat.Builder(context, ModelDownloadService.CHANNEL_COMPLETE_ID)
+            val doneNotif = NotificationCompat.Builder(ctx, ModelDownloadService.CHANNEL_COMPLETE_ID)
                 .setSmallIcon(
                     if (isSuccess) android.R.drawable.stat_sys_download_done
                     else android.R.drawable.stat_notify_sync_noanim
@@ -491,6 +535,7 @@ class ModelDownloadManager(private val context: Context) {
         var currentUrl = model.downloadUrl
         var redirects = 0
         var connection: HttpURLConnection? = null
+        var activeConn: HttpURLConnection? = null
 
         try {
             while (redirects < 8) {
@@ -517,7 +562,7 @@ class ModelDownloadManager(private val context: Context) {
                 }
             }
 
-            var activeConn = connection ?: throw IllegalStateException("Impossibile connettersi a Hugging Face")
+            activeConn = connection ?: throw IllegalStateException("Impossibile connettersi a Hugging Face")
             var responseCode = activeConn.responseCode
 
             // Se il server risponde con HTTP 416 (Range Not Satisfiable), il file .part è corrotto o completato
@@ -531,17 +576,52 @@ class ModelDownloadManager(private val context: Context) {
                     setRequestProperty("User-Agent", "PeritoAI-Android/2.8")
                 }
                 activeConn = freshConn
+                connection = freshConn
                 responseCode = activeConn.responseCode
             }
 
-            val isResume = responseCode == HttpURLConnection.HTTP_PARTIAL && existingPartBytes > 0L && tempFile.exists()
+            var isResume = false
+            var rangeTotal: Long? = null
 
-            if (responseCode != HttpURLConnection.HTTP_OK && !isResume) {
+            if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
+                if (existingPartBytes <= 0L || !tempFile.exists()) {
+                    throw java.io.IOException("Risposta HTTP 206 inattesa per ${model.fileName}: nessun download parziale precedente")
+                }
+                val contentRange = activeConn.getHeaderField("Content-Range")
+                if (contentRange.isNullOrBlank()) {
+                    throw java.io.IOException("Risposta HTTP 206 non valida per ${model.fileName}: header Content-Range assente")
+                }
+                val match = Regex("""^bytes\s+(\d+)-(\d+)/(\d+|\*)$""", RegexOption.IGNORE_CASE).find(contentRange.trim())
+                    ?: throw java.io.IOException("Header Content-Range malformato per ${model.fileName}: '$contentRange'")
+
+                val rangeStart = match.groupValues[1].toLongOrNull()
+                    ?: throw java.io.IOException("Start range non valido in Content-Range: '$contentRange'")
+                val rangeEnd = match.groupValues[2].toLongOrNull()
+                    ?: throw java.io.IOException("End range non valido in Content-Range: '$contentRange'")
+                val totalStr = match.groupValues[3]
+                val parsedTotal = if (totalStr == "*") null else totalStr.toLongOrNull()
+
+                if (rangeStart != existingPartBytes) {
+                    throw java.io.IOException("Offset Content-Range non corrispondente per ${model.fileName}: start=$rangeStart, atteso=$existingPartBytes")
+                }
+                if (rangeEnd < rangeStart) {
+                    throw java.io.IOException("Estremi Content-Range incoerenti per ${model.fileName}: end ($rangeEnd) < start ($rangeStart)")
+                }
+                if (parsedTotal != null && parsedTotal <= rangeEnd) {
+                    throw java.io.IOException("Estremi Content-Range incoerenti rispetto al totale per ${model.fileName}: total=$parsedTotal <= end=$rangeEnd")
+                }
+
+                rangeTotal = parsedTotal
+                isResume = true
+            } else if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Se il server ignora l'header Range e risponde 200 OK, sovrascrive .part dall'inizio in modo sicuro
+                isResume = false
+            } else {
                 throw IllegalStateException("Errore HTTP $responseCode durante il download da Hugging Face")
             }
 
             val contentLength = activeConn.contentLengthLong.coerceAtLeast(0L)
-            val totalBytes = if (isResume) {
+            val totalBytes = rangeTotal ?: if (isResume) {
                 existingPartBytes + contentLength
             } else {
                 if (contentLength > 0L) contentLength else model.expectedBytes
@@ -552,7 +632,7 @@ class ModelDownloadManager(private val context: Context) {
             activeConn.inputStream.use { input ->
                 FileOutputStream(tempFile, isResume).use { output ->
                     val buffer = ByteArray(256 * 1024)
-                    var lastReportTimeMs = SystemClock.elapsedRealtime()
+                    var lastReportTimeMs = System.nanoTime() / 1_000_000L
                     var lastReportBytes = downloaded
                     while (true) {
                         coroutineContext.ensureActive()
@@ -560,7 +640,7 @@ class ModelDownloadManager(private val context: Context) {
                         if (read == -1) break
                         output.write(buffer, 0, read)
                         downloaded += read
-                        val nowMs = SystemClock.elapsedRealtime()
+                        val nowMs = System.nanoTime() / 1_000_000L
                         val deltaMs = nowMs - lastReportTimeMs
                         // Throttle a 350ms per evitare ricomposizioni eccessive della UI durante lo scroll
                         if (deltaMs >= 350L || downloaded >= totalBytes) {
@@ -574,8 +654,19 @@ class ModelDownloadManager(private val context: Context) {
                 }
             }
 
+            val finalLength = tempFile.length()
+            if (totalBytes > 0L && finalLength < totalBytes) {
+                throw java.io.IOException("Download incompleto per ${model.fileName}: scaricati $finalLength byte su $totalBytes attesi.")
+            }
+            if (model.expectedBytes > 0L && finalLength != model.expectedBytes) {
+                throw java.io.IOException("Dimensione finale non corrispondente per ${model.fileName}: scaricati $finalLength byte, attesi ${model.expectedBytes} byte.")
+            }
+
             if (targetFile.exists()) targetFile.delete()
-            tempFile.renameTo(targetFile)
+            val promoted = tempFile.renameTo(targetFile)
+            if (!promoted) {
+                throw java.io.IOException("Impossibile promuovere il file scaricato ${tempFile.name} in ${targetFile.name}")
+            }
             targetFile
         } catch (e: CancellationException) {
             // Mantiene il file .part così l'utente può riprendere il download dal punto in cui era rimasto!
@@ -583,6 +674,7 @@ class ModelDownloadManager(private val context: Context) {
         } catch (e: Throwable) {
             throw e
         } finally {
+            activeConn?.disconnect()
             connection?.disconnect()
         }
     }

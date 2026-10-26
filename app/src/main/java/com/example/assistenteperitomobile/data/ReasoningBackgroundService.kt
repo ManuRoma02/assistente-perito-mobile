@@ -59,7 +59,7 @@ class ReasoningBackgroundService : Service() {
             else -> {
                 acquireWakeLock()
                 val taskTitle = intent?.getStringExtra(EXTRA_TASK_TITLE) ?: "🧠 PeritoAI in elaborazione..."
-                val preview = intent?.getStringExtra(EXTRA_TASK_PREVIEW) ?: "Analisi con Qwen 3.5 2B (Q4_K_M) in background..."
+                val preview = intent?.getStringExtra(EXTRA_TASK_PREVIEW) ?: "Analisi On-Device in background..."
 
                 val notification = buildOngoingNotification(taskTitle, preview)
                 try {

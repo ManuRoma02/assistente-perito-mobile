@@ -68,9 +68,8 @@ data class StudioProfile(
 )
 
 enum class MainAppTab(val title: String) {
-    PRATICHE("Pratiche & Fascicoli"),
-    AGENDA("Agenda Sopralluoghi"),
-    CHAT("Assistente PeritoAI")
+    CHAT("Assistente PeritoAI"),
+    AGENDA("Agenda Sopralluoghi")
 }
 
 enum class FascicoloStato(val label: String) {
@@ -141,9 +140,9 @@ enum class PeritoEventCategory(
                 it.id.equals(norm, ignoreCase = true) ||
                 it.displayName.equals(norm, ignoreCase = true)
             } ?: when {
-                norm.contains("ape") || norm.contains("prestazione energetica") || norm.contains("attestato energetico") -> APE
+                Regex("""\bape\b""", RegexOption.IGNORE_CASE).containsMatchIn(norm) || norm.contains("prestazione energetica") || norm.contains("attestato energetico") -> APE
                 norm.contains("unioncasa") || norm.contains("union casa") -> UNIONCASA
-                norm.contains("agenzia orso") || norm.contains("orso") -> AGENZIA_ORSO
+                norm.contains("agenzia orso") || Regex("""\borso\b""", RegexOption.IGNORE_CASE).containsMatchIn(norm) -> AGENZIA_ORSO
                 norm.contains("riliev") || norm.contains("misuraz") || norm.contains("misure") -> RILIEVO
                 norm.contains("comun") || norm.contains("catast") || norm.contains("ufficio tecnic") || norm.contains("sportello") || norm.contains("edilizia") || norm.contains("accesso atti") -> COMUNE
                 norm.contains("tribunal") || norm.contains("udienz") || norm.contains("giudic") || norm.contains("ctu") || norm.contains("giurament") || norm.contains("cancelleria") -> TRIBUNALE
@@ -446,3 +445,144 @@ data class AiEngineConfig(
 )
 
 typealias PeritoAiConfig = AiEngineConfig
+
+/**
+ * Matcher semantico robusto con confini di parola per definizioni di categoria.
+ * Rispetta rigorosamente la priorità:
+ * 1. Categorie personalizzate utente (!isSystem)
+ * 2. Attività tecniche specifiche (ape, rilievo, comune, tribunale)
+ * 3. Agenzie partner (unioncasa, agenzia_orso)
+ * 4. Studio e personali (personale, riunione)
+ * 5. Generiche fallback (sopralluogo, cliente, altro)
+ */
+fun matchCategoryDefinition(
+    text: String,
+    categories: List<PeritoCategoryDefinition>
+): PeritoCategoryDefinition? {
+    if (text.isBlank() || categories.isEmpty()) return null
+    val lower = text.lowercase(java.util.Locale.ITALIAN)
+
+    fun matchesKeywords(def: PeritoCategoryDefinition): Boolean {
+        val terms = (listOf(def.displayName, def.defaultPrefix) + def.keywords).filter { it.isNotBlank() }
+        return terms.any { term ->
+            val cleanKw = term.trim().lowercase(java.util.Locale.ITALIAN)
+            if (cleanKw.isEmpty()) return@any false
+            val startBoundary = if (cleanKw.first().isLetterOrDigit()) """(?<![\p{L}\p{N}_])""" else ""
+            val endBoundary = if (cleanKw.last().isLetterOrDigit()) """(?![\p{L}\p{N}_])""" else ""
+            Regex("""$startBoundary${Regex.escape(cleanKw)}$endBoundary""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+        }
+    }
+
+    // 1. Categorie personalizzate dell'utente (priorità massima)
+    val customDefs = categories.filter { !it.isSystem }
+    customDefs.firstOrNull { matchesKeywords(it) }?.let { return it }
+
+    // 2. Attività tecniche specifiche (APE, Rilievo, Comune, Tribunale)
+    val specificIds = listOf("ape", "rilievo", "comune", "tribunale")
+    for (id in specificIds) {
+        categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+    }
+
+    // 3. Agenzie partner (Unioncasa, Agenzia Orso)
+    val agencyIds = listOf("unioncasa", "agenzia_orso")
+    for (id in agencyIds) {
+        categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+    }
+
+    // 4. Attività studio e personali (Personale, Riunione)
+    val studioIds = listOf("personale", "riunione")
+    for (id in studioIds) {
+        categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+    }
+
+    // 5. Categorie generiche fallback (Sopralluogo, Cliente, Altro)
+    val genericIds = listOf("sopralluogo", "cliente", "altro")
+    for (id in genericIds) {
+        categories.firstOrNull { it.id == id && matchesKeywords(it) }?.let { return it }
+    }
+
+    return null
+}
+
+/**
+ * Riconosce una correzione esplicita di categoria in linguaggio naturale.
+ * Ignora messaggi ordinari contenenti parole generiche come "in realtà", "invece", "è un/una".
+ */
+fun detectCategoryCorrection(
+    text: String,
+    categories: List<PeritoCategoryDefinition>
+): PeritoCategoryDefinition? {
+    if (text.isBlank() || categories.isEmpty()) return null
+
+    val isExplicitCommand = Regex(
+        """\b(?:cambia(?:re)?|modifica(?:re)?|imposta(?:re)?|correggi(?:re)?|aggiorna(?:re)?)\s+(?:la\s+)?categoria\b""" +
+        """|\bcategoria\s*:\s*""" +
+        """|\b(?:cambia|modifica|imposta|correggi|aggiorna)\s+in\s+""",
+        RegexOption.IGNORE_CASE
+    ).containsMatchIn(text)
+
+    val isExplicitCorrection = Regex(
+        """\b(?:non\s+è\s+(?:un['\s]|una\s+|in\s+)[^\n,;]+?(?:,\s*|\s+)(?:ma|invece|anzi|è)\s+(?:un['\s]|una\s+|in\s+)?\b)""" +
+        """|\b(?:in\s+realtà|invece|anzi)\s+(?:è|si\s+tratta\s+di)\s+(?:un['\s]|una\s+|in\s+)?\b""" +
+        """|\bè\s+invece\s+(?:un['\s]|una\s+|in\s+)?\b""" +
+        """|(?<![\p{L}\p{N}_])è\s+(?:un\s+appuntamento\s+in\s+comune|in\s+comune|in\s+tribunale|una\s+riunione|un\s+sopralluogo)\b""",
+        RegexOption.IGNORE_CASE
+    ).containsMatchIn(text)
+
+    if (!isExplicitCommand && !isExplicitCorrection) return null
+
+    val contrastMatch = Regex(
+        """\bnon\s+è\s+.*?(?:,\s*|\s+)(?:ma|invece|anzi|è)\s+(?:un['\s]|una\s+|in\s+)?(.*)$""",
+        RegexOption.IGNORE_CASE
+    ).find(text)
+    val targetSegment = contrastMatch?.groupValues?.get(1)?.trim() ?: text
+
+    return matchCategoryDefinition(targetSegment, categories)
+}
+
+/**
+ * Risolve la coppia visiva (emoji, displayName) per un appuntamento in agenda.
+ * Utilizzato da NextWeekExpandableEventCard e AgendaEventCard per evitare
+ * false classificazioni su sottostringhe casuali, supportando categorie dinamiche e fallback legacy.
+ */
+fun resolveEventCategoryVisuals(
+    categoria: String,
+    titolo: String,
+    categories: List<PeritoCategoryDefinition> = emptyList()
+): Pair<String, String> {
+    val catStr = categoria.ifBlank { titolo }.trim()
+    if (catStr.isBlank()) {
+        val defaultFallback = PeritoEventCategory.SOPRALLUOGO
+        return defaultFallback.emoji to defaultFallback.displayName
+    }
+
+    // 1. Match esatto su id o displayName (priorità categorie personalizzate)
+    val exactCustom = categories.filter { !it.isSystem }.firstOrNull {
+        it.id.equals(catStr, ignoreCase = true) || it.displayName.equals(catStr, ignoreCase = true)
+    }
+    if (exactCustom != null) return exactCustom.emoji to exactCustom.displayName
+
+    val exactSystem = categories.filter { it.isSystem }.firstOrNull {
+        it.id.equals(catStr, ignoreCase = true) || it.displayName.equals(catStr, ignoreCase = true)
+    }
+    if (exactSystem != null) return exactSystem.emoji to exactSystem.displayName
+
+    // 2. Match semantico con confini di parola e rispetto delle priorità
+    val matched = matchCategoryDefinition(catStr, categories)
+    if (matched != null) {
+        return matched.emoji to matched.displayName
+    }
+
+    // 3. Fallback legacy enum
+    val fallback = PeritoEventCategory.fromString(catStr)
+    return fallback.emoji to fallback.displayName
+}
+
+@Immutable
+data class ReasoningModelResolution(
+    val selectedModelId: String,
+    val resolvedFile: java.io.File?,
+    val isFallback: Boolean,
+    val effectiveModelId: String?,
+    val effectiveLabel: String
+)

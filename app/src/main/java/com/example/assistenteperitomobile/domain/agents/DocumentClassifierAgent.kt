@@ -3,6 +3,8 @@ package com.example.assistenteperitomobile.domain.agents
 import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.DocumentClassificationResult
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import java.time.LocalDate
 
 /**
@@ -23,6 +25,7 @@ class DocumentClassifierAgent(
         val startNs = System.nanoTime()
 
         return try {
+            kotlin.coroutines.coroutineContext.ensureActive()
             val result = aiEngine.classifyDocument(
                 docText = docText,
                 originalFileName = originalFileName,
@@ -58,6 +61,8 @@ class DocumentClassifierAgent(
                     )
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             val elapsedMs = (System.nanoTime() - startNs) / 1_000_000
             AgentResponse.Failure(

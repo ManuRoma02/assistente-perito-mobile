@@ -92,7 +92,8 @@ fun FascicoliPraticheScreen(
     viewModel: PeritoViewModel,
     onOpenInAppCamera: () -> Unit,
     onPickDocumentClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showHeader: Boolean = true
 ) {
     val context = LocalContext.current
     var selectedFilter by rememberSaveable { mutableStateOf<FascicoloStato?>(null) }
@@ -121,52 +122,90 @@ fun FascicoliPraticheScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(
+                        horizontal = if (showHeader) 16.dp else 12.dp,
+                        vertical = if (showHeader) 12.dp else 8.dp
+                    )
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Fascicoli & Pratiche",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = FontFamily.Serif,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = AppleLabelPrimary
-                        )
-                        Text(
-                            text = "${uiState.fascicoli.size} commesse registrate nello studio",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AppleLabelSecondary
-                        )
-                    }
-
-                    Button(
-                        onClick = { showNewFascicoloDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                if (showHeader) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = null,
-                            tint = AppleWhite,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Fascicoli & Pratiche",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = AppleLabelPrimary
+                            )
+                            Text(
+                                text = "${uiState.fascicoli.size} commesse registrate nello studio",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = AppleLabelSecondary
+                            )
+                        }
+
+                        Button(
+                            onClick = { showNewFascicoloDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = AppleWhite,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Nuovo Fascicolo",
+                                color = AppleWhite,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            "Nuovo Fascicolo",
-                            color = AppleWhite,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.5.sp
+                            text = "${uiState.fascicoli.size} commesse registrate",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AppleLabelSecondary,
+                            modifier = Modifier.weight(1f)
                         )
+
+                        Button(
+                            onClick = { showNewFascicoloDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = AppleWhite,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                "Nuovo Fascicolo",
+                                color = AppleWhite,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
 
                 // Filtri per Stato (Tutti / In Corso / Aperti / Chiusi)
                 Row(
@@ -379,8 +418,7 @@ fun FascicoloCard(
             Text(
                 text = fascicolo.titolo,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif
+                    fontWeight = FontWeight.Bold
                 ),
                 color = AppleLabelPrimary
             )

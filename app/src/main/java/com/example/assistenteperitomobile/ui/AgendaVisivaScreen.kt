@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.sp
 import com.example.assistenteperitomobile.domain.CalendarEventItem
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.domain.resolveEventCategoryVisuals
 import com.example.assistenteperitomobile.theme.AppleBlueDark
 import com.example.assistenteperitomobile.theme.AppleBlueSoft
 import com.example.assistenteperitomobile.theme.AppleGreen
@@ -198,7 +199,6 @@ fun AgendaVisivaScreen(
                         Text(
                             text = "Agenda Sopralluoghi",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold
                             ),
                             color = AppleLabelPrimary,
@@ -664,18 +664,7 @@ fun NextWeekExpandableEventCard(
     }
 
     val (catEmoji, catName) = remember(event.categoria, event.titolo, categories) {
-        val catStr = event.categoria.ifBlank { event.titolo }.trim()
-        val match = categories.firstOrNull {
-            it.id.equals(catStr, ignoreCase = true) ||
-            it.displayName.equals(catStr, ignoreCase = true) ||
-            it.keywords.any { kw -> catStr.contains(kw, ignoreCase = true) }
-        }
-        if (match != null) {
-            match.emoji to match.displayName
-        } else {
-            val fallback = PeritoEventCategory.fromString(catStr)
-            fallback.emoji to fallback.displayName
-        }
+        resolveEventCategoryVisuals(event.categoria, event.titolo, categories)
     }
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -929,18 +918,7 @@ fun AgendaEventCard(
     val dateLabel = event.startIso.take(10)
 
     val (catEmoji, catName) = remember(event.categoria, event.titolo, categories) {
-        val catStr = event.categoria.ifBlank { event.titolo }.trim()
-        val match = categories.firstOrNull {
-            it.id.equals(catStr, ignoreCase = true) ||
-            it.displayName.equals(catStr, ignoreCase = true) ||
-            it.keywords.any { kw -> catStr.contains(kw, ignoreCase = true) }
-        }
-        if (match != null) {
-            match.emoji to match.displayName
-        } else {
-            val fallback = PeritoEventCategory.fromString(catStr)
-            fallback.emoji to fallback.displayName
-        }
+        resolveEventCategoryVisuals(event.categoria, event.titolo, categories)
     }
 
     Surface(
@@ -1056,7 +1034,6 @@ fun AgendaEventCard(
                     text = formattedTitle ?: event.titolo,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontFamily = FontFamily.Serif,
                         letterSpacing = (-0.1).sp
                     ),
                     color = AppleLabelPrimary
@@ -1138,8 +1115,7 @@ fun AgendaEventCard(
                     Text(
                         text = "Promemoria automatici attivi (24h, 1h, 30m prima)",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppleGreen,
-                        fontSize = 10.sp
+                        color = AppleGreen
                     )
                 }
             }

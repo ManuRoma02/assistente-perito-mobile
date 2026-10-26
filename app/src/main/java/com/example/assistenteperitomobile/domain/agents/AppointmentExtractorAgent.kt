@@ -3,6 +3,8 @@ package com.example.assistenteperitomobile.domain.agents
 import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import java.time.LocalDateTime
 
 /**
@@ -22,6 +24,7 @@ class AppointmentExtractorAgent(
         val startNs = System.nanoTime()
 
         return try {
+            kotlin.coroutines.coroutineContext.ensureActive()
             val result = aiEngine.parseAppointment(
                 messageText = messageText,
                 now = now,
@@ -69,6 +72,8 @@ class AppointmentExtractorAgent(
                     )
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             val elapsedMs = (System.nanoTime() - startNs) / 1_000_000
             AgentResponse.Failure(

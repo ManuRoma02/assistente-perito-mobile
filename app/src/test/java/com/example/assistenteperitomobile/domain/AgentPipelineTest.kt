@@ -4,6 +4,9 @@ import com.example.assistenteperitomobile.domain.agents.AgentPipelineOrchestrato
 import com.example.assistenteperitomobile.domain.agents.AgentStatus
 import com.example.assistenteperitomobile.domain.agents.IntentRouterAgent
 import com.example.assistenteperitomobile.domain.agents.UserIntentCategory
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -100,5 +103,35 @@ class AgentPipelineTest {
         val data = response.getOrNull()
         assertNotNull(data)
         assertEquals(PeritoCategory.ATTI_TRIBUNALE.folderName, data!!.categoria)
+    }
+
+    @Test
+    fun testAppointmentExtractorPropagatesCancellation() = runBlocking {
+        val job = launch {
+            coroutineContext.cancel()
+            orchestrator.appointmentAgent.extract("sopralluogo domani", traceId = "trace-test")
+        }
+        job.join()
+        assertTrue("AppointmentExtractorAgent deve propagare CancellationException", job.isCancelled)
+    }
+
+    @Test
+    fun testDocumentClassifierPropagatesCancellation() = runBlocking {
+        val job = launch {
+            coroutineContext.cancel()
+            orchestrator.documentAgent.classify("test doc", traceId = "trace-test")
+        }
+        job.join()
+        assertTrue("DocumentClassifierAgent deve propagare CancellationException", job.isCancelled)
+    }
+
+    @Test
+    fun testReasoningAdvisorPropagatesCancellation() = runBlocking {
+        val job = launch {
+            coroutineContext.cancel()
+            orchestrator.reasoningAgent.answer("test question", traceId = "trace-test")
+        }
+        job.join()
+        assertTrue("PeritoReasoningAdvisorAgent deve propagare CancellationException", job.isCancelled)
     }
 }

@@ -11,10 +11,23 @@ import android.os.ParcelFileDescriptor
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
+import java.util.Locale
+
+const val MAX_DOCUMENT_SIZE_BYTES = 50 * 1024 * 1024L // 50 MB: limite prudenziale per prevenire OutOfMemory su heap Android (192-256 MB)
+
+class DocumentTooLargeException(
+    val actualSize: Long,
+    val maxSize: Long = MAX_DOCUMENT_SIZE_BYTES
+) : IllegalArgumentException(
+    "Il file supera il limite massimo di ${maxSize / (1024 * 1024)} MB per l'elaborazione su dispositivo mobile (dimensione: ${String.format(Locale.ITALIAN, "%.1f", actualSize / (1024.0 * 1024.0))} MB)."
+)
 
 data class ProcessedDocumentPayload(
     val cleanFileName: String,
@@ -30,6 +43,28 @@ class DocumentProcessor(private val context: Context) {
     }
 
     /**
+     * Lettura protetta con streaming limitato a maxBytes per prevenire spike di memoria heap.
+     */
+    fun readStreamBounded(
+        stream: InputStream,
+        maxBytes: Long = MAX_DOCUMENT_SIZE_BYTES
+    ): ByteArray {
+        val buffer = ByteArray(64 * 1024)
+        val out = ByteArrayOutputStream()
+        var totalRead = 0L
+        while (true) {
+            val r = stream.read(buffer)
+            if (r == -1) break
+            totalRead += r
+            if (totalRead > maxBytes) {
+                throw DocumentTooLargeException(totalRead, maxBytes)
+            }
+            out.write(buffer, 0, r)
+        }
+        return out.toByteArray()
+    }
+
+    /**
      * Elabora un URI proveniente da Fotocamera, File Picker o Condivisione WhatsApp/Email:
      * 1. Se è un .p7m (busta crittografica CAdES PEC/Tribunale), estrae il PDF interno.
      * 2. Se è un PDF, renderizza le pagine con PdfRenderer ed esegue OCR On-Device tramite Google ML Kit.
@@ -38,14 +73,22 @@ class DocumentProcessor(private val context: Context) {
     suspend fun processUri(uri: Uri, originalNameHint: String? = null): ProcessedDocumentPayload =
         withContext(Dispatchers.IO) {
             val rawName = originalNameHint ?: queryDisplayName(uri) ?: "documento_${System.currentTimeMillis()}.pdf"
-            val rawBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                ?: ByteArray(0)
+            val declaredSize = queryFileSize(uri)
+            if (declaredSize != null && declaredSize > MAX_DOCUMENT_SIZE_BYTES) {
+                throw DocumentTooLargeException(declaredSize, MAX_DOCUMENT_SIZE_BYTES)
+            }
+            val rawBytes = context.contentResolver.openInputStream(uri)?.use { stream ->
+                readStreamBounded(stream, MAX_DOCUMENT_SIZE_BYTES)
+            } ?: ByteArray(0)
 
             processBytes(rawBytes, rawName)
         }
 
     suspend fun processBytes(rawBytes: ByteArray, rawName: String): ProcessedDocumentPayload =
         withContext(Dispatchers.IO) {
+            if (rawBytes.size > MAX_DOCUMENT_SIZE_BYTES) {
+                throw DocumentTooLargeException(rawBytes.size.toLong(), MAX_DOCUMENT_SIZE_BYTES)
+            }
             val lowerName = rawName.lowercase()
             var workingBytes = rawBytes
             var workingName = rawName
@@ -228,6 +271,19 @@ class DocumentProcessor(private val context: Context) {
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                 if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun queryFileSize(uri: Uri): Long? {
+        return try {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (idx >= 0 && cursor.moveToFirst() && !cursor.isNull(idx)) {
+                    cursor.getLong(idx)
+                } else null
             }
         } catch (_: Throwable) {
             null

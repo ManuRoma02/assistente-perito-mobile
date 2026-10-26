@@ -2,6 +2,8 @@ package com.example.assistenteperitomobile.domain.agents
 
 import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 
 /**
  * Agent specializzato nell'assistenza tecnica e forense (CTU, CTP, stime estimative, DPR 380/01).
@@ -19,6 +21,7 @@ class PeritoReasoningAdvisorAgent(
         val startNs = System.nanoTime()
 
         return try {
+            kotlin.coroutines.coroutineContext.ensureActive()
             val answer = aiEngine.askReasoningAssistant(
                 question = question,
                 config = config
@@ -50,6 +53,8 @@ class PeritoReasoningAdvisorAgent(
                     )
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             val elapsedMs = (System.nanoTime() - startNs) / 1_000_000
             AgentResponse.Failure(

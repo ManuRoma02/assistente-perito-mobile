@@ -7,10 +7,17 @@
         </trust-anchors>
     </base-config>
 
-    <!-- Eccezioni di traffico in chiaro consentite esclusivamente per server LLM locali (Ollama / RizzoFlow su localhost/emulatore) -->
+    <!-- Eccezioni di traffico in chiaro circoscritte esclusivamente a server LLM locali (Ollama / RizzoFlow).
+         MOTIVAZIONE & TRADE-OFF DI SICUREZZA:
+         - Endpoint loopback ed emulatore: localhost, 127.0.0.1, 10.0.2.2.
+         - Dominio mDNS 'local' (.local): necessario per consentire l'accesso a server LLM LAN di studio senza TLS
+           (i certificati TLS emessi da CA pubbliche non sono rilasciabili per il TLD riservato RFC 6762 .local).
+         - Rischio circoscritto alla sola LAN locale: tutto il traffico WAN resta bloccato in chiaro da base-config.
+    -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">local</domain>
     </domain-config>
 </network-security-config>

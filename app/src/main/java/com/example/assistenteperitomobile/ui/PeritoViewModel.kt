@@ -38,12 +38,15 @@ import com.example.assistenteperitomobile.domain.DocumentClassificationResult
 import com.example.assistenteperitomobile.domain.Fascicolo
 import com.example.assistenteperitomobile.domain.FascicoloStato
 import com.example.assistenteperitomobile.domain.MainAppTab
+import com.example.assistenteperitomobile.domain.ReasoningModelResolution
 import com.example.assistenteperitomobile.domain.agents.AgentPipelineOrchestrator
+import com.example.assistenteperitomobile.domain.agents.UserIntentCategory
 import com.example.assistenteperitomobile.domain.PendingConflictState
 import com.example.assistenteperitomobile.domain.PeritoAiEngine
 import com.example.assistenteperitomobile.domain.PeritoCategory
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.domain.detectCategoryCorrection
 import com.example.assistenteperitomobile.domain.StudioProfile
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import com.example.assistenteperitomobile.domain.defaultCategoryFormats
@@ -57,6 +60,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
@@ -103,7 +107,10 @@ data class PeritoUiState(
     val showUpdateDialog: Boolean = false,
     val currentAppVersionName: String = "1.0",
     val currentAppVersionCode: Int = 1,
-    val pendingSharedText: String? = null
+    val pendingSharedText: String? = null,
+    val archiveErrorMessage: String? = null,
+    val isReasoningFallback: Boolean = false,
+    val effectiveReasoningModelLabel: String = ""
 )
 
 class PeritoViewModel(application: Application) : AndroidViewModel(application) {
@@ -218,44 +225,88 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private data class RefreshDataBundle(
+        val docs: List<ArchivedDocument>,
+        val archiveError: String?,
+        val fascicoli: List<Fascicolo>,
+        val availableCals: List<SystemCalendarInfo>,
+        val events: List<CalendarEventItem>,
+        val downloadedModelIds: Set<String>,
+        val modelResolution: ReasoningModelResolution
+    )
+
     fun refreshAllData() {
         viewModelScope.launch {
-            val docs = if (_uiState.value.archiveSearchQuery.isBlank()) {
-                archiveRepo.loadAllDocuments()
-            } else {
-                archiveRepo.searchDocuments(_uiState.value.archiveSearchQuery)
+            val currentConfig = _uiState.value.aiConfig
+            val searchQuery = _uiState.value.archiveSearchQuery
+
+            val bundle = withContext(Dispatchers.IO) {
+                val archiveRes = if (searchQuery.isBlank()) {
+                    archiveRepo.loadAllDocumentsResult()
+                } else {
+                    Result.success(archiveRepo.searchDocuments(searchQuery))
+                }
+                val docs = archiveRes.getOrElse { _uiState.value.archivedDocuments }
+                val errorMsg = archiveRes.exceptionOrNull()?.let {
+                    "Errore caricamento archivio: ${it.localizedMessage ?: "Indice corrotto o illeggibile"}"
+                }
+
+                val fascicoli = fascicoloRepo.loadAllFascicoli()
+
+                val today = LocalDate.now()
+                val zone = ZoneId.systemDefault()
+                val startOfTodayMillis = today.atStartOfDay(zone).toInstant().toEpochMilli()
+                val endOfTomorrowMillis = today.plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
+                val nowMillis = System.currentTimeMillis()
+                val rangeEndMillis = maxOf(endOfTomorrowMillis, nowMillis + 30L * 86_400_000L)
+
+                calendarRepo.isSyncEnabled = currentConfig.syncSystemCalendar
+                calendarRepo.selectedCalendarId = currentConfig.selectedCalendarId
+
+                val cals = if (calendarRepo.hasNativeCalendarPermissions()) {
+                    calendarRepo.getAvailableCalendars()
+                } else emptyList()
+
+                val events = calendarRepo.getEventsInRange(
+                    startOfTodayMillis,
+                    rangeEndMillis,
+                    currentConfig.categories
+                )
+
+                val downloaded = computeDownloadedModelIds()
+                val resolution = aiEngine.resolveReasoningModel(currentConfig)
+
+                RefreshDataBundle(
+                    docs = docs,
+                    archiveError = errorMsg,
+                    fascicoli = fascicoli,
+                    availableCals = cals,
+                    events = events,
+                    downloadedModelIds = downloaded,
+                    modelResolution = resolution
+                )
             }
-            val fascicoliList = fascicoloRepo.loadAllFascicoli()
+
             val today = LocalDate.now()
-            val zone = ZoneId.systemDefault()
-            val startOfTodayMillis = today.atStartOfDay(zone).toInstant().toEpochMilli()
-            val endOfTomorrowMillis = today.plusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
-            val nowMillis = System.currentTimeMillis()
-            val rangeEndMillis = maxOf(endOfTomorrowMillis, nowMillis + 30L * 86_400_000L)
-
-            // Sincronizzazione preferenza utente con CalendarRepository
-            calendarRepo.isSyncEnabled = _uiState.value.aiConfig.syncSystemCalendar
-            calendarRepo.selectedCalendarId = _uiState.value.aiConfig.selectedCalendarId
-
-            val availableCals = if (calendarRepo.hasNativeCalendarPermissions()) {
-                calendarRepo.getAvailableCalendars()
-            } else emptyList()
-
-            // Singola query IPC al Calendar Provider invece di 3 roundtrip separati
-            val allEventsInRange = calendarRepo.getEventsInRange(startOfTodayMillis, rangeEndMillis)
-            val todayEvs = allEventsInRange.filter {
-                val evDate = Instant.ofEpochMilli(it.startMillis).atZone(zone).toLocalDate()
-                evDate == today
-            }
             val tomorrow = today.plusDays(1)
-            val tomorrowEvs = allEventsInRange.filter {
-                val evDate = Instant.ofEpochMilli(it.startMillis).atZone(zone).toLocalDate()
-                evDate == tomorrow
-            }
-            val next30Days = allEventsInRange.filter { it.startMillis >= nowMillis - 3_600_000L }
+            val dayAfterTomorrow = tomorrow.plusDays(1)
+            val zone = ZoneId.systemDefault()
+            val nowMillis = System.currentTimeMillis()
 
-            val customPath = _uiState.value.aiConfig.mediaPipeModelPath
-            val reasoningReady = modelDownloadManager.isPrimaryReasoningDownloaded(customPath)
+            val startOfToday = today.atStartOfDay(zone).toInstant().toEpochMilli()
+            val startOfTomorrow = tomorrow.atStartOfDay(zone).toInstant().toEpochMilli()
+            val startOfDayAfterTomorrow = dayAfterTomorrow.atStartOfDay(zone).toInstant().toEpochMilli()
+
+            val todayEvs = bundle.events.filter {
+                it.endMillis > startOfToday && it.startMillis < startOfTomorrow
+            }
+            val tomorrowEvs = bundle.events.filter {
+                it.endMillis > startOfTomorrow && it.startMillis < startOfDayAfterTomorrow
+            }
+            val next30Days = bundle.events.filter { it.startMillis >= nowMillis - 3_600_000L }
+
+            val customPath = currentConfig.mediaPipeModelPath
+            val reasoningReady = bundle.modelResolution.resolvedFile != null
             val allReady = modelDownloadManager.areAllModelsDownloaded(customPath)
 
             if (calendarRepo.hasNativeCalendarPermissions()) {
@@ -264,16 +315,19 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
             _uiState.update {
                 it.copy(
-                    archivedDocuments = docs,
-                    fascicoli = fascicoliList,
+                    archivedDocuments = bundle.docs,
+                    archiveErrorMessage = bundle.archiveError,
+                    fascicoli = bundle.fascicoli,
                     todayEvents = todayEvs,
                     tomorrowEvents = tomorrowEvs,
                     upcomingEvents = next30Days,
                     hasCalendarPermission = calendarRepo.hasCalendarPermissions(),
                     hasNativeCalendarPermission = calendarRepo.hasNativeCalendarPermissions(),
-                    availableCalendars = availableCals,
-                    downloadedModelIds = computeDownloadedModelIds(),
+                    availableCalendars = bundle.availableCals,
+                    downloadedModelIds = bundle.downloadedModelIds,
                     isReasoningReady = reasoningReady,
+                    isReasoningFallback = bundle.modelResolution.isFallback,
+                    effectiveReasoningModelLabel = bundle.modelResolution.effectiveLabel,
                     areAllModelsReady = allReady
                 )
             }
@@ -413,14 +467,15 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             voiceDurationSeconds = voiceDurationSeconds,
             voiceAudioPath = voiceAudioPath
         )
+        val traceId = agentOrchestrator.newTraceId()
+        val routedIntent = agentOrchestrator.routeMessage(text, traceId)
         val lowerText = text.lowercase(Locale.ITALIAN)
         val semanticLabel = when {
-            voiceDurationSeconds != null -> "🎙️ Google Speech In-App • Trascrizione vocale & Analisi Qwen 3.5..."
-            lowerText.startsWith("/oggi") || lowerText == "oggi" -> "☀️ Comando /oggi • Briefing Giornaliero & Fascicoli..."
-            lowerText.startsWith("/cerca") -> "🔍 Comando /cerca • Ricerca mirata nelle 6 Cartelle..."
-            lowerText.startsWith("/elimina") || lowerText.startsWith("/cancella") -> "🗑️ Comando /elimina • Rimozione da Archivio o Agenda..."
-            lowerText.contains("cerca") || lowerText.contains("mandami") -> "🔍 Ricerca semantica nelle 6 Cartelle..."
-            else -> "🧠 ${getActiveReasoningModelLabel()} • Analisi impegno e controllo conflitti (±15m)..."
+            voiceDurationSeconds != null -> "🎙️ Trascrizione vocale & Analisi in corso..."
+            routedIntent.category == UserIntentCategory.DAILY_BRIEFING || lowerText.startsWith("/oggi") || lowerText == "oggi" -> "☀️ Classificazione richiesta • Preparazione Briefing..."
+            routedIntent.category == UserIntentCategory.ARCHIVE_SEARCH || lowerText.startsWith("/cerca") || lowerText.contains("cerca") || lowerText.contains("mandami") -> "🔍 Classificazione richiesta • Ricerca Archivio..."
+            routedIntent.category == UserIntentCategory.CORRECTION_OR_DELETE || lowerText.startsWith("/elimina") || lowerText.startsWith("/cancella") -> "🗑️ Classificazione richiesta • Verifica cancellazione..."
+            else -> "🧠 ${getActiveReasoningModelLabel()} • Analisi richiesta e controllo conflitti..."
         }
         _uiState.update {
             it.copy(
@@ -437,12 +492,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         ReasoningBackgroundService.startReasoning(
             appContext,
             taskTitle = "🧠 Elaborazione PeritoAI...",
-            previewText = text
+            previewText = "${getActiveReasoningModelLabel()} • Elaborazione richiesta..."
         )
 
         appScope.launch {
             try {
-                kotlinx.coroutines.delay(380L)
                 val lower = text.lowercase(Locale.ITALIAN)
 
                 // 0. ROUTING DETERMINISTICO COMANDI SLASH (/oggi, /cerca, /elimina, /cartelle, /fissa)
@@ -658,7 +712,6 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     cleanedForAppointment
                 }
 
-                val traceId = agentOrchestrator.newTraceId()
                 val parsedResp = agentOrchestrator.extractAppointment(
                     messageText = effectiveInput,
                     now = LocalDateTime.now(),
@@ -845,7 +898,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Elabora un documento (PDF, .p7m, Immagine/Screenshot) scelto dal telefono o condiviso da WhatsApp/Email.
      */
-    fun processDocumentUri(uri: Uri, nameHint: String? = null) {
+    fun processDocumentUri(uri: Uri, nameHint: String? = null, isExternalShare: Boolean = false) {
         if (!requireReasoningModelReady(nameHint ?: "Documento allegato")) return
 
         _uiState.update {
@@ -868,7 +921,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     bytes = payload.extractedBytes,
                     extractedText = payload.extractedText,
                     wasP7m = payload.wasP7mUnwrapped,
-                    fascicoloId = _uiState.value.selectedFascicoloId
+                    fascicoloId = if (isExternalShare) null else _uiState.value.selectedFascicoloId
                 )
             } catch (e: Throwable) {
                 appendAssistantMessage(
@@ -1032,7 +1085,20 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteArchivedDocument(docId: String, notifyInChat: Boolean = true) {
         viewModelScope.launch {
             val targetDoc = archiveRepo.loadAllDocuments().find { it.id == docId }
-            archiveRepo.deleteDocument(docId)
+            val deleted = archiveRepo.deleteDocument(docId)
+            if (!deleted) {
+                if (notifyInChat) {
+                    appendAssistantMessage(
+                        ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            isUser = false,
+                            text = "⚠️ **Impossibile eliminare il documento**\nIl file richiesto non è stato trovato o è protetto da scrittura."
+                        )
+                    )
+                }
+                _uiState.update { it.copy(statusBanner = "⚠️ Eliminazione non riuscita") }
+                return@launch
+            }
             refreshAllData()
             _uiState.update { state ->
                 val cleanedMessages = state.messages.map { msg ->
@@ -1660,21 +1726,9 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        // B2.0 CAMBIO CATEGORIA APPUNTAMENTO (Linguaggio naturale)
-        val isCategoryChange = lower.contains("cambia categoria") ||
-            lower.contains("modifica categoria") ||
-            lower.contains("cambia la categoria") ||
-            lower.contains("imposta categoria") ||
-            lower.contains("è un appuntamento in comune") ||
-            lower.contains("è in comune") ||
-            lower.contains("appuntamenti in comune") ||
-            lower.contains("è in tribunale") ||
-            lower.contains("è una riunione") ||
-            lower.contains("è un sopralluogo") ||
-            lower.contains("non è un sopralluogo")
-
-        if (isCategoryChange) {
-            val targetCategory = PeritoEventCategory.fromString(text)
+        // B2.0 CAMBIO CATEGORIA APPUNTAMENTO (Linguaggio naturale con supporto categorie dinamiche)
+        val targetCategory = detectCategoryCorrection(text, _uiState.value.aiConfig.categories)
+        if (targetCategory != null) {
             val clientSuffix = if (lastEv.cliente.isNotBlank() && lastEv.cliente != "Cliente" && !lastEv.cliente.equals(lastEv.categoria, ignoreCase = true)) {
                 " con ${lastEv.cliente}"
             } else {
@@ -1822,7 +1876,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         return false
     }
 
-    private fun handleSlashSearchCommand(query: String) {
+    private suspend fun handleSlashSearchCommand(query: String) {
         val allDocs = archiveRepo.loadAllDocuments()
         val cleanQuery = query.trim()
 
@@ -1973,7 +2027,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    private fun buildConfirmationChatMessage(
+    private suspend fun buildConfirmationChatMessage(
         event: CalendarEventItem,
         prefix: String = "✅ **Appuntamento Confermato in Agenda!**\n\n"
     ): ChatMessage {
@@ -2177,11 +2231,18 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun getActiveReasoningModelLabel(): String {
-        return if (_uiState.value.aiConfig.reasoningModelId == modelDownloadManager.powerfulReasoningModel.id) {
-            "Qwen 3.5 4B Potenziato"
-        } else {
-            "Qwen 3.5 2B (Q4_K_M)"
-        }
+        return aiEngine.getActiveReasoningModelLabel(_uiState.value.aiConfig)
+    }
+
+    fun getReasoningModelResolution(): ReasoningModelResolution {
+        return aiEngine.resolveReasoningModel(_uiState.value.aiConfig)
+    }
+
+    fun getMissingModelsForActiveConfig(): List<DownloadableAiModel> {
+        return modelDownloadManager.getMissingModels(
+            _uiState.value.aiConfig.reasoningModelId,
+            _uiState.value.aiConfig.mediaPipeModelPath
+        )
     }
 
     /**
@@ -2200,13 +2261,20 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             ollamaModel = suggestedOllama
         )
         saveConfig(updatedConfig)
-        val isReady = modelDownloadManager.isPrimaryReasoningDownloaded(updatedConfig.mediaPipeModelPath, modelId)
+        val resolution = aiEngine.resolveReasoningModel(updatedConfig)
+        val isReady = resolution.resolvedFile != null
         _uiState.update {
             it.copy(
                 aiConfig = updatedConfig,
                 isReasoningReady = isReady,
+                isReasoningFallback = resolution.isFallback,
+                effectiveReasoningModelLabel = resolution.effectiveLabel,
                 areAllModelsReady = modelDownloadManager.areAllModelsDownloaded(updatedConfig.mediaPipeModelPath),
-                statusBanner = "⭐ Modello attivo impostato su: ${targetModel.title}"
+                statusBanner = if (resolution.isFallback) {
+                    "⚠️ ${targetModel.title} non ancora scaricato: in uso fallback (${resolution.effectiveLabel})"
+                } else {
+                    "⭐ Modello attivo impostato su: ${targetModel.title}"
+                }
             )
         }
         viewModelScope.launch(Dispatchers.Default) {
@@ -2231,18 +2299,32 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun downloadAllMissingModels() {
         if (_uiState.value.downloadProgress.isDownloading) return
-        val activeReasoning = modelDownloadManager.getActiveReasoningModel(_uiState.value.aiConfig.reasoningModelId)
-        val targetSuite = buildList {
-            if (!modelDownloadManager.isModelDownloaded(activeReasoning) &&
-                !modelDownloadManager.isPrimaryReasoningDownloaded(_uiState.value.aiConfig.mediaPipeModelPath, activeReasoning.id)
-            ) {
-                add(activeReasoning)
-            }
-            addAll(modelDownloadManager.fixedTaskModels)
-        }
-        val missing = targetSuite.filterNot { modelDownloadManager.isModelDownloaded(it) }
+        val missing = getMissingModelsForActiveConfig()
         if (missing.isEmpty()) {
             dismissFirstRunModelDialog()
+            return
+        }
+
+        val requiredBytes = missing.sumOf { it.expectedBytes }
+        val availableBytes = modelDownloadManager.getAvailableStorageBytes()
+        if (availableBytes in 1L until requiredBytes) {
+            val reqStr = modelDownloadManager.formatByteSize(requiredBytes)
+            val availStr = modelDownloadManager.formatByteSize(availableBytes)
+            _uiState.update {
+                it.copy(
+                    statusBanner = "⚠️ Spazio insufficiente: richiesti $reqStr, disponibili solo $availStr"
+                )
+            }
+            appendAssistantMessage(
+                ChatMessage(
+                    id = UUID.randomUUID().toString(),
+                    isUser = false,
+                    text = "⚠️ **Spazio di archiviazione insufficiente per i modelli IA**\n\n" +
+                        "• **Spazio richiesto:** $reqStr\n" +
+                        "• **Spazio disponibile:** $availStr\n\n" +
+                        "Libera spazio nella memoria interna del dispositivo per avviare il download."
+                )
+            )
             return
         }
 
@@ -2557,7 +2639,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 @Suppress("DEPRECATION")
                 val streamUri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
                 if (streamUri != null) {
-                    processDocumentUri(streamUri)
+                    processDocumentUri(streamUri, isExternalShare = true)
                 }
             }
         }

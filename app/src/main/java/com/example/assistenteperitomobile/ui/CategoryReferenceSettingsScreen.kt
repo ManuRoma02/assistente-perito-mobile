@@ -65,16 +65,17 @@ import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.theme.AppleBlue
+import com.example.assistenteperitomobile.theme.AppleBlueSoft
+import com.example.assistenteperitomobile.theme.AppleLabelPrimary
+import com.example.assistenteperitomobile.theme.AppleLabelSecondary
+import com.example.assistenteperitomobile.theme.AppleLabelTertiary
+import com.example.assistenteperitomobile.theme.AppleWhite
+import com.example.assistenteperitomobile.theme.DavezAlabaster
+import com.example.assistenteperitomobile.theme.DavezBordeaux
+import com.example.assistenteperitomobile.theme.DavezStoneBorder
+import com.example.assistenteperitomobile.theme.DavezTravertine
 import java.util.Locale
-
-// Palette Davez Luxury Architectural & Apple HIG
-private val DavezBurgundy = Color(0xFF4F0B18)
-private val DavezAlabaster = Color(0xFFFAF7F2)
-private val DavezTravertine = Color(0xFFEFE9E1)
-private val DavezCharcoal = Color(0xFF1D1D1F)
-private val DavezMuted = Color(0xFF86868B)
-private val AppleBlue = Color(0xFF0071E3)
-private val AppleGreen = Color(0xFF34C759)
 
 /**
  * Schermata di personalizzazione delle informazioni da visualizzare nel riferimento
@@ -99,7 +100,7 @@ fun CategoryReferenceSettingsContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Top Bar stile Davez / Apple HIG
         Surface(
@@ -120,7 +121,7 @@ fun CategoryReferenceSettingsContent(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Torna alle Impostazioni",
-                        tint = DavezBurgundy
+                        tint = DavezBordeaux
                     )
                 }
 
@@ -133,26 +134,26 @@ fun CategoryReferenceSettingsContent(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.2).sp
                         ),
-                        color = DavezCharcoal
+                        color = AppleLabelPrimary
                     )
                     Text(
                         text = "Gestisci categorie e formato dei titoli in agenda",
                         style = MaterialTheme.typography.labelSmall,
-                        color = DavezMuted
+                        color = AppleLabelTertiary
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = DavezBurgundy.copy(alpha = 0.08f),
-                    border = BorderStroke(0.5.dp, DavezBurgundy.copy(alpha = 0.2f))
+                    color = DavezBordeaux.copy(alpha = 0.08f),
+                    border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.2f))
                 ) {
                     Text(
                         text = "🏷️ Riferimenti",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = DavezBurgundy
+                            color = DavezBordeaux
                         )
                     )
                 }
@@ -164,14 +165,14 @@ fun CategoryReferenceSettingsContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
-                .background(DavezAlabaster, RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
                 .border(BorderStroke(0.5.dp, DavezTravertine), RoundedCornerShape(12.dp))
                 .padding(12.dp)
         ) {
             Text(
                 text = "Tocca una categoria per espanderla e configurare gli elementi del titolo. Puoi aggiungere nuove categorie personalizzate con parole chiave dedicate che l'IA riconoscerà nei messaggi vocali e scritti.",
                 style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                color = DavezCharcoal.copy(alpha = 0.85f)
+                color = AppleLabelPrimary.copy(alpha = 0.85f)
             )
         }
 
@@ -188,8 +189,8 @@ fun CategoryReferenceSettingsContent(
                 Surface(
                     onClick = { isCreatingCategory = true },
                     shape = RoundedCornerShape(14.dp),
-                    color = DavezBurgundy.copy(alpha = 0.06f),
-                    border = BorderStroke(1.dp, DavezBurgundy.copy(alpha = 0.25f)),
+                    color = DavezBordeaux.copy(alpha = 0.06f),
+                    border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.25f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 4.dp)
@@ -204,7 +205,7 @@ fun CategoryReferenceSettingsContent(
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
-                            tint = DavezBurgundy,
+                            tint = DavezBordeaux,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -212,7 +213,7 @@ fun CategoryReferenceSettingsContent(
                             text = "+ Nuova Categoria Personalizzata",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = DavezBurgundy
+                                color = DavezBordeaux
                             )
                         )
                     }
@@ -251,9 +252,9 @@ fun CategoryReferenceSettingsContent(
                         .fillMaxWidth()
                         .padding(bottom = 24.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = DavezBurgundy
+                        contentColor = DavezBordeaux
                     ),
-                    border = BorderStroke(1.dp, DavezBurgundy.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.35f)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(
@@ -308,7 +309,7 @@ fun CategoryReferenceSettingsContent(
                         text = "Elimina Categoria",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = DavezCharcoal
+                            color = AppleLabelPrimary
                         )
                     )
                 }
@@ -317,7 +318,7 @@ fun CategoryReferenceSettingsContent(
                 Text(
                     text = "Sei sicuro di voler eliminare la categoria '${categoryToDelete?.displayName}'? Questa operazione rimuoverà la categoria e le sue impostazioni di formato.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = DavezCharcoal.copy(alpha = 0.85f)
+                    color = AppleLabelPrimary.copy(alpha = 0.85f)
                 )
             },
             confirmButton = {
@@ -340,11 +341,11 @@ fun CategoryReferenceSettingsContent(
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(0.5.dp, DavezTravertine)
                 ) {
-                    Text("Annulla", color = DavezCharcoal)
+                    Text("Annulla", color = AppleLabelPrimary)
                 }
             },
             shape = RoundedCornerShape(16.dp),
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }
@@ -378,7 +379,7 @@ fun AddEditCategoryDialog(
                     text = if (isEditing) "Modifica Categoria" else "Nuova Categoria",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = DavezCharcoal
+                        color = AppleLabelPrimary
                     )
                 )
             }
@@ -396,7 +397,7 @@ fun AddEditCategoryDialog(
                     else
                         "Crea una nuova categoria per la tua agenda. L'assistente IA la userà automaticamente per categorizzare e formattare gli appuntamenti quando riconosce le parole chiave.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = DavezMuted,
+                    color = AppleLabelTertiary,
                     lineHeight = 17.sp
                 )
 
@@ -466,8 +467,8 @@ fun AddEditCategoryDialog(
                 },
                 enabled = isValid,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DavezBurgundy,
-                    disabledContainerColor = DavezBurgundy.copy(alpha = 0.35f)
+                    containerColor = DavezBordeaux,
+                    disabledContainerColor = DavezBordeaux.copy(alpha = 0.35f)
                 ),
                 shape = RoundedCornerShape(10.dp)
             ) {
@@ -480,7 +481,7 @@ fun AddEditCategoryDialog(
                 shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(0.5.dp, DavezTravertine)
             ) {
-                Text("Annulla", color = DavezCharcoal)
+                Text("Annulla", color = AppleLabelPrimary)
             }
         },
         containerColor = Color.White,
@@ -514,12 +515,12 @@ fun CategoryAccordionCard(
 
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isExpanded) DavezAlabaster else Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(
             if (isExpanded) 1.dp else 0.5.dp,
-            if (isExpanded) DavezBurgundy.copy(alpha = 0.4f) else DavezTravertine
+            if (isExpanded) DavezBordeaux.copy(alpha = 0.4f) else DavezTravertine
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 2.dp else 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 2.dp else 0.5.dp),
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
@@ -537,7 +538,7 @@ fun CategoryAccordionCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(DavezBurgundy.copy(alpha = 0.08f), CircleShape),
+                        .background(DavezBordeaux.copy(alpha = 0.08f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = category.emoji, fontSize = 18.sp)
@@ -552,7 +553,7 @@ fun CategoryAccordionCard(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.1).sp
                         ),
-                        color = DavezCharcoal
+                        color = AppleLabelPrimary
                     )
 
                     // Pillole riassuntive dei campi attivi nello stato compresso
@@ -579,7 +580,7 @@ fun CategoryAccordionCard(
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Modifica categoria",
-                        tint = DavezBurgundy.copy(alpha = 0.75f),
+                        tint = DavezBordeaux.copy(alpha = 0.75f),
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -608,7 +609,7 @@ fun CategoryAccordionCard(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = if (isExpanded) "Comprimi" else "Espandi",
-                        tint = DavezMuted
+                        tint = AppleLabelTertiary
                     )
                 }
             }
@@ -624,7 +625,7 @@ fun CategoryAccordionCard(
                         Text(
                             text = "Parole chiave IA: ${category.keywords.joinToString(", ")}",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.5.sp),
-                            color = DavezMuted
+                            color = AppleLabelTertiary
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                     }
@@ -632,7 +633,7 @@ fun CategoryAccordionCard(
                     Text(
                         text = "Elementi da includere nel titolo:",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = DavezMuted
+                        color = AppleLabelTertiary
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -681,7 +682,7 @@ fun CategoryAccordionCard(
                         Text(
                             text = "Preset:",
                             style = MaterialTheme.typography.labelSmall,
-                            color = DavezMuted
+                            color = AppleLabelTertiary
                         )
 
                         PresetButton(label = "Tutti") {
@@ -760,10 +761,10 @@ private fun ToggleFieldChip(
     Surface(
         onClick = onToggle,
         shape = RoundedCornerShape(20.dp),
-        color = if (checked) DavezBurgundy else Color.White,
+        color = if (checked) DavezBordeaux else Color.White,
         border = BorderStroke(
             1.dp,
-            if (checked) DavezBurgundy else DavezTravertine
+            if (checked) DavezBordeaux else DavezTravertine
         ),
         shadowElevation = if (checked) 1.dp else 0.dp
     ) {
@@ -786,7 +787,7 @@ private fun ToggleFieldChip(
                     fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
                     fontSize = 11.5.sp
                 ),
-                color = if (checked) Color.White else DavezCharcoal
+                color = if (checked) Color.White else AppleLabelPrimary
             )
         }
     }
@@ -810,9 +811,8 @@ private fun PresetButton(
             text = label,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = DavezCharcoal
+                color = AppleLabelPrimary
             )
         )
     }
@@ -828,14 +828,13 @@ private fun FormatMiniBadge(
 ) {
     Surface(
         shape = RoundedCornerShape(4.dp),
-        color = if (isMuted) Color.LightGray.copy(alpha = 0.3f) else DavezBurgundy.copy(alpha = 0.08f)
+        color = if (isMuted) Color.LightGray.copy(alpha = 0.3f) else DavezBordeaux.copy(alpha = 0.08f)
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.5.sp,
-                color = if (isMuted) DavezMuted else DavezBurgundy,
+                color = if (isMuted) AppleLabelTertiary else DavezBordeaux,
                 fontWeight = FontWeight.Medium
             )
         )
@@ -891,8 +890,8 @@ private fun CategoryLivePreviewBox(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
-            .border(BorderStroke(0.5.dp, DavezBurgundy.copy(alpha = 0.25f)), RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .border(BorderStroke(0.5.dp, DavezStoneBorder), RoundedCornerShape(12.dp))
             .padding(10.dp)
     ) {
         Row(
@@ -903,19 +902,18 @@ private fun CategoryLivePreviewBox(
             Text(
                 text = "Anteprima in Agenda:",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = DavezBurgundy
+                color = DavezBordeaux
             )
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = AppleBlue.copy(alpha = 0.1f),
-                border = BorderStroke(0.5.dp, AppleBlue.copy(alpha = 0.25f))
+                color = DavezBordeaux.copy(alpha = 0.08f),
+                border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.22f))
             ) {
                 Text(
                     text = "${category.emoji} ${category.displayName}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppleBlue
+                        color = DavezBordeaux
                     ),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
@@ -931,7 +929,7 @@ private fun CategoryLivePreviewBox(
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.1).sp
             ),
-            color = DavezCharcoal,
+            color = AppleLabelPrimary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -942,7 +940,7 @@ private fun CategoryLivePreviewBox(
         Text(
             text = "📍 $samplePlace • 🕒 10:30 - 11:30",
             style = MaterialTheme.typography.labelSmall,
-            color = DavezMuted,
+            color = AppleLabelTertiary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

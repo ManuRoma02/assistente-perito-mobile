@@ -78,6 +78,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -167,6 +168,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.assistenteperitomobile.domain.MainAppTab
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
@@ -222,7 +226,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -577,15 +583,33 @@ fun Perito3DThinkingOrb(
     }
 }
 
+enum class ModelVisualStatus(val label: String) {
+    READY("Modello pronto"),
+    DOWNLOADING("Download in corso"),
+    NOT_CONFIGURED("Modello non configurato")
+}
+
 @Composable
 fun PeritoAiBrandEmblem(
     size: Dp = 40.dp,
-    showOnlineBadge: Boolean = true
+    showOnlineBadge: Boolean = true,
+    modelStatus: ModelVisualStatus = ModelVisualStatus.READY
 ) {
-    Box(modifier = Modifier.size(size + 2.dp)) {
+    val badgeColor = when (modelStatus) {
+        ModelVisualStatus.READY -> AppleGreen
+        ModelVisualStatus.DOWNLOADING -> AppleOrange
+        ModelVisualStatus.NOT_CONFIGURED -> AppleLabelTertiary
+    }
+    val badgeDesc = "Logo PeritoAI RD • ${modelStatus.label}"
+
+    Box(
+        modifier = Modifier
+            .size(size + 2.dp)
+            .semantics { contentDescription = badgeDesc }
+    ) {
         Image(
             painter = painterResource(id = R.drawable.rd_logo_colore),
-            contentDescription = "Logo PeritoAI RD",
+            contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(size)
         )
@@ -598,7 +622,7 @@ fun PeritoAiBrandEmblem(
                     .background(Color.White)
                     .padding(1.5.dp)
                     .clip(CircleShape)
-                    .background(AppleGreen)
+                    .background(badgeColor)
             )
         }
     }
@@ -614,26 +638,25 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
     var showAiSettingsSheet by rememberSaveable { mutableStateOf(false) }
     var showInAppCameraSheet by rememberSaveable { mutableStateOf(false) }
 
-    // Permessi Calendario + Notifiche
+    // Permessi Calendario
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         viewModel.onPermissionsUpdated()
     }
 
-    val requestCalendarAndNotificationPermissions = {
+    val requestCalendarPermissions = {
         permissionLauncher.launch(
             arrayOf(
                 Manifest.permission.READ_CALENDAR,
-                Manifest.permission.WRITE_CALENDAR,
-                Manifest.permission.POST_NOTIFICATIONS
+                Manifest.permission.WRITE_CALENDAR
             )
         )
     }
 
     val handleCalendarConnect = {
         if (!uiState.hasNativeCalendarPermission) {
-            requestCalendarAndNotificationPermissions()
+            requestCalendarPermissions()
         } else {
             viewModel.connectCalendar()
         }
@@ -653,18 +676,6 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
     ) { granted ->
         if (granted) {
             MorningBriefingWorker.scheduleDailyBriefing(context)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val hasNotifPerm = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!hasNotifPerm) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
         }
     }
 
@@ -800,6 +811,8 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
                 archivedCount = uiState.archivedDocuments.size,
                 hasCalendarPermission = uiState.hasCalendarPermission,
                 isProcessing = uiState.isProcessing,
+                isModelReady = uiState.isReasoningReady,
+                isModelDownloading = uiState.downloadProgress.isDownloading,
                 studioTitle = uiState.aiConfig.studioProfile.studioName,
                 onOpenArchive = { showArchiveSheet = true },
                 onOpenAiModels = { showAiSettingsSheet = true },
@@ -1195,27 +1208,18 @@ fun UnifiedStudioBottomBar(
     val isSlashMode = inputFieldValue.text.startsWith("/")
 
     Surface(
-        color = Color(0xF7FAF7F4),
-        border = BorderStroke(
-            0.8.dp,
-            Brush.verticalGradient(
-                listOf(
-                    Color.White.copy(alpha = 0.95f),
-                    Color.White.copy(alpha = 0.25f),
-                    DavezStoneBorder.copy(alpha = 0.45f)
-                )
-            )
-        ),
-        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
-        shadowElevation = 10.dp,
+        color = DavezAlabaster,
+        border = BorderStroke(1.dp, DavezStoneBorder.copy(alpha = 0.50f)),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shadowElevation = 2.dp,
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // 1. POPUP SUGGERIMENTI COMANDI SLASH (/)
             AnimatedVisibility(
@@ -1302,7 +1306,7 @@ fun UnifiedStudioBottomBar(
                             .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // [+] Pulsante Azioni & Allegati Stile Apple HIG Frosted Glass
+                        // [+] Pulsante Azioni & Allegati
                         val attachInteraction = remember { MutableInteractionSource() }
                         Surface(
                             onClick = {
@@ -1312,16 +1316,10 @@ fun UnifiedStudioBottomBar(
                             interactionSource = attachInteraction,
                             shape = CircleShape,
                             color = AppleWhite,
-                            border = BorderStroke(
-                                0.8.dp,
-                                Brush.verticalGradient(
-                                    listOf(Color.White, DavezStoneBorder.copy(alpha = 0.65f))
-                                )
-                            ),
-                            shadowElevation = 1.5.dp,
+                            border = BorderStroke(1.dp, DavezStoneBorder.copy(alpha = 0.60f)),
+                            shadowElevation = 1.dp,
                             modifier = Modifier
-                                .size(44.dp)
-                                .cartoonPressSquash(attachInteraction, pressedScaleY = 0.90f, squashScaleX = 1.08f)
+                                .size(48.dp)
                                 .semantics {
                                     contentDescription = "Azioni e allegati"
                                     testTag = "chat_attach_button"
@@ -1339,26 +1337,17 @@ fun UnifiedStudioBottomBar(
 
                         Spacer(Modifier.width(8.dp))
 
-                        // Campo di testo arrotondato Capsule Apple White su Davez Alabaster
+                        // Campo di testo arrotondato Capsule Apple White
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 44.dp, max = 110.dp)
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.White, Color(0xFFFAF8F5))
-                                    )
-                                )
+                                .heightIn(min = 48.dp, max = 110.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(AppleWhite)
                                 .border(
-                                    0.8.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.95f),
-                                            DavezStoneBorder.copy(alpha = 0.50f)
-                                        )
-                                    ),
-                                    RoundedCornerShape(22.dp)
+                                    1.dp,
+                                    DavezStoneBorder.copy(alpha = 0.55f),
+                                    RoundedCornerShape(24.dp)
                                 )
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             contentAlignment = Alignment.CenterStart
@@ -1415,10 +1404,9 @@ fun UnifiedStudioBottomBar(
                             interactionSource = sendInteraction,
                             shape = CircleShape,
                             color = DavezBordeaux,
-                            shadowElevation = 2.5.dp,
+                            shadowElevation = 2.dp,
                             modifier = Modifier
-                                .size(44.dp)
-                                .cartoonPressSquash(sendInteraction, pressedScaleY = 0.88f, squashScaleX = 1.08f)
+                                .size(48.dp)
                                 .semantics {
                                     contentDescription = if (hasText) "Invia messaggio" else "Detta nota vocale"
                                     testTag = if (hasText) "chat_send_button" else "chat_mic_button"
@@ -1465,25 +1453,20 @@ fun UnifiedStudioBottomBar(
                 }
             }
 
-            // 3. SEGMENTED SWITCHER (iOS 17 FLUID DOCK)
-            // Quando la tastiera è aperta (imeBottomPx > 0), nascondiamo la barra dock all'istante senza animare l'altezza layout (Emil Kowalski: 100+ times/day = instant state change) per evitare jitter o incertezze con l'IME
-            val isKeyboardOpen = imeBottomPx > 0
-            if (!isKeyboardOpen) {
-                LiquidFluidTabDock(
-                    selectedTab = selectedTab,
-                    onSelectTab = onSelectTab,
-                    agendaCount = agendaCount
-                )
-            }
+            // 3. SELETTORE SCHEDE (Material 3 Segmented Dock)
+            LiquidFluidTabDock(
+                selectedTab = selectedTab,
+                onSelectTab = onSelectTab,
+                agendaCount = agendaCount
+            )
         }
     }
 }
 
 // =============================================================================
-// LIQUID FLUID TAB DOCK (iOS 17 ELEGANT SPRING SWITCHER)
-// Fisica a molla organica (/emilkowalski-animation): transizione fluida su GPU
-// senza distorsioni, onde anomale o deformazioni di scala.
+// SELETTORE SCHEDE (Material 3 SingleChoiceSegmentedButtonRow)
 // =============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiquidFluidTabDock(
     selectedTab: MainAppTab,
@@ -1492,238 +1475,105 @@ fun LiquidFluidTabDock(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val targetIndex = if (selectedTab == MainAppTab.CHAT) 0 else 1
-    val pillProgress = remember { Animatable(targetIndex.toFloat()) }
-    var prevIndex by remember { mutableIntStateOf(targetIndex) }
 
-    LaunchedEffect(targetIndex) {
-        if (targetIndex != prevIndex) {
-            prevIndex = targetIndex
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            pillProgress.animateTo(
-                targetValue = targetIndex.toFloat(),
-                animationSpec = spring(
-                    dampingRatio = 0.82f,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            )
-        }
-    }
-
-    // Binario incassato con finitura frosted glass tenue
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFEBE6E1),
-        border = BorderStroke(
-            0.6.dp,
-            Brush.verticalGradient(
-                listOf(
-                    DavezStoneBorder.copy(alpha = 0.50f),
-                    Color.White.copy(alpha = 0.60f)
-                )
-            )
-        ),
-        shadowElevation = 0.dp,
+    SingleChoiceSegmentedButtonRow(
         modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(3.dp)
-        ) {
-            val availableWidth = maxWidth
-            val tabWidth = availableWidth / 2
-            val currentProgress = pillProgress.value
-
-            // Pillola Bianca Apple morbida con ombra soffusa e bordo satinato su GPU RenderThread
-            Box(
-                modifier = Modifier
-                    .width(tabWidth)
-                    .fillMaxHeight()
-                    .graphicsLayer {
-                        translationX = (currentProgress * tabWidth.toPx())
-                    }
-                    .shadow(
-                        elevation = 2.dp,
-                        shape = RoundedCornerShape(13.dp),
-                        ambientColor = Color(0x25000000),
-                        spotColor = Color(0x18000000)
-                    )
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White,
-                                Color(0xFFFAF7F5)
-                            )
-                        )
-                    )
-                    .border(
-                        width = 0.6.dp,
-                        brush = Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.95f),
-                                Color.White.copy(alpha = 0.40f)
-                            )
-                        ),
-                        shape = RoundedCornerShape(13.dp)
-                    )
-            )
-
-            // C. Livello etichette ed icone con transizione cromatica fluida continua
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Sezione Assistente
-                val chatFraction = (1f - currentProgress).coerceIn(0f, 1f)
-                val chatColor = lerp(AppleLabelSecondary, DavezBordeaux, chatFraction)
-                val chatInteraction = remember { MutableInteractionSource() }
-                val isChatSelected = selectedTab == MainAppTab.CHAT
-                val chatIconBounce by animateFloatAsState(
-                    targetValue = if (isChatSelected) 1.16f else 1.0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    ),
-                    label = "chat_tab_bounce"
+        SegmentedButton(
+            selected = selectedTab == MainAppTab.CHAT,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onSelectTab(MainAppTab.CHAT)
+            },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            colors = SegmentedButtonDefaults.colors(
+                activeContainerColor = AppleWhite,
+                activeContentColor = DavezBordeaux,
+                inactiveContainerColor = Color.Transparent,
+                inactiveContentColor = AppleLabelSecondary,
+                activeBorderColor = DavezStoneBorder.copy(alpha = 0.50f),
+                inactiveBorderColor = DavezStoneBorder.copy(alpha = 0.35f)
+            ),
+            icon = {
+                Icon(
+                    imageVector = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
+                    contentDescription = null,
+                    tint = if (selectedTab == MainAppTab.CHAT) DavezBordeaux else AppleLabelSecondary,
+                    modifier = Modifier.size(18.dp)
                 )
+            },
+            label = {
+                Text(
+                    text = "Assistente",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = if (selectedTab == MainAppTab.CHAT) FontWeight.Bold else FontWeight.Medium,
+                        letterSpacing = (-0.2).sp
+                    )
+                )
+            }
+        )
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(13.dp))
-                        .clickable(
-                            interactionSource = chatInteraction,
-                            indication = null
-                        ) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelectTab(MainAppTab.CHAT)
-                        }
-                        .cartoonPressSquash(chatInteraction, pressedScaleY = 0.93f, squashScaleX = 1.03f),
-                    contentAlignment = Alignment.Center
+        SegmentedButton(
+            selected = selectedTab == MainAppTab.AGENDA,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onSelectTab(MainAppTab.AGENDA)
+            },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            colors = SegmentedButtonDefaults.colors(
+                activeContainerColor = AppleWhite,
+                activeContentColor = DavezBordeaux,
+                inactiveContainerColor = Color.Transparent,
+                inactiveContentColor = AppleLabelSecondary,
+                activeBorderColor = DavezStoneBorder.copy(alpha = 0.50f),
+                inactiveBorderColor = DavezStoneBorder.copy(alpha = 0.35f)
+            ),
+            icon = {
+                Icon(
+                    imageVector = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
+                    contentDescription = null,
+                    tint = if (selectedTab == MainAppTab.AGENDA) DavezBordeaux else AppleLabelSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            label = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
-                            contentDescription = "Assistente",
-                            tint = chatColor,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .graphicsLayer {
-                                    scaleX = chatIconBounce
-                                    scaleY = chatIconBounce
-                                }
+                    Text(
+                        text = "Agenda",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = if (selectedTab == MainAppTab.AGENDA) FontWeight.Bold else FontWeight.Medium,
+                            letterSpacing = (-0.2).sp
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Assistente",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (chatFraction > 0.5f) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 13.5.sp,
-                                letterSpacing = (-0.2).sp
-                            ),
-                            color = chatColor
-                        )
-                    }
-                }
-
-                // Sezione Agenda
-                val agendaFraction = currentProgress.coerceIn(0f, 1f)
-                val agendaColor = lerp(AppleLabelSecondary, DavezBordeaux, agendaFraction)
-                val agendaInteraction = remember { MutableInteractionSource() }
-                val isAgendaSelected = selectedTab == MainAppTab.AGENDA
-                val agendaIconBounce by animateFloatAsState(
-                    targetValue = if (isAgendaSelected) 1.16f else 1.0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    ),
-                    label = "agenda_tab_bounce"
-                )
-                val badgeScale by animateFloatAsState(
-                    targetValue = if (agendaCount > 0) 1.0f else 0f,
-                    animationSpec = spring(
-                        dampingRatio = 0.52f,
-                        stiffness = Spring.StiffnessMediumLow
-                    ),
-                    label = "agenda_badge_scale"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(13.dp))
-                        .clickable(
-                            interactionSource = agendaInteraction,
-                            indication = null
+                    )
+                    if (agendaCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (selectedTab == MainAppTab.AGENDA) DavezBordeaux else DavezBordeaux.copy(alpha = 0.16f),
+                            modifier = Modifier.defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
                         ) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelectTab(MainAppTab.AGENDA)
-                        }
-                        .cartoonPressSquash(agendaInteraction, pressedScaleY = 0.93f, squashScaleX = 1.03f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
-                            contentDescription = "Agenda",
-                            tint = agendaColor,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .graphicsLayer {
-                                    scaleX = agendaIconBounce
-                                    scaleY = agendaIconBounce
-                                }
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Agenda",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (agendaFraction > 0.5f) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 13.5.sp,
-                                letterSpacing = (-0.2).sp
-                            ),
-                            color = agendaColor
-                        )
-                        if (agendaCount > 0) {
-                            Spacer(Modifier.width(6.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = lerp(DavezBordeaux.copy(alpha = 0.16f), DavezBordeaux, agendaFraction),
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .graphicsLayer {
-                                        scaleX = badgeScale
-                                        scaleY = badgeScale
-                                    }
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.5.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = if (agendaCount > 99) "99+" else agendaCount.toString(),
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = if (agendaFraction > 0.5f) AppleWhite else DavezBordeaux
-                                    )
-                                }
+                                Text(
+                                    text = if (agendaCount > 99) "99+" else agendaCount.toString(),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    ),
+                                    color = if (selectedTab == MainAppTab.AGENDA) AppleWhite else DavezBordeaux
+                                )
                             }
                         }
                     }
                 }
             }
-        }
+        )
     }
 }
 
@@ -1735,6 +1585,8 @@ fun PeritoStudioTopBar(
     archivedCount: Int,
     hasCalendarPermission: Boolean,
     isProcessing: Boolean,
+    isModelReady: Boolean = false,
+    isModelDownloading: Boolean = false,
     studioTitle: String = "Studio Tecnico Peritale",
     onOpenArchive: () -> Unit,
     onOpenAiModels: () -> Unit,
@@ -1743,6 +1595,12 @@ fun PeritoStudioTopBar(
 ) {
     val haptic = LocalHapticFeedback.current
     var showConfirmClear by remember { mutableStateOf(false) }
+
+    val modelStatus = when {
+        isModelDownloading -> ModelVisualStatus.DOWNLOADING
+        isModelReady -> ModelVisualStatus.READY
+        else -> ModelVisualStatus.NOT_CONFIGURED
+    }
 
     if (showConfirmClear && onClearChat != null) {
         androidx.compose.material3.AlertDialog(
@@ -1795,8 +1653,8 @@ fun PeritoStudioTopBar(
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Brand Logo 3D PeritoAI RD con pallino verde Online
-            PeritoAiBrandEmblem(size = 42.dp, showOnlineBadge = true)
+            // Brand Logo 3D PeritoAI RD con indicatore stato modello dinamico
+            PeritoAiBrandEmblem(size = 42.dp, showOnlineBadge = true, modelStatus = modelStatus)
 
             Spacer(Modifier.width(10.dp))
 
@@ -1836,14 +1694,18 @@ fun PeritoStudioTopBar(
                                 text = studioTitle.uppercase().take(14),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DavezBordeaux,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.5.sp
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
+                val modelStatusLabel = when (modelStatus) {
+                    ModelVisualStatus.READY -> "Modello pronto"
+                    ModelVisualStatus.DOWNLOADING -> "Download modello in corso..."
+                    ModelVisualStatus.NOT_CONFIGURED -> "Modello non configurato"
+                }
                 Text(
-                    text = if (isProcessing) "✨ Elaborazione IA in corso..." else "$studioTitle • IA Locale",
+                    text = if (isProcessing) "✨ Elaborazione IA in corso..." else "$studioTitle • $modelStatusLabel",
                     style = MaterialTheme.typography.bodySmall,
                     color = DavezBordeauxSoft,
                     maxLines = 1,
@@ -1995,7 +1857,6 @@ fun PeritoInteractiveHeroHeader(
                         Text(
                             text = "Studio Peritale & Rilievi",
                             style = MaterialTheme.typography.titleSmall.copy(
-                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold
                             ),
                             color = AppleLabelPrimary,
@@ -3309,7 +3170,6 @@ fun ModernAttachmentSheet(
                     Text(
                         text = "Allega o Scansiona",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             letterSpacing = (-0.3).sp
@@ -5049,6 +4909,7 @@ fun ArchiveFoldersSheetContent(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    var activeArchiveTab by rememberSaveable { mutableIntStateOf(0) }
     val filteredDocs = remember(uiState.archivedDocuments, uiState.selectedCategoryFilter) {
         if (uiState.selectedCategoryFilter == null) {
             uiState.archivedDocuments
@@ -5070,8 +4931,8 @@ fun ArchiveFoldersSheetContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "📂 Archivio 6 Cartelle Perito",
-                style = MaterialTheme.typography.titleLarge,
+                text = if (activeArchiveTab == 0) "📂 Archivio 6 Cartelle" else "💼 Fascicoli & Pratiche",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = AppleLabelPrimary
             )
             TextButton(onClick = onClose) {
@@ -5079,7 +4940,46 @@ fun ArchiveFoldersSheetContent(
             }
         }
 
-        // Ricerca stile iOS
+        // Selettore Sezione Archivio: Documenti vs Fascicoli
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = activeArchiveTab == 0,
+                onClick = { activeArchiveTab = 0 },
+                label = { Text("📂 Documenti (${uiState.archivedDocuments.size})") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = DavezBordeaux,
+                    selectedLabelColor = AppleWhite
+                )
+            )
+            FilterChip(
+                selected = activeArchiveTab == 1,
+                onClick = { activeArchiveTab = 1 },
+                label = { Text("💼 Fascicoli (${uiState.fascicoli.size})") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = DavezBordeaux,
+                    selectedLabelColor = AppleWhite
+                )
+            )
+        }
+
+        if (activeArchiveTab == 1) {
+            FascicoliPraticheScreen(
+                uiState = uiState,
+                viewModel = viewModel,
+                onOpenInAppCamera = onCameraClick,
+                onPickDocumentClick = onPickDocumentClick,
+                showHeader = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        } else {
+            // Ricerca stile iOS
         OutlinedTextField(
             value = uiState.archiveSearchQuery,
             onValueChange = { viewModel.setArchiveSearchQuery(it) },
@@ -5131,6 +5031,40 @@ fun ArchiveFoldersSheetContent(
         }
 
         HorizontalDivider(thickness = 0.5.dp, color = AppleSecondaryGroupedBg)
+
+        if (uiState.archiveErrorMessage != null) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = AppleOrangeSoft,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = AppleOrange)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Errore lettura archivio",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = AppleOrange
+                        )
+                        Text(
+                            text = "${uiState.archiveErrorMessage}. I file su disco sono preservati.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppleLabelPrimary
+                        )
+                    }
+                    TextButton(onClick = { viewModel.refreshAllData() }) {
+                        Text("Riprova", color = DavezBordeaux, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
 
         if (filteredDocs.isEmpty()) {
             Column(
@@ -5264,6 +5198,7 @@ fun ArchiveFoldersSheetContent(
             }
         }
     }
+}
 }
 
 // =============================================================================
@@ -6377,25 +6312,42 @@ fun ModelDownloadCatalogList(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // Pulsante 1-Click per scaricare tutti i 3 modelli in sequenza in background (3.44 GB)
-        if (!uiState.areAllModelsReady && !progress.isDownloading) {
-            Button(
-                onClick = {
-                    ensureNotificationPermAndRun {
-                        viewModel.downloadAllMissingModels()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            ) {
+        val missingModels = remember(uiState.downloadedModelIds, uiState.aiConfig.reasoningModelId) {
+            viewModel.getMissingModelsForActiveConfig()
+        }
+        val missingBytes = remember(missingModels) {
+            missingModels.sumOf { it.expectedBytes }
+        }
+        val missingNames = remember(missingModels) {
+            missingModels.joinToString(" + ") { it.title }
+        }
+
+        if (missingModels.isNotEmpty() && !progress.isDownloading) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(
+                    onClick = {
+                        ensureNotificationPermAndRun {
+                            viewModel.downloadAllMissingModels()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                ) {
+                    Text(
+                        text = "⬇️ Scarica Modelli Richiesti (${missingModels.size}) • ${viewModel.modelDownloadManager.formatByteSize(missingBytes)}",
+                        color = AppleWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp
+                    )
+                }
                 Text(
-                    text = "⬇️ Scarica Tutti i 3 Modelli in Background (3.44 GB)",
-                    color = AppleWhite,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.5.sp
+                    text = "Include: $missingNames",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppleLabelSecondary,
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 )
             }
         }
