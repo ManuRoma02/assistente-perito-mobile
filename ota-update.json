@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 17,
-  "latestVersionName": "1.0.16",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.16/app-release.apk",
-  "releaseNotes": "• **Importazione**: lettura documenti a flusso e protezione dai file troppo grandi.\n• **Modelli IA**: download riprendibili con verifica integrità e fallback mostrato correttamente.\n• **Agenda e categorie**: classificazione più precisa e correzione dei falsi positivi.\n• **Privacy e archivio**: notifiche più riservate, permessi contestuali e segnalazione degli errori archivio.",
+  "latestVersionCode": 18,
+  "latestVersionName": "1.0.17",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.17/app-release.apk",
+  "releaseNotes": "• **Easter egg**: 251 battute a rotazione all'apertura dell'app.\n• **Bug fix**: rimossi doppioni e battute che attribuivano all'app azioni mai eseguite.",
   "mandatory": false,
-  "publishedAt": "2026-10-26T12:12:54Z",
-  "sha256": "569a1bd66e3a75d9538563ed952ee8dbe121e438a2c0f1c9608a86abab8d65f0",
-  "fileSize": 22901544
+  "publishedAt": "2026-10-26T14:13:54Z",
+  "sha256": "65244027abefd67d6b0b57b07766e12d96f6e8e09735d7c88b2c0bb419618def",
+  "fileSize": 22911856
 }
