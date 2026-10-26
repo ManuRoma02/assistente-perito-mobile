@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 16,
-  "latestVersionName": "1.0.15",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.15/app-release.apk",
-  "releaseNotes": "• **Architettura Multi-Agente**: routing deterministico e agenti specializzati per agenda, perizie e CTU\n• **Runtime LLM**: contesto esteso a 2048 token e risposte fino a 1024 token\n• **Classificazione Dinamica**: prompt sincronizzato con le cartelle peritali\n• **Tracciabilità**: metriche e traceId per ogni richiesta",
+  "latestVersionCode": 17,
+  "latestVersionName": "1.0.16",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.16/app-release.apk",
+  "releaseNotes": "• **Importazione**: lettura documenti a flusso e protezione dai file troppo grandi.\n• **Modelli IA**: download riprendibili con verifica integrità e fallback mostrato correttamente.\n• **Agenda e categorie**: classificazione più precisa e correzione dei falsi positivi.\n• **Privacy e archivio**: notifiche più riservate, permessi contestuali e segnalazione degli errori archivio.",
   "mandatory": false,
-  "publishedAt": "2026-10-23T15:45:00Z",
-  "sha256": "e321934a89d64f70442282ad37254adfe34d69d9c31db220effc376202e91c1d",
-  "fileSize": 22881120
+  "publishedAt": "2026-10-26T12:12:54Z",
+  "sha256": "569a1bd66e3a75d9538563ed952ee8dbe121e438a2c0f1c9608a86abab8d65f0",
+  "fileSize": 22901544
 }
