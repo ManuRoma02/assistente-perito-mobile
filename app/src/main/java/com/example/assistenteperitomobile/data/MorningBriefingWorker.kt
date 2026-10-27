@@ -36,19 +36,36 @@ class MorningBriefingWorker(
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun isBriefingEnabled(context: Context): Boolean {
-            val file = File(context.filesDir, "ai_engine_config.json")
-            if (!file.exists()) return true
+        fun parseBriefingTime(timeStr: String): Pair<Int, Int> {
             return try {
-                val cfg = json.decodeFromString<AiEngineConfig>(file.readText())
-                cfg.morningBriefingEnabled
+                val clean = timeStr.trim().replace(".", ":")
+                val parts = clean.split(":")
+                val h = parts[0].trim().toInt().coerceIn(0, 23)
+                val m = if (parts.size > 1) parts[1].trim().toInt().coerceIn(0, 59) else 0
+                Pair(h, m)
             } catch (_: Throwable) {
-                true
+                Pair(8, 30)
             }
         }
 
+        fun getBriefingConfig(context: Context): Pair<Boolean, String> {
+            val file = File(context.filesDir, "ai_engine_config.json")
+            if (!file.exists()) return Pair(true, "08:30")
+            return try {
+                val cfg = json.decodeFromString<AiEngineConfig>(file.readText())
+                Pair(cfg.morningBriefingEnabled, cfg.morningBriefingTime.ifBlank { "08:30" })
+            } catch (_: Throwable) {
+                Pair(true, "08:30")
+            }
+        }
+
+        fun isBriefingEnabled(context: Context): Boolean = getBriefingConfig(context).first
+
+        fun getBriefingTime(context: Context): String = getBriefingConfig(context).second
+
         suspend fun sendBriefingNotification(context: Context): Result {
-            if (!isBriefingEnabled(context)) {
+            val (enabled, timeStr) = getBriefingConfig(context)
+            if (!enabled) {
                 return Result.success()
             }
 
@@ -73,8 +90,8 @@ class MorningBriefingWorker(
                     }
                 } else {
                     val summaryList = todayEvents.take(4).map { ev ->
-                        val timeStr = ev.startIso.drop(11).take(5)
-                        "• $timeStr ${ev.titolo} (${ev.luogo})"
+                        val evTimeStr = ev.startIso.drop(11).take(5)
+                        "• $evTimeStr ${ev.titolo} (${ev.luogo})"
                     }
                     append(summaryList.joinToString("\n"))
                     if (tomorrowEvents.isNotEmpty()) {
@@ -83,19 +100,19 @@ class MorningBriefingWorker(
                 }
             }
 
-            showNotification(context, title, body)
+            showNotification(context, title, body, timeStr)
             return Result.success()
         }
 
-        fun showNotification(context: Context, title: String, body: String) {
+        fun showNotification(context: Context, title: String, body: String, timeStr: String = "08:30") {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Briefing Mattutino Peritale (08:00)",
+                "Briefing Mattutino Peritale ($timeStr)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Riepilogo giornaliero alle 08:00 dei sopralluoghi con link Google Maps e fascicolo"
+                description = "Riepilogo giornaliero alle $timeStr dei sopralluoghi con link Google Maps e fascicolo"
                 enableVibration(true)
                 setShowBadge(true)
             }
@@ -126,17 +143,19 @@ class MorningBriefingWorker(
         }
 
         fun scheduleDailyBriefing(context: Context) {
-            if (!isBriefingEnabled(context)) {
+            val (enabled, timeStr) = getBriefingConfig(context)
+            if (!enabled) {
                 cancelDailyBriefing(context)
                 return
             }
 
+            val (hour, minute) = parseBriefingTime(timeStr)
             val now = LocalDateTime.now()
-            var next8am = now.withHour(8).withMinute(0).withSecond(0)
-            if (!now.isBefore(next8am)) {
-                next8am = next8am.plusDays(1)
+            var nextBriefing = now.withHour(hour).withMinute(minute).withSecond(0)
+            if (!now.isBefore(nextBriefing)) {
+                nextBriefing = nextBriefing.plusDays(1)
             }
-            val initialDelayMinutes = Duration.between(now, next8am).toMinutes().coerceAtLeast(1)
+            val initialDelayMinutes = Duration.between(now, nextBriefing).toMinutes().coerceAtLeast(1)
 
             val request = PeriodicWorkRequestBuilder<MorningBriefingWorker>(24, TimeUnit.HOURS)
                 .setInitialDelay(initialDelayMinutes, TimeUnit.MINUTES)

@@ -5397,6 +5397,9 @@ fun AiEngineSettingsSheetContent(
     var briefingEnabled by remember(uiState.aiConfig.morningBriefingEnabled) {
         mutableStateOf(uiState.aiConfig.morningBriefingEnabled)
     }
+    var briefingTime by remember(uiState.aiConfig.morningBriefingTime) {
+        mutableStateOf(uiState.aiConfig.morningBriefingTime.ifBlank { "08:30" })
+    }
     var studioNameInput by remember(uiState.aiConfig.studioProfile.studioName) {
         mutableStateOf(uiState.aiConfig.studioProfile.studioName)
     }
@@ -5754,10 +5757,32 @@ fun AiEngineSettingsSheetContent(
 
                     // TENDINA 3: BRIEFING MATTUTINO QUOTIDIANO
                     item(key = "tendina_morning_briefing") {
+                        val context = LocalContext.current
+                        val (currentHour, currentMinute) = MorningBriefingWorker.parseBriefingTime(briefingTime)
+                        val openBriefingTimePicker = {
+                            val picker = android.app.TimePickerDialog(
+                                context,
+                                { _, hourOfDay, minute ->
+                                    val formatted = String.format(Locale.ROOT, "%02d:%02d", hourOfDay, minute)
+                                    briefingTime = formatted
+                                    viewModel.updateAiConfig(
+                                        uiState.aiConfig.copy(
+                                            morningBriefingEnabled = briefingEnabled,
+                                            morningBriefingTime = formatted
+                                        )
+                                    )
+                                },
+                                currentHour,
+                                currentMinute,
+                                true
+                            )
+                            picker.show()
+                        }
+
                         SettingsTendinaCard(
                             title = "☀️ Briefing Mattutino Quotidiano",
-                            subtitle = "Riepilogo automatico alle 08:00 con sopralluoghi, scadenze e fascicoli",
-                            badgeText = if (briefingEnabled) "Attivo (08:00)" else "Disattivato",
+                            subtitle = "Riepilogo automatico alle $briefingTime con sopralluoghi, scadenze e fascicoli",
+                            badgeText = if (briefingEnabled) "Attivo ($briefingTime)" else "Disattivato",
                             badgeColor = if (briefingEnabled) AppleGreenSoft else AppleSecondaryGroupedBg,
                             badgeTextColor = if (briefingEnabled) AppleGreen else AppleLabelSecondary,
                             isExpanded = expandedSections.contains("morning_briefing"),
@@ -5782,7 +5807,7 @@ fun AiEngineSettingsSheetContent(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "Attiva Notifica ore 08:00",
+                                                text = "Attiva Notifica ore $briefingTime",
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = AppleLabelPrimary
@@ -5798,12 +5823,110 @@ fun AiEngineSettingsSheetContent(
                                             checked = briefingEnabled,
                                             onCheckedChange = {
                                                 briefingEnabled = it
-                                                viewModel.updateAiConfig(uiState.aiConfig.copy(morningBriefingEnabled = it))
+                                                viewModel.updateAiConfig(
+                                                    uiState.aiConfig.copy(
+                                                        morningBriefingEnabled = it,
+                                                        morningBriefingTime = briefingTime
+                                                    )
+                                                )
                                             },
                                             colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
                                         )
                                     }
                                     if (briefingEnabled) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            thickness = 0.5.dp,
+                                            color = AppleSecondaryGroupedBg
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = "Orario Notifica",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = AppleLabelPrimary
+                                                )
+                                                Text(
+                                                    text = "Tocca per impostare l'orario personalizzato",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = AppleLabelSecondary
+                                                )
+                                            }
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = AppleWhite,
+                                                border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.5f)),
+                                                modifier = Modifier.clickable { openBriefingTimePicker() }
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Schedule,
+                                                        contentDescription = "Cambia orario briefing",
+                                                        tint = DavezBordeaux,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Text(
+                                                        text = briefingTime,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = DavezBordeaux
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        val presetTimes = listOf("07:30", "08:00", "08:30", "09:00")
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            presetTimes.forEach { preset ->
+                                                val isSelected = briefingTime == preset
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = if (isSelected) DavezBordeaux.copy(alpha = 0.12f) else AppleSecondaryGroupedBg.copy(alpha = 0.45f),
+                                                    border = BorderStroke(
+                                                        if (isSelected) 1.dp else 0.5.dp,
+                                                        if (isSelected) DavezBordeaux else AppleSecondaryGroupedBg
+                                                    ),
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clickable {
+                                                            briefingTime = preset
+                                                            viewModel.updateAiConfig(
+                                                                uiState.aiConfig.copy(
+                                                                    morningBriefingEnabled = briefingEnabled,
+                                                                    morningBriefingTime = preset
+                                                                )
+                                                            )
+                                                        }
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.padding(vertical = 6.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = preset,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                            color = if (isSelected) DavezBordeaux else AppleLabelSecondary
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         OutlinedButton(
                                             onClick = { viewModel.triggerTestMorningBriefing() },
                                             shape = RoundedCornerShape(10.dp),

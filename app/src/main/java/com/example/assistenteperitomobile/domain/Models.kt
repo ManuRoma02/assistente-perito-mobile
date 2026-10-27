@@ -432,6 +432,7 @@ data class AiEngineConfig(
     val useRizzoFlow: Boolean = false,
     val rizzoFlowUrl: String = "http://127.0.0.1:8017/v1/systemone",
     val morningBriefingEnabled: Boolean = true,
+    val morningBriefingTime: String = "08:30",
     val hasSeenModelSetupPrompt: Boolean = false,
     val syncSystemCalendar: Boolean = true,
     val selectedCalendarId: Long? = null,

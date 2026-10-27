@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 18,
-  "latestVersionName": "1.0.17",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.17/app-release.apk",
-  "releaseNotes": "• **Bug fix**: miglioramenti generali di stabilità e affidabilità.",
+  "latestVersionCode": 19,
+  "latestVersionName": "1.0.18",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.18/app-release.apk",
+  "releaseNotes": "• **Briefing Mattutino**: orario impostabile da impostazioni (default 08:30) con selettore e preset.\n• **Ottimizzazione**: ripianificazione automatica notifiche e canali di sistema.",
   "mandatory": false,
-  "publishedAt": "2026-10-26T14:13:54Z",
-  "sha256": "65244027abefd67d6b0b57b07766e12d96f6e8e09735d7c88b2c0bb419618def",
-  "fileSize": 22911856
+  "publishedAt": "2026-10-27T10:27:00Z",
+  "sha256": "0e89ec08485a3b81025e96ffac931286983219550f17ab3317dbf4d1b8544cfe",
+  "fileSize": 22914348
 }

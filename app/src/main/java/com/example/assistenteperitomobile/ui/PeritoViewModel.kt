@@ -1252,7 +1252,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun updateAiConfig(newConfig: AiEngineConfig) {
         val oldConfig = _uiState.value.aiConfig
         saveConfig(newConfig)
-        if (newConfig.morningBriefingEnabled != oldConfig.morningBriefingEnabled) {
+        if (newConfig.morningBriefingEnabled != oldConfig.morningBriefingEnabled ||
+            newConfig.morningBriefingTime != oldConfig.morningBriefingTime) {
             if (newConfig.morningBriefingEnabled) {
                 MorningBriefingWorker.scheduleDailyBriefing(appContext)
             } else {
@@ -2882,8 +2883,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun checkAndTriggerMorningBriefingOnFirstLaunch() {
         if (!_uiState.value.aiConfig.morningBriefingEnabled) return
+        val (targetHour, targetMinute) = MorningBriefingWorker.parseBriefingTime(_uiState.value.aiConfig.morningBriefingTime)
         val now = LocalTime.now()
-        if (now.hour in 7..12) {
+        val targetTime = LocalTime.of(targetHour, targetMinute)
+        val endMorning = LocalTime.of(13, 0)
+        if (!now.isBefore(targetTime) && now.isBefore(endMorning)) {
             val todayStr = LocalDate.now().toString()
             val prefs = appContext.getSharedPreferences("perito_briefing_prefs", Context.MODE_PRIVATE)
             val lastBriefingDay = prefs.getString("last_briefing_date", null)
