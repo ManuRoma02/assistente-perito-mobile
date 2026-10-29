@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notif_expanded_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_notification_card"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <!-- HERO ROW: COVER ART + DETTAGLI PROSSIMO APPUNTAMENTO -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Cover Art Squircle con Data/Mese/Badge -->
+        <ImageView
+            android:id="@+id/notif_expanded_cover"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:background="@drawable/bg_notification_cover"
+            android:contentDescription="Copertina Data e Stato"
+            android:scaleType="centerCrop" />
+
+        <!-- Colonna Dettagli -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- Pill Categoria -->
+            <TextView
+                android:id="@+id/notif_expanded_category"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_category_pill"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="2dp"
+                android:text="🔥 SINISTRO INCENDIO"
+                android:textColor="#FFFCA5A5"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+
+            <!-- Titolo Principale -->
+            <TextView
+                android:id="@+id/notif_expanded_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="3 Sopralluoghi Programmati"
+                android:textColor="#FFFFFFFF"
+                android:textSize="14.5sp"
+                android:textStyle="bold" />
+
+            <!-- Prossimo Appuntamento & Cliente -->
+            <TextView
+                android:id="@+id/notif_expanded_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Prossimo: 09:30 • Mario Rossi"
+                android:textColor="#FFF43F5E"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <!-- Indirizzo / Luogo -->
+            <TextView
+                android:id="@+id/notif_expanded_location"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="📍 Via Dante 14, Monza • #2024-89"
+                android:textColor="#FFCBD5E1"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- TIMELINE TRACK SCRUBBER (STILE SPOTIFY) -->
+    <LinearLayout
+        android:id="@+id/notif_expanded_timeline_box"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_timeline_track"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/notif_expanded_timeline_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="09:30 Monza  •  14:00 Milano  •  17:00 Seregno"
+            android:textColor="#FFE2E8F0"
+            android:textSize="10.5sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/notif_expanded_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="4dp"
+            android:indeterminate="false"
+            android:max="100"
+            android:progress="33"
+            android:progressTint="#FFE11D48" />
+    </LinearLayout>
+
+    <!-- RIGA AZIONI RAPIDE 1-TAP (ACTION PILLS) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/notif_action_maps"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1.3"
+            android:background="@drawable/bg_notification_action_primary"
+            android:gravity="center"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:text="🗺️ Mappe"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11.5sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/notif_action_dossier"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_notification_action_secondary"
+            android:gravity="center"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:text="📁 Fascicolo"
+            android:textColor="#FFF1F5F9"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/notif_action_agenda"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_notification_action_secondary"
+            android:gravity="center"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:text="📅 Agenda"
+            android:textColor="#FFF1F5F9"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/notif_action_snooze"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_notification_action_secondary"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="7dp"
+            android:text="⏰ 15m"
+            android:textColor="#FFCBD5E1"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</LinearLayout>
