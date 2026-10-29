@@ -117,7 +117,8 @@ class MorningBriefingWorker(
             try {
                 val modernNotif = ModernNotificationBuilder.buildBriefingNotification(context, briefingData)
                 nm.notify(NOTIFICATION_ID, modernNotif)
-            } catch (_: Throwable) {
+            } catch (t: Throwable) {
+                android.util.Log.e("BriefingWorker", "ERROR in showModernBriefingNotification: ${t.message}", t)
                 // Fallback sicuro su notifica standard
                 showNotification(context, briefingData.mainHeadline, briefingData.timelineText, timeStr)
             }
