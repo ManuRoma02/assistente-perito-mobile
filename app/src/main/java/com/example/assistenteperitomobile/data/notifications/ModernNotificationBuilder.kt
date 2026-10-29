@@ -91,19 +91,15 @@ object ModernNotificationBuilder {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Collapsed RemoteViews
+        // Collapsed RemoteViews (Stile Spotify compatto: cover, brano/titolo, artista/luogo, mini progress bar)
         val collapsedViews = RemoteViews(context.packageName, R.layout.view_notification_briefing_collapsed).apply {
             setImageViewBitmap(R.id.notif_collapsed_cover, coverBitmap)
             setTextViewText(R.id.notif_collapsed_title, data.mainHeadline)
             setTextViewText(R.id.notif_collapsed_subtitle, data.nextEventSubtitle)
-            setTextViewText(R.id.notif_collapsed_location, data.locationText)
-            setOnClickPendingIntent(R.id.notif_collapsed_action_maps, mapsPendingIntent)
-            if (data.rawLocationQuery.isBlank()) {
-                setTextViewText(R.id.notif_collapsed_action_maps, "📅 Agenda")
-            }
+            setProgressBar(R.id.notif_collapsed_progress, 100, data.progressPercent, false)
         }
 
-        // Expanded RemoteViews
+        // Expanded RemoteViews (Stile Spotify esteso: cover, category, titolo, dettagli, timeline scrubber)
         val expandedViews = RemoteViews(context.packageName, R.layout.view_notification_briefing_expanded).apply {
             setImageViewBitmap(R.id.notif_expanded_cover, coverBitmap)
             setTextViewText(R.id.notif_expanded_category, data.categoryPillText)
@@ -112,15 +108,6 @@ object ModernNotificationBuilder {
             setTextViewText(R.id.notif_expanded_location, data.locationText)
             setTextViewText(R.id.notif_expanded_timeline_text, data.timelineText)
             setProgressBar(R.id.notif_expanded_progress, 100, data.progressPercent, false)
-
-            setOnClickPendingIntent(R.id.notif_action_maps, mapsPendingIntent)
-            if (data.rawLocationQuery.isBlank()) {
-                setTextViewText(R.id.notif_action_maps, "📂 Archivio")
-            }
-
-            setOnClickPendingIntent(R.id.notif_action_dossier, dossierPendingIntent)
-            setOnClickPendingIntent(R.id.notif_action_agenda, agendaPendingIntent)
-            setOnClickPendingIntent(R.id.notif_action_snooze, snoozePendingIntent)
         }
 
         return NotificationCompat.Builder(context, MorningBriefingWorker.CHANNEL_ID)

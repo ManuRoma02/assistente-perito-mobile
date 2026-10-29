@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 20,
-  "latestVersionName": "1.0.19",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.19/app-release.apk",
-  "releaseNotes": "• **Notifiche Spotify-Style**: briefing mattutino con layout rich media e azioni rapide.\n• **Tema Bordeaux**: rifinitura estetica bordeaux per notifiche e card di sistema.",
+  "latestVersionCode": 21,
+  "latestVersionName": "1.0.20",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.20/app-release.apk",
+  "releaseNotes": "• **Design Spotify-Style**: rimossi i pulsanti ingombranti per un layout pulito a tutta larghezza.\n• **Timeline Scrubber**: avanzamento visivo dello stato giornaliero senza interruzioni.\n• **Integrazione di Sistema**: rimossa la card nidificata per fondersi nativamente nel drawer.",
   "mandatory": false,
-  "publishedAt": "2026-10-29T12:07:00Z",
-  "sha256": "eca8f312b82ef788ff413fcf3a1b4c9e48ec5280536ed095bf7e33182832a9e6",
-  "fileSize": 22929432
+  "publishedAt": "2026-10-29T12:19:00Z",
+  "sha256": "669f84bef73d82c7b3bc6140bd5efdbd9e4f6cf5faa9ec7bb6702139effd24c0",
+  "fileSize": 22929840
 }
