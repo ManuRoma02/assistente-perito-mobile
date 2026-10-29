@@ -12,7 +12,11 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.assistenteperitomobile.MainActivity
+import com.example.assistenteperitomobile.R
+import com.example.assistenteperitomobile.data.notifications.ModernNotificationBuilder
+import com.example.assistenteperitomobile.data.notifications.NotificationBriefingFormatter
 import com.example.assistenteperitomobile.domain.AiEngineConfig
+import com.example.assistenteperitomobile.domain.CalendarEventItem
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Duration
@@ -74,34 +78,49 @@ class MorningBriefingWorker(
             val todayEvents = calRepo.getEventsForDate(today)
             val tomorrowEvents = calRepo.getEventsForDate(today.plusDays(1))
 
-            val title = if (todayEvents.isEmpty()) {
-                "☀️ Briefing Mattutino: Nessun sopralluogo per oggi"
-            } else {
-                "☀️ Briefing Mattutino: ${todayEvents.size} appuntament${if (todayEvents.size == 1) "o" else "i"} oggi"
-            }
-
-            val body = buildString {
-                if (todayEvents.isEmpty()) {
-                    append("Giornata libera da sopralluoghi oggi. ")
-                    if (tomorrowEvents.isNotEmpty()) {
-                        append("Domani previsti ${tomorrowEvents.size} appuntamenti.")
-                    } else {
-                        append("Tocca per aprire l'archivio perizie.")
-                    }
-                } else {
-                    val summaryList = todayEvents.take(4).map { ev ->
-                        val evTimeStr = ev.startIso.drop(11).take(5)
-                        "• $evTimeStr ${ev.titolo} (${ev.luogo})"
-                    }
-                    append(summaryList.joinToString("\n"))
-                    if (tomorrowEvents.isNotEmpty()) {
-                        append("\n📅 Domani: ${tomorrowEvents.size} appuntament${if (tomorrowEvents.size == 1) "o" else "i"}")
-                    }
-                }
-            }
-
-            showNotification(context, title, body, timeStr)
+            showModernBriefingNotification(
+                context = context,
+                today = today,
+                todayEvents = todayEvents,
+                tomorrowEvents = tomorrowEvents,
+                timeStr = timeStr
+            )
             return Result.success()
+        }
+
+        fun showModernBriefingNotification(
+            context: Context,
+            today: LocalDate = LocalDate.now(),
+            todayEvents: List<CalendarEventItem> = emptyList(),
+            tomorrowEvents: List<CalendarEventItem> = emptyList(),
+            timeStr: String = "08:30"
+        ) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Briefing Mattutino Peritale ($timeStr)",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Riepilogo giornaliero alle $timeStr dei sopralluoghi con link Google Maps e fascicolo"
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            nm.createNotificationChannel(channel)
+
+            val briefingData = NotificationBriefingFormatter.computeBriefingData(
+                today = today,
+                todayEvents = todayEvents,
+                tomorrowEvents = tomorrowEvents
+            )
+
+            try {
+                val modernNotif = ModernNotificationBuilder.buildBriefingNotification(context, briefingData)
+                nm.notify(NOTIFICATION_ID, modernNotif)
+            } catch (_: Throwable) {
+                // Fallback sicuro su notifica standard
+                showNotification(context, briefingData.mainHeadline, briefingData.timelineText, timeStr)
+            }
         }
 
         fun showNotification(context: Context, title: String, body: String, timeStr: String = "08:30") {
@@ -130,11 +149,13 @@ class MorningBriefingWorker(
             )
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_menu_my_calendar)
+                .setSmallIcon(R.drawable.ic_perito_notification)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setContentIntent(pendingIntent)
+                .setColor(0xFF730B1E.toInt())
+                .setColorized(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()
