@@ -45,7 +45,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="Prossimo: 09:30 • Caricamento..."
-            android:textColor="#FFF43F5E"
+            android:textColor="#FFFFB3C0"
             android:textSize="11.5sp"
             android:textStyle="bold" />
 

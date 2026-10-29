@@ -155,7 +155,7 @@ class MorningBriefingWorker(
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setContentIntent(pendingIntent)
-                .setColor(0xFF730B1E.toInt())
+                .setColor(0xFF4F0B18.toInt())
                 .setColorized(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)

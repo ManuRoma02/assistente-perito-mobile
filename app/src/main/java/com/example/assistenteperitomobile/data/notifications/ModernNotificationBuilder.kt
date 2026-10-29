@@ -129,7 +129,7 @@ object ModernNotificationBuilder {
             .setCustomContentView(collapsedViews)
             .setCustomBigContentView(expandedViews)
             .setContentIntent(mainPendingIntent)
-            .setColor(0xFF730B1E.toInt())
+            .setColor(0xFF4F0B18.toInt())
             .setColorized(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -152,19 +152,19 @@ object ModernNotificationBuilder {
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f, 0f, size.toFloat(), size.toFloat(),
-                Color.parseColor("#7A1224"),
-                Color.parseColor("#25040B"),
+                Color.parseColor("#6A1628"),
+                Color.parseColor("#380812"),
                 Shader.TileMode.CLAMP
             )
         }
         val bgRect = RectF(0f, 0f, size.toFloat(), size.toFloat())
         canvas.drawRoundRect(bgRect, 38f, 38f, bgPaint)
 
-        // 2. Bordo di rifinitura luxury (stroke rosa semitrasparente)
+        // 2. Bordo di rifinitura luxury (stroke bordeaux semitrasparente)
         val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 3f
-            color = Color.parseColor("#55FF6482")
+            color = Color.parseColor("#66FF7D90")
         }
         canvas.drawRoundRect(bgRect, 38f, 38f, strokePaint)
 
@@ -179,7 +179,7 @@ object ModernNotificationBuilder {
 
         // 4. Mese abbreviato (es. "OTT")
         val monthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#FFB3C0")
+            color = Color.parseColor("#FFFFB3C0")
             textSize = 32f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
@@ -189,7 +189,7 @@ object ModernNotificationBuilder {
 
         // 5. Pill badge di conteggio in basso (es. "3 OGGI" o "LIBERO")
         val pillBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(175, 0, 0, 0)
+            color = Color.argb(190, 32, 4, 10)
         }
         val pillRect = RectF(34f, 182f, size - 34f, 222f)
         canvas.drawRoundRect(pillRect, 14f, 14f, pillBgPaint)
@@ -197,7 +197,7 @@ object ModernNotificationBuilder {
         val pillStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 1.5f
-            color = Color.argb(80, 255, 255, 255)
+            color = Color.argb(110, 255, 125, 144)
         }
         canvas.drawRoundRect(pillRect, 14f, 14f, pillStrokePaint)
 
