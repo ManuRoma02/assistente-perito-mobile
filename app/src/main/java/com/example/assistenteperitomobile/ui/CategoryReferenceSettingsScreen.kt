@@ -116,7 +116,7 @@ fun CategoryReferenceSettingsContent(
             ) {
                 IconButton(
                     onClick = onBack,
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -332,7 +332,7 @@ fun CategoryReferenceSettingsContent(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Elimina", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Elimina Categoria", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             },
             dismissButton = {
@@ -575,7 +575,7 @@ fun CategoryAccordionCard(
                 // Icone Azione: Modifica & Elimina
                 IconButton(
                     onClick = { onEditCategory?.invoke() },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -588,7 +588,7 @@ fun CategoryAccordionCard(
                 if (!category.isSystem) {
                     IconButton(
                         onClick = { onDeleteCategory?.invoke() },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,

@@ -254,7 +254,7 @@ fun AgendaVisivaScreen(
                             shape = RoundedCornerShape(12.dp),
                             color = AppleWhite,
                             border = BorderStroke(0.5.dp, DavezStoneBorder),
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -304,9 +304,9 @@ fun AgendaVisivaScreen(
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     text = if (!uiState.hasNativeCalendarPermission) {
-                                        "Permessi Calendario mancanti: gli impegni restano salvati solo localmente."
+                                        "Permessi mancanti. Salvataggio locale."
                                     } else {
-                                        "Calendario di sistema scollegato: gli impegni restano salvati nell'Agenda locale."
+                                        "Calendario scollegato. Salvataggio locale."
                                     },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFF856404)
@@ -987,7 +987,7 @@ fun AgendaEventCard(
                     ) {
                         IconButton(
                             onClick = onReschedule,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
                                 Icons.Default.Edit,
@@ -998,7 +998,7 @@ fun AgendaEventCard(
                         }
                         IconButton(
                             onClick = onDelete,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
                                 Icons.Default.DeleteOutline,

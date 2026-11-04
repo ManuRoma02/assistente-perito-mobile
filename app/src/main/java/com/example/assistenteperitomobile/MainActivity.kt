@@ -22,11 +22,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(
+            statusBarStyle = SystemBarStyle.auto(
                 Color.TRANSPARENT,
                 Color.TRANSPARENT
             ),
-            navigationBarStyle = SystemBarStyle.light(
+            navigationBarStyle = SystemBarStyle.auto(
                 Color.TRANSPARENT,
                 Color.TRANSPARENT
             )
@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         if (savedInstanceState == null) {
+            handleIntentNavigation(intent)
             peritoViewModel.handleIncomingShareIntent(intent)
         }
 
@@ -69,7 +70,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleIntentNavigation(intent)
         peritoViewModel.handleIncomingShareIntent(intent)
+    }
+
+    private fun handleIntentNavigation(intent: Intent?) {
+        if (intent == null) return
+        val targetTab = intent.getStringExtra("NAVIGATE_TO_TAB")
+        val targetFascicoloId = intent.getStringExtra("FASCICOLO_ID")
+        if (!targetTab.isNullOrBlank() || !targetFascicoloId.isNullOrBlank()) {
+            peritoViewModel.handleNavigationIntent(targetTab, targetFascicoloId)
+        }
     }
 
     companion object {

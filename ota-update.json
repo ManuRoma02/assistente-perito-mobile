@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 21,
-  "latestVersionName": "1.0.20",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.20/app-release.apk",
-  "releaseNotes": "• **Design Spotify-Style**: rimossi i pulsanti ingombranti per un layout pulito a tutta larghezza.\n• **Timeline Scrubber**: avanzamento visivo dello stato giornaliero senza interruzioni.\n• **Integrazione di Sistema**: rimossa la card nidificata per fondersi nativamente nel drawer.",
+  "latestVersionCode": 22,
+  "latestVersionName": "1.0.21",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.21/app-release.apk",
+  "releaseNotes": "• **Persistenza Atomica**: transazioni protette da corruzioni e blackout.\n• **Cancellazione Sicura**: guardie con token esatti e conferma modale.\n• **Dark Mode Apple**: tema scuro OLED ed edge-to-edge adattivo.\n• **Touch Target 44dp**: pulsanti conformi a Apple HIG e accessibilità.\n• **Animazioni Fluide**: rendering offloaded su GPU e scroll stabile.\n• **Taps Riga Intera**: switch attivabili toccando ovunque sulla riga.\n• **Pulsanti Ergonomici**: azioni primarie a piena larghezza ancorate in basso.\n• **Microcopy Concisa**: rimossi testi prolissi e verbi generici.\n• **Design Agentico**: tag semantici e transizioni reattive integrate.",
   "mandatory": false,
-  "publishedAt": "2026-10-29T12:19:00Z",
-  "sha256": "669f84bef73d82c7b3bc6140bd5efdbd9e4f6cf5faa9ec7bb6702139effd24c0",
-  "fileSize": 22929840
+  "publishedAt": "2026-11-04T16:10:00Z",
+  "sha256": "05d979fa852ef49a43d67ea64896eba6b2298d028cb7c2a3e937c785296762d3",
+  "fileSize": 22937364
 }

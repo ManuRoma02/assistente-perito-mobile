@@ -30,6 +30,9 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.runtime.DisposableEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -112,8 +115,11 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
+import android.content.ClipData
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -410,37 +416,28 @@ fun Perito3DThinkingOrb(
     size: Dp = 54.dp,
     modifier: Modifier = Modifier
 ) {
-    val phase: Float
-    val pulse: Float
-    if (isThinking) {
-        val infiniteTransition = rememberInfiniteTransition(label = "orb_3d_rotation")
-        val animatedPhase by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = (2.0 * PI).toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    durationMillis = 2400,
-                    easing = LinearEasing
-                ),
-                repeatMode = RepeatMode.Restart
+    val infiniteTransition = rememberInfiniteTransition(label = "orb_3d_rotation")
+    val animatedPhase = infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2.0 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 2400,
+                easing = LinearEasing
             ),
-            label = "orb_phase"
-        )
-        val animatedPulse by infiniteTransition.animateFloat(
-            initialValue = 0.92f,
-            targetValue = 1.08f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 550),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "orb_pulse"
-        )
-        phase = animatedPhase
-        pulse = animatedPulse
-    } else {
-        phase = 0.35f
-        pulse = 1.0f
-    }
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "orb_phase"
+    )
+    val animatedPulse = infiniteTransition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 550),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb_pulse"
+    )
 
     // Interactive Touch OrbitControls (/threejs)
     var userYaw by remember { mutableFloatStateOf(0.35f) }
@@ -461,6 +458,8 @@ fun Perito3DThinkingOrb(
                 testTag = "perito_3d_thinking_orb"
             }
     ) {
+        val phase = if (isThinking) animatedPhase.value else 0.35f
+        val pulse = if (isThinking) animatedPulse.value else 1.0f
         val cx = this.size.width / 2f
         val cy = this.size.height / 2f
         val r = (this.size.minDimension / 2f) * 0.84f * pulse
@@ -691,7 +690,7 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
         } else {
             Toast.makeText(
                 context,
-                "Permesso fotocamera richiesto per scattare foto",
+                "Permesso fotocamera necessario",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -800,6 +799,13 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
         if (!pending.isNullOrBlank()) {
             prefillCommandInChat(pending)
             viewModel.clearPendingSharedText()
+        }
+    }
+
+    LaunchedEffect(uiState.openArchiveSheetRequested) {
+        if (uiState.openArchiveSheetRequested) {
+            showArchiveSheet = true
+            viewModel.clearOpenArchiveSheetRequest()
         }
     }
 
@@ -1103,9 +1109,9 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
                         showInAppCameraSheet = false
                         viewModel.processCameraBitmap(bitmap, preset)
                     },
-                    onCaptureBurstBitmaps = { burstBitmaps ->
+                    onCaptureBurstFiles = { burstFiles ->
                         showInAppCameraSheet = false
-                        viewModel.processCameraBitmaps(burstBitmaps)
+                        viewModel.processCameraBurstFiles(burstFiles)
                     },
                     onOpenSystemCamera = {
                         showInAppCameraSheet = false
@@ -1673,7 +1679,7 @@ fun PeritoStudioTopBar(
                         onClearChat()
                     }
                 ) {
-                    Text("Cancella", color = AppleRed, fontWeight = FontWeight.Bold)
+                    Text("Svuota Chat", color = AppleRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -1771,7 +1777,7 @@ fun PeritoStudioTopBar(
                     shape = CircleShape,
                     color = AppleOrangeSoft,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .emilPressScale(calInteraction)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -1812,6 +1818,57 @@ fun PeritoStudioTopBar(
                         tint = DavezBordeaux,
                         modifier = Modifier.size(20.dp)
                     )
+                }
+            }
+
+            // Pulsante Archivio Documentale con Badge (Feature 17 - Touch target 44x44dp Apple HIG)
+            Spacer(Modifier.width(6.dp))
+            val arcInteraction = remember { MutableInteractionSource() }
+            Surface(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onOpenArchive()
+                },
+                interactionSource = arcInteraction,
+                shape = RoundedCornerShape(14.dp),
+                color = AppleBlueSoft,
+                border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.18f)),
+                modifier = Modifier
+                    .size(44.dp)
+                    .emilPressScale(arcInteraction)
+                    .semantics {
+                        contentDescription = "Archivio Documentale"
+                        testTag = "top_bar_archive_button"
+                    }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = "Archivio Documentale",
+                        tint = DavezBordeaux,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    if (archivedCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = DavezBordeaux,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(2.dp)
+                                .size(16.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = if (archivedCount > 99) "99+" else archivedCount.toString(),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = AppleWhite
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2045,7 +2102,7 @@ private fun HeroActionBentoCard(
 @Composable
 fun AgenticThinkingBubble(label: String) {
     val infiniteTransition = rememberInfiniteTransition(label = "thinking_orb_breathe")
-    val breathePhase by infiniteTransition.animateFloat(
+    val breathePhase = infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2.0 * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
@@ -2054,8 +2111,6 @@ fun AgenticThinkingBubble(label: String) {
         ),
         label = "breathe_phase"
     )
-    val breatheScaleX = 1f + sin(breathePhase) * 0.025f
-    val breatheScaleY = 1f - sin(breathePhase) * 0.025f
 
     Surface(
         shape = RoundedCornerShape(
@@ -2069,8 +2124,9 @@ fun AgenticThinkingBubble(label: String) {
         modifier = Modifier
             .widthIn(min = 180.dp, max = 330.dp)
             .graphicsLayer {
-                scaleX = breatheScaleX
-                scaleY = breatheScaleY
+                val phase = breathePhase.value
+                scaleX = 1f + sin(phase) * 0.025f
+                scaleY = 1f - sin(phase) * 0.025f
             }
             .semantics { testTag = "agentic_thinking_bubble" }
     ) {
@@ -3248,7 +3304,7 @@ fun ModernAttachmentSheet(
                     shape = CircleShape,
                     color = Color(0x14000000),
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(44.dp)
                         .emilPressScale(closeInteraction, pressedScale = 0.90f)
                         .semantics { contentDescription = "Chiudi finestra allegati" }
                 ) {
@@ -3405,7 +3461,7 @@ private fun SquircleAttachmentTile(
 @Composable
 fun InAppCameraScannerSheet(
     onCaptureRealBitmap: (Bitmap, Int) -> Unit,
-    onCaptureBurstBitmaps: ((List<Bitmap>) -> Unit)? = null,
+    onCaptureBurstFiles: ((List<File>) -> Unit)? = null,
     onOpenSystemCamera: () -> Unit,
     onPickFromGallery: () -> Unit,
     onClose: () -> Unit
@@ -3415,11 +3471,18 @@ fun InAppCameraScannerSheet(
     val haptic = LocalHapticFeedback.current
     var selectedScanMode by rememberSaveable { mutableIntStateOf(1) }
     var isBurstMode by rememberSaveable { mutableStateOf(false) }
-    val burstList = remember { mutableStateListOf<Bitmap>() }
+    val burstFileList = remember { mutableStateListOf<File>() }
     var flashEnabled by rememberSaveable { mutableStateOf(true) }
     var shutterFlashAlpha by remember { mutableFloatStateOf(0f) }
     var isCapturing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            burstFileList.forEach { runCatching { it.delete() } }
+            burstFileList.clear()
+        }
+    }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -3547,7 +3610,7 @@ fun InAppCameraScannerSheet(
                     onClick = onClose,
                     shape = CircleShape,
                     color = Color(0xFF2B2625),
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -3747,7 +3810,7 @@ fun InAppCameraScannerSheet(
                 }
             )
             ScannerModePill(
-                label = if (burstList.isEmpty()) "⚡ Raffica" else "⚡ (${burstList.size})",
+                label = if (burstFileList.isEmpty()) "⚡ Raffica" else "⚡ (${burstFileList.size})",
                 selected = isBurstMode,
                 modifier = Modifier.weight(1.15f),
                 onClick = {
@@ -3795,7 +3858,7 @@ fun InAppCameraScannerSheet(
                                         val rotation = image.imageInfo.rotationDegrees
                                         val finalBitmap = if (rotation != 0) {
                                             val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-                                            Bitmap.createBitmap(
+                                            val rotated = Bitmap.createBitmap(
                                                 rawBitmap,
                                                 0,
                                                 0,
@@ -3804,13 +3867,32 @@ fun InAppCameraScannerSheet(
                                                 matrix,
                                                 true
                                             )
+                                            rawBitmap.recycle()
+                                            rotated
                                         } else {
                                             rawBitmap
                                         }
                                         image.close()
                                         if (isBurstMode) {
-                                            burstList.add(finalBitmap)
-                                            Toast.makeText(context, "📸 Foto #${burstList.size} acquisita!", Toast.LENGTH_SHORT).show()
+                                            scope.launch(Dispatchers.IO) {
+                                                try {
+                                                    val burstDir = File(context.cacheDir, "camera_burst").apply { mkdirs() }
+                                                    val burstFile = File(burstDir, "burst_${System.currentTimeMillis()}_${burstFileList.size + 1}.jpg")
+                                                    burstFile.outputStream().use { out ->
+                                                        finalBitmap.compress(Bitmap.CompressFormat.JPEG, 88, out)
+                                                    }
+                                                    finalBitmap.recycle()
+                                                    withContext(Dispatchers.Main) {
+                                                        burstFileList.add(burstFile)
+                                                        Toast.makeText(context, "📸 Foto #${burstFileList.size} acquisita!", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                } catch (_: Throwable) {
+                                                    runCatching { finalBitmap.recycle() }
+                                                    withContext(Dispatchers.Main) {
+                                                        Toast.makeText(context, "Errore salvataggio foto raffica", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
                                         } else {
                                             onCaptureRealBitmap(finalBitmap, selectedScanMode)
                                         }
@@ -3869,12 +3951,12 @@ fun InAppCameraScannerSheet(
         }
 
         // Se in modalità raffica con foto già scattate, mostra il pulsante di conferma e salvataggio batch
-        if (isBurstMode && burstList.isNotEmpty()) {
+        if (isBurstMode && burstFileList.isNotEmpty()) {
             Button(
                 onClick = {
-                    val batch = burstList.toList()
-                    burstList.clear()
-                    onCaptureBurstBitmaps?.invoke(batch)
+                    val batch = burstFileList.toList()
+                    burstFileList.clear()
+                    onCaptureBurstFiles?.invoke(batch)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
                 shape = RoundedCornerShape(14.dp),
@@ -3883,7 +3965,7 @@ fun InAppCameraScannerSheet(
                     .height(48.dp)
             ) {
                 Text(
-                    text = "📁 Salva Raffica (${burstList.size} foto) nel Fascicolo",
+                    text = "📁 Salva Raffica (${burstFileList.size} foto) nel Fascicolo",
                     fontWeight = FontWeight.Bold,
                     color = AppleWhite,
                     fontSize = 13.5.sp
@@ -3974,7 +4056,7 @@ fun PeritoStudioMessageBubble(
     val timeColor = if (isUser) AppleWhite.copy(alpha = 0.78f) else AppleLabelTertiary
 
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var isCopied by remember { mutableStateOf(false) }
@@ -3995,10 +4077,16 @@ fun PeritoStudioMessageBubble(
         label = "dissolve_vaporize"
     )
 
-    // Emil Kowalski Cartoon Physics: Bouncy spring entrance from 0.82f on GPU layer
-    val entranceProgress = remember(message.id) { Animatable(0.82f) }
+    // Emil Kowalski Animation Philosophy:
+    // Only freshly posted messages trigger the spring entrance bounce; historical scrolled messages render stably at 1f.
+    val isFreshMessage = remember(message.id) {
+        (System.currentTimeMillis() - message.timestampMillis) < 2500L
+    }
+    val entranceProgress = remember(message.id) {
+        Animatable(if (isFreshMessage) 0.85f else 1f)
+    }
     LaunchedEffect(message.id) {
-        if (ValueAnimator.areAnimatorsEnabled()) {
+        if (isFreshMessage && ValueAnimator.areAnimatorsEnabled()) {
             entranceProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = spring(
@@ -4148,10 +4236,12 @@ fun PeritoStudioMessageBubble(
                                 shape = RoundedCornerShape(7.dp),
                                 color = if (isUser) AppleWhite.copy(alpha = 0.16f) else DavezAlabaster,
                                 modifier = Modifier.clickable {
-                                    clipboardManager.setText(AnnotatedString(message.text))
+                                    coroutineScope.launch {
+                                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("PeritoAI", message.text)))
+                                    }
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     isCopied = true
-                                    Toast.makeText(context, "Messaggio copiato negli appunti", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Messaggio copiato", Toast.LENGTH_SHORT).show()
                                     coroutineScope.launch {
                                         delay(1800)
                                         isCopied = false
@@ -4632,7 +4722,7 @@ fun WhatsAppVoiceNoteCard(
                 shape = CircleShape,
                 color = accent,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(44.dp)
                     .emilPressScale(playInteraction)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -4956,12 +5046,53 @@ fun ArchiveFoldersSheetContent(
 ) {
     val context = LocalContext.current
     var activeArchiveTab by rememberSaveable { mutableIntStateOf(0) }
+    var docPendingDelete by remember { mutableStateOf<ArchivedDocument?>(null) }
     val filteredDocs = remember(uiState.archivedDocuments, uiState.selectedCategoryFilter) {
         if (uiState.selectedCategoryFilter == null) {
             uiState.archivedDocuments
         } else {
             uiState.archivedDocuments.filter { it.category == uiState.selectedCategoryFilter }
         }
+    }
+
+    if (docPendingDelete != null) {
+        val targetDoc = docPendingDelete!!
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { docPendingDelete = null },
+            title = {
+                Text(
+                    text = "Elimina documento",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = DavezBordeaux
+                )
+            },
+            text = {
+                Text(
+                    text = "Sei sicuro di voler eliminare definitivamente \"${targetDoc.fileName}\"? Questa operazione non può essere annullata.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppleLabelPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val idToDelete = targetDoc.id
+                        docPendingDelete = null
+                        viewModel.deleteArchivedDocument(idToDelete)
+                    }
+                ) {
+                    Text("Elimina Documento", color = AppleRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { docPendingDelete = null }) {
+                    Text("Annulla", color = AppleLabelSecondary)
+                }
+            },
+            containerColor = AppleWhite,
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 
     Column(
@@ -5230,11 +5361,15 @@ fun ArchiveFoldersSheetContent(
                                         Text("Condividi", color = DavezBordeaux)
                                     }
                                 }
-                                IconButton(onClick = { viewModel.deleteArchivedDocument(doc.id) }) {
+                                IconButton(
+                                    onClick = { docPendingDelete = doc },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
                                     Icon(
                                         Icons.Default.DeleteOutline,
                                         contentDescription = "Elimina",
-                                        tint = AppleRed
+                                        tint = AppleRed,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -5801,7 +5936,24 @@ fun AiEngineSettingsSheetContent(
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .toggleable(
+                                                value = briefingEnabled,
+                                                role = Role.Switch,
+                                                onValueChange = {
+                                                    briefingEnabled = it
+                                                    viewModel.updateAiConfig(
+                                                        uiState.aiConfig.copy(
+                                                            morningBriefingEnabled = it,
+                                                            morningBriefingTime = briefingTime
+                                                        )
+                                                    )
+                                                }
+                                            )
+                                            .semantics { testTag = "briefing_toggle_row" }
+                                            .padding(vertical = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -5821,15 +5973,7 @@ fun AiEngineSettingsSheetContent(
                                         Spacer(Modifier.width(8.dp))
                                         Switch(
                                             checked = briefingEnabled,
-                                            onCheckedChange = {
-                                                briefingEnabled = it
-                                                viewModel.updateAiConfig(
-                                                    uiState.aiConfig.copy(
-                                                        morningBriefingEnabled = it,
-                                                        morningBriefingTime = briefingTime
-                                                    )
-                                                )
-                                            },
+                                            onCheckedChange = null,
                                             colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
                                         )
                                     }
@@ -6310,7 +6454,15 @@ fun AiEngineSettingsSheetContent(
                                     shape = RoundedCornerShape(12.dp),
                                     color = AppleWhite,
                                     border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .toggleable(
+                                            value = uiState.aiConfig.autoCheckUpdatesOnStart,
+                                            role = Role.Switch,
+                                            onValueChange = { viewModel.toggleAutoCheckUpdates(it) }
+                                        )
+                                        .semantics { testTag = "auto_check_updates_row" }
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -6334,7 +6486,7 @@ fun AiEngineSettingsSheetContent(
                                         }
                                         Switch(
                                             checked = uiState.aiConfig.autoCheckUpdatesOnStart,
-                                            onCheckedChange = { viewModel.toggleAutoCheckUpdates(it) },
+                                            onCheckedChange = null,
                                             colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
                                         )
                                     }
@@ -6740,7 +6892,8 @@ private fun DownloadableModelCard(
     onSelectActive: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
 
     Surface(
         shape = RoundedCornerShape(14.dp),
@@ -6854,7 +7007,9 @@ private fun DownloadableModelCard(
                         }
                         IconButton(
                             onClick = {
-                                clipboardManager.setText(AnnotatedString(tag))
+                                coroutineScope.launch {
+                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("PeritoAI", tag)))
+                                }
                                 Toast.makeText(context, "Copiato: $tag", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.size(32.dp)
@@ -7769,7 +7924,7 @@ fun AppUpdateDialog(
                                 .heightIn(min = 44.dp)
                         ) {
                             Text(
-                                text = if (isReinstall) "Chiudi" else "Continua con la versione vecchia",
+                                text = if (isReinstall) "Chiudi" else "Ricorda più tardi",
                                 color = AppleLabelSecondary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp

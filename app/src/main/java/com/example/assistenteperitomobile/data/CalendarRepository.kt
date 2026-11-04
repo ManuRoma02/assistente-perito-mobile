@@ -307,9 +307,10 @@ class CalendarRepository(
     }
 
     fun loadLocalEvents(): List<CalendarEventItem> {
+        AtomicFileUtils.syncBackupBeforeRead(eventsFile)
         if (!eventsFile.exists()) return emptyList()
         return try {
-            json.decodeFromString<List<CalendarEventItem>>(eventsFile.readText())
+            json.decodeFromString<List<CalendarEventItem>>(AtomicFileUtils.readText(eventsFile))
                 .sortedBy { it.startMillis }
         } catch (_: Throwable) {
             emptyList()
@@ -348,15 +349,7 @@ class CalendarRepository(
     private fun saveLocalEvents(events: List<CalendarEventItem>) {
         try {
             val serialized = json.encodeToString(events)
-            val target = eventsFile
-            val parent = target.parentFile ?: File(".")
-            if (!parent.exists()) parent.mkdirs()
-            val tmp = File(parent, "${target.name}.tmp")
-            tmp.writeText(serialized, Charsets.UTF_8)
-            if (tmp.exists()) {
-                if (target.exists()) target.delete()
-                tmp.renameTo(target)
-            }
+            AtomicFileUtils.writeText(eventsFile, serialized)
         } catch (_: Throwable) {
         }
     }

@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -66,11 +67,11 @@ object ModernNotificationBuilder {
         )
 
         val mapsPendingIntent = if (data.rawLocationQuery.isNotBlank()) {
-            val mapsIntent = Intent(context, BriefingActionReceiver::class.java).apply {
-                action = BriefingActionReceiver.ACTION_NAVIGATE_MAPS
-                putExtra(BriefingActionReceiver.EXTRA_LOCATION_QUERY, data.rawLocationQuery)
+            val geoUri = Uri.parse("geo:0,0?q=" + Uri.encode(data.rawLocationQuery.trim()))
+            val mapsIntent = Intent(Intent.ACTION_VIEW, geoUri).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
-            PendingIntent.getBroadcast(
+            PendingIntent.getActivity(
                 context,
                 2004,
                 mapsIntent,
@@ -97,6 +98,7 @@ object ModernNotificationBuilder {
             setTextViewText(R.id.notif_collapsed_title, data.mainHeadline)
             setTextViewText(R.id.notif_collapsed_subtitle, data.nextEventSubtitle)
             setProgressBar(R.id.notif_collapsed_progress, 100, data.progressPercent, false)
+            setOnClickPendingIntent(R.id.notif_collapsed_root, mainPendingIntent)
         }
 
         // Expanded RemoteViews (Stile Spotify esteso: cover, category, titolo, dettagli, timeline scrubber)
@@ -108,9 +110,10 @@ object ModernNotificationBuilder {
             setTextViewText(R.id.notif_expanded_location, data.locationText)
             setTextViewText(R.id.notif_expanded_timeline_text, data.timelineText)
             setProgressBar(R.id.notif_expanded_progress, 100, data.progressPercent, false)
+            setOnClickPendingIntent(R.id.notif_expanded_timeline_box, agendaPendingIntent)
         }
 
-        return NotificationCompat.Builder(context, MorningBriefingWorker.CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, MorningBriefingWorker.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_perito_notification)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(collapsedViews)
@@ -120,7 +123,19 @@ object ModernNotificationBuilder {
             .setColorized(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .build()
+
+        // Binding azioni notifiche interattive (Feature 10)
+        if (data.rawLocationQuery.isNotBlank()) {
+            builder.addAction(R.drawable.ic_perito_notification, "Naviga Mappe", mapsPendingIntent)
+        }
+        builder.addAction(R.drawable.ic_perito_notification, "Posticipa 15m", snoozePendingIntent)
+        if (!data.targetDossierId.isNullOrBlank()) {
+            builder.addAction(R.drawable.ic_perito_notification, "Apri Fascicolo", dossierPendingIntent)
+        } else {
+            builder.addAction(R.drawable.ic_perito_notification, "Visualizza Agenda", agendaPendingIntent)
+        }
+
+        return builder.build()
     }
 
     /**

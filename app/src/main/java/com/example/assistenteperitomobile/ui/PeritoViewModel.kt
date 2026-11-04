@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.assistenteperitomobile.MainActivity
 import com.example.assistenteperitomobile.data.ArchiveRepository
+import com.example.assistenteperitomobile.data.AtomicFileUtils
 import com.example.assistenteperitomobile.data.CalendarRepository
 import com.example.assistenteperitomobile.data.ChatHistoryRepository
 import com.example.assistenteperitomobile.data.DocumentProcessor
@@ -47,6 +49,7 @@ import com.example.assistenteperitomobile.domain.PeritoCategory
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.PeritoEasterEggs
+import com.example.assistenteperitomobile.domain.SafeDeletionGuard
 import com.example.assistenteperitomobile.domain.detectCategoryCorrection
 import com.example.assistenteperitomobile.domain.StudioProfile
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
@@ -56,6 +59,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,7 +116,8 @@ data class PeritoUiState(
     val archiveErrorMessage: String? = null,
     val isReasoningFallback: Boolean = false,
     val effectiveReasoningModelLabel: String = "",
-    val easterEggMessage: String? = null
+    val easterEggMessage: String? = null,
+    val openArchiveSheetRequested: Boolean = false
 )
 
 class PeritoViewModel(application: Application) : AndroidViewModel(application) {
@@ -1006,27 +1011,23 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * Modalità Raffica Sopralluogo: salva una serie di N foto scattate consecutivamente
-     * archiviandole direttamente nella cartella Perizie Tecniche e collegandole al Fascicolo selezionato.
+     * Modalità Raffica Sopralluogo: elabora una serie di file JPEG temporanei da cacheDir
+     * archiviandoli direttamente nella cartella Perizie Tecniche e collegandoli al Fascicolo selezionato.
+     * Evita OOM causati dall'accumulo di Bitmap non compresse in RAM.
      */
-    fun processCameraBitmaps(bitmaps: List<Bitmap>, fascicoloId: String? = null) {
-        if (bitmaps.isEmpty()) return
-        if (bitmaps.size == 1) {
-            processCameraBitmap(bitmaps[0], scanPreset = 2, fascicoloId = fascicoloId)
-            return
-        }
-
+    fun processCameraBurstFiles(files: List<File>, fascicoloId: String? = null) {
+        if (files.isEmpty()) return
         _uiState.update {
             it.copy(
                 isProcessing = true,
-                processingLabel = "📸 Elaborazione Raffica (${bitmaps.size} foto sopralluogo)..."
+                processingLabel = "📸 Elaborazione Raffica (${files.size} foto sopralluogo)..."
             )
         }
         val appContext = getApplication<Application>()
         ReasoningBackgroundService.startReasoning(
             appContext,
             taskTitle = "📸 Archiviazione Raffica Sopralluogo...",
-            previewText = "${bitmaps.size} scatti in elaborazione"
+            previewText = "${files.size} scatti in elaborazione"
         )
         appScope.launch {
             try {
@@ -1036,13 +1037,21 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 val targetFascicolo = _uiState.value.fascicoli.firstOrNull { it.id == targetFascicoloId }
                 val clientLabel = targetFascicolo?.cliente ?: "Sopralluogo Peritale"
 
-                bitmaps.forEachIndexed { idx, bmp ->
+                files.forEachIndexed { idx, file ->
                     try {
-                        val out = ByteArrayOutputStream()
-                        bmp.compress(Bitmap.CompressFormat.JPEG, 88, out)
-                        val bytes = out.toByteArray()
+                        val bytes = file.readBytes()
                         val fileName = "Sopralluogo_${timestampBase}_foto${idx + 1}.jpg"
-                        val ocr = docProcessor.performOcrOnBitmap(bmp).trim()
+                        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                        val ocr = if (bmp != null) {
+                            try {
+                                docProcessor.performOcrOnBitmap(bmp).trim()
+                            } finally {
+                                runCatching { bmp.recycle() }
+                            }
+                        } else {
+                            ""
+                        }
                         val classification = DocumentClassificationResult(
                             categoria = PeritoCategory.PERIZIE_TECNICHE.folderName,
                             cliente_o_controparte = clientLabel,
@@ -1058,7 +1067,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         )
                         archivedList.add(doc)
                     } finally {
-                        runCatching { bmp.recycle() }
+                        runCatching { file.delete() }
                     }
                 }
                 refreshAllData()
@@ -1075,10 +1084,35 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 notifyOrStopBackgroundService("📸 Raffica Salvata", "${archivedList.size} foto archiviate con successo")
             } finally {
+                files.forEach { runCatching { it.delete() } }
                 _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
                 ReasoningBackgroundService.stopReasoning(appContext)
             }
         }
+    }
+
+    /**
+     * Modalità Raffica Sopralluogo: salva una serie di N foto scattate consecutivamente
+     * archiviandole direttamente nella cartella Perizie Tecniche e collegandole al Fascicolo selezionato.
+     */
+    fun processCameraBitmaps(bitmaps: List<Bitmap>, fascicoloId: String? = null) {
+        if (bitmaps.isEmpty()) return
+        if (bitmaps.size == 1) {
+            processCameraBitmap(bitmaps[0], scanPreset = 2, fascicoloId = fascicoloId)
+            return
+        }
+
+        val burstDir = File(getApplication<Application>().cacheDir, "camera_burst").apply { mkdirs() }
+        val tempFiles = bitmaps.mapIndexed { idx, bmp ->
+            val f = File(burstDir, "burst_compat_${System.currentTimeMillis()}_$idx.jpg")
+            try {
+                f.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 88, out) }
+            } finally {
+                runCatching { bmp.recycle() }
+            }
+            f
+        }
+        processCameraBurstFiles(tempFiles, fascicoloId)
     }
 
     /**
@@ -1558,11 +1592,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
         // A. GESTIONE ELIMINAZIONE DOCUMENTI / FILE DA CHAT ("elimina questo file", "elimina nomina ctu", ecc.)
         if (hasDeleteVerb) {
-            val isAppointmentTarget = lower.contains("appuntamento") ||
-                lower.contains("sopralluogo") ||
-                lower.contains("impegno") ||
-                lower.contains("evento") ||
-                lower.contains("agenda")
+            val isAppointmentTarget = SafeDeletionGuard.isAppointmentTarget(lower)
 
             if (!isAppointmentTarget) {
                 val allDocs = archiveRepo.loadAllDocuments()
@@ -1577,62 +1607,25 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     return true
                 }
 
-                // Caso 1: "elimina tutti i file" / "svuota archivio"
-                if (lower.contains("tutti") || lower.contains("tutto") || lower.contains("svuota")) {
-                    allDocs.forEach { archiveRepo.deleteDocument(it.id) }
-                    refreshAllData()
-                    _uiState.update { state ->
-                        state.copy(
-                            messages = state.messages.map { msg ->
-                                msg.copy(archivedDocument = null, matchedDocuments = emptyList())
-                            },
-                            statusBanner = "🗑️ Tutti i file sono stati eliminati dall'archivio"
-                        )
-                    }
+                val evalResult = SafeDeletionGuard.evaluateDeletionIntent(
+                    query = text,
+                    docs = allDocs,
+                    hasExplicitUserConfirmation = false
+                )
+
+                if (evalResult.isFailure) {
                     appendAssistantMessage(
                         ChatMessage(
                             id = UUID.randomUUID().toString(),
                             isUser = false,
-                            text = "🗑️ **Archivio svuotato!** Tutti i **${allDocs.size}** documenti sono stati rimossi dalle 6 cartelle."
+                            text = "⚠️ **Richiesta di cancellazione massiva bloccata per sicurezza.**\n" +
+                                "Per svuotare l'archivio o eliminare tutti i file, scrivi esplicitamente: **\"conferma svuota archivio\"** oppure **\"conferma elimina tutti i file\"**."
                         )
                     )
                     return true
                 }
 
-                // Caso 2: "elimina questo file", "elimina il file", "elimina ultimo file", o specifica query ("elimina nomina ctu")
-                val genericPointers = setOf(
-                    "elimina", "cancella", "rimuovi", "butta", "togli",
-                    "questo", "questa", "quello", "quella", "ultimo", "ultima", "l",
-                    "il", "lo", "la", "i", "gli", "le", "un", "una",
-                    "file", "documento", "allegato", "foto", "scansione", "pdf", "p7m", "archivio", "da", "dall"
-                )
-                val targetTokens = lower.replace(Regex("""[^a-zà-ú0-9\s]"""), " ")
-                    .split(Regex("""\s+"""))
-                    .filter { it.length >= 2 && it !in genericPointers }
-
-                val docsToDelete: List<ArchivedDocument> = if (targetTokens.isEmpty()) {
-                    // "elimina questo file" / "elimina l'ultimo documento" -> elimina l'ultimo file archiviato
-                    listOf(allDocs.first())
-                } else {
-                    val queryJoined = targetTokens.joinToString(" ")
-                    val directSearch = archiveRepo.searchDocuments(queryJoined)
-                    if (directSearch.isNotEmpty()) {
-                        listOf(directSearch.first())
-                    } else {
-                        // Cerca corrispondenza anche su singoli token (es. "nomina" o "ctu")
-                        val tokenMatched = allDocs.filter { doc ->
-                            val hay = "${doc.fileName} ${doc.originalName} ${doc.cliente} ${doc.oggetto} ${doc.category.displayTitle} ${doc.extractedTextSnippet}".lowercase(Locale.ITALIAN)
-                            targetTokens.any { tok -> hay.contains(tok) }
-                        }
-                        if (tokenMatched.isNotEmpty()) {
-                            listOf(tokenMatched.first())
-                        } else if (allDocs.size == 1) {
-                            listOf(allDocs.first())
-                        } else {
-                            emptyList()
-                        }
-                    }
-                }
+                val docsToDelete = evalResult.getOrDefault(emptyList())
 
                 if (docsToDelete.isNotEmpty()) {
                     val deletedIds = docsToDelete.map { it.id }.toSet()
@@ -1646,27 +1639,37 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                                     matchedDocuments = msg.matchedDocuments.filterNot { it.id in deletedIds }
                                 )
                             },
-                            statusBanner = "🗑️ File eliminato dall'archivio"
+                            statusBanner = if (docsToDelete.size > 1) "🗑️ Eliminati ${docsToDelete.size} file dall'archivio" else "🗑️ File eliminato dall'archivio"
                         )
                     }
-                    val doc = docsToDelete.first()
-                    appendAssistantMessage(
-                        ChatMessage(
-                            id = UUID.randomUUID().toString(),
-                            isUser = false,
-                            text = "🗑️ **Documento eliminato dall'archivio!**\n" +
-                                "• **File rimosso:** `${doc.fileName}`\n" +
-                                "• **Cartella:** ${doc.category.displayTitle}"
+                    if (docsToDelete.size > 1) {
+                        appendAssistantMessage(
+                            ChatMessage(
+                                id = UUID.randomUUID().toString(),
+                                isUser = false,
+                                text = "🗑️ **Archivio svuotato con successo.**\nTutti i **${docsToDelete.size}** documenti confermati sono stati rimossi."
+                            )
                         )
-                    )
+                    } else {
+                        val doc = docsToDelete.first()
+                        appendAssistantMessage(
+                            ChatMessage(
+                                id = UUID.randomUUID().toString(),
+                                isUser = false,
+                                text = "🗑️ **Documento eliminato dall'archivio!**\n" +
+                                    "• **File rimosso:** `${doc.fileName}`\n" +
+                                    "• **Cartella:** ${doc.category.displayTitle}"
+                            )
+                        )
+                    }
                     return true
                 } else {
                     appendAssistantMessage(
                         ChatMessage(
                             id = UUID.randomUUID().toString(),
                             isUser = false,
-                            text = "⚠️ Non ho trovato nessun file corrispondente a *\"${targetTokens.joinToString(" ")}\"* da eliminare.\n" +
-                                "Puoi scrivere **\"elimina ultimo file\"** oppure toccare il pulsante **🗑️ Elimina** direttamente sotto il documento."
+                            text = "⚠️ Non ho trovato nessun file corrispondente da eliminare in sicurezza.\n" +
+                                "Puoi specificare il nome del file, l'ID esatto (es. **\"elimina doc <ID>\"**) oppure toccare il pulsante **🗑️ Elimina** direttamente nella scheda del documento in Archivio."
                         )
                     )
                     return true
@@ -2145,6 +2148,41 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(selectedFascicoloId = id) }
     }
 
+    fun openFascicolo(id: String) {
+        selectFascicoloFilter(id)
+        _uiState.update { it.copy(openArchiveSheetRequested = true) }
+    }
+
+    fun clearOpenArchiveSheetRequest() {
+        _uiState.update { it.copy(openArchiveSheetRequested = false) }
+    }
+
+    fun handleNavigationIntent(tabName: String?, targetFascicoloId: String?) {
+        if (!tabName.isNullOrBlank()) {
+            when (tabName.uppercase(Locale.ROOT)) {
+                "AGENDA" -> selectTab(MainAppTab.AGENDA)
+                "FASCICOLI" -> {
+                    selectTab(MainAppTab.CHAT)
+                    if (!targetFascicoloId.isNullOrBlank()) {
+                        openFascicolo(targetFascicoloId)
+                    } else {
+                        _uiState.update { it.copy(openArchiveSheetRequested = true) }
+                    }
+                }
+                "CHAT" -> selectTab(MainAppTab.CHAT)
+                else -> {
+                    try {
+                        selectTab(MainAppTab.valueOf(tabName.uppercase(Locale.ROOT)))
+                    } catch (_: IllegalArgumentException) {
+                        // ignore unknown tab name
+                    }
+                }
+            }
+        } else if (!targetFascicoloId.isNullOrBlank()) {
+            openFascicolo(targetFascicoloId)
+        }
+    }
+
     fun createNewFascicolo(
         codice: String,
         titolo: String,
@@ -2203,9 +2241,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun loadConfig(): AiEngineConfig {
+        AtomicFileUtils.syncBackupBeforeRead(configFile)
         if (!configFile.exists()) return AiEngineConfig()
         return try {
-            val loaded = json.decodeFromString<AiEngineConfig>(configFile.readText())
+            val raw = AtomicFileUtils.readText(configFile)
+            val loaded = json.decodeFromString<AiEngineConfig>(raw)
             if (loaded.otaManifestUrl.contains("githubusercontent.com/manue/")) {
                 val fixed = loaded.copy(otaManifestUrl = OtaUpdateManager.DEFAULT_MANIFEST_URL)
                 saveConfig(fixed)
@@ -2213,15 +2253,24 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 loaded
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.e("PeritoViewModel", "Errore decodifica ai_config.json, ripristino default", e)
+            runCatching {
+                if (configFile.exists()) {
+                    val corruptBackup = File(configFile.parentFile, "ai_config.json.corrupt.${System.currentTimeMillis()}")
+                    configFile.copyTo(corruptBackup, overwrite = true)
+                }
+            }
             AiEngineConfig()
         }
     }
 
     private fun saveConfig(config: AiEngineConfig) {
         try {
-            configFile.writeText(json.encodeToString(config))
-        } catch (_: Throwable) {
+            val serialized = json.encodeToString(config)
+            AtomicFileUtils.writeText(configFile, serialized)
+        } catch (e: Throwable) {
+            Log.e("PeritoViewModel", "Errore salvataggio atomico config", e)
         }
     }
 
@@ -2463,6 +2512,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         )
                     )
                 }
+            } finally {
+                com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
             }
         }
     }
@@ -2576,6 +2627,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         )
                     )
                 }
+            } finally {
+                com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
             }
         }
     }
@@ -2583,6 +2636,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun cancelModelDownload() {
         activeDownloadJob?.cancel()
         activeDownloadJob = null
+        com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
     }
 
     fun activateDownloadedModel(model: DownloadableAiModel) {
@@ -2867,6 +2921,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         super.onCleared()
+        com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
+        appScope.cancel()
         calendarContentObserver?.let {
             try {
                 appContext.contentResolver.unregisterContentObserver(it)

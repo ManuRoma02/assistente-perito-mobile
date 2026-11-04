@@ -57,7 +57,8 @@ class IntentRouterAgent {
             lower.contains("domani") || lower.contains("lunedì") || lower.contains("martedì") ||
             lower.contains("mercoledì") || lower.contains("giovedì") || lower.contains("venerdì") ||
             lower.contains("sabato") || lower.contains("domenica") || lower.contains("alle ore") ||
-            lower.contains("alle ") || Regex("\\b\\d{1,2}[:.]\\d{2}\\b").containsMatchIn(lower) -> {
+            Regex("""\balle\s+\d{1,2}([:.]\d{2})?\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower) ||
+            Regex("\\b\\d{1,2}[:.]\\d{2}\\b").containsMatchIn(lower) -> {
                 ClassifiedIntent(
                     category = UserIntentCategory.APPOINTMENT_REQUEST,
                     rawText = text,

@@ -5,5 +5,6 @@
     <exclude domain="file" path="fascicoli_studio.json" />
     <exclude domain="file" path="chat_history.json" />
     <exclude domain="file" path="calendar_events.json" />
+    <exclude domain="file" path="ai_config.json" />
     <exclude domain="file" path="ai_engine_config.json" />
 </full-backup-content>

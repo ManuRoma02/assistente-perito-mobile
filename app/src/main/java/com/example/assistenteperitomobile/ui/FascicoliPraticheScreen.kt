@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -263,10 +265,21 @@ fun FascicoliPraticheScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Tocca '+ Nuovo Fascicolo' per creare la prima commessa o perizia.",
+                        text = "Crea una nuova pratica per iniziare.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppleLabelSecondary
                     )
+                    Spacer(Modifier.height(18.dp))
+                    Button(
+                        onClick = { showNewFascicoloDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("empty_state_create_fascicolo_btn")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = AppleWhite, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Crea Fascicolo", color = AppleWhite, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         } else {
@@ -543,7 +556,7 @@ fun FascicoloCard(
 
                     if (documents.isEmpty()) {
                         Text(
-                            text = "Nessun documento o foto ancora collegato a questa pratica.",
+                            text = "Nessun documento collegato.",
                             style = MaterialTheme.typography.bodySmall,
                             color = AppleLabelSecondary
                         )
@@ -587,19 +600,19 @@ fun FascicoloCard(
                                 Row {
                                     IconButton(
                                         onClick = { onOpenDoc(doc) },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(44.dp)
                                     ) {
                                         Text("Apri", fontSize = 11.sp, color = DavezBordeaux, fontWeight = FontWeight.Bold)
                                     }
                                     IconButton(
                                         onClick = { onShareDoc(doc) },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(44.dp)
                                     ) {
                                         Icon(
                                             Icons.Default.Share,
                                             contentDescription = "Condividi",
                                             tint = AppleLabelSecondary,
-                                            modifier = Modifier.size(14.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
@@ -634,6 +647,7 @@ fun NewFascicoloDialog(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .widthIn(max = 520.dp)
+                .imePadding()
                 .padding(vertical = 24.dp)
         ) {
             Column(
@@ -653,7 +667,7 @@ fun NewFascicoloDialog(
                         fontWeight = FontWeight.Bold,
                         color = AppleLabelPrimary
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Chiudi", tint = AppleLabelSecondary)
                     }
                 }
@@ -726,25 +740,44 @@ fun NewFascicoloDialog(
 
                 Spacer(Modifier.height(18.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                Spacer(Modifier.height(20.dp))
+
+                // Bottom, full width primary action button (Thumb Reach UX)
+                Button(
+                    onClick = {
+                        if (titolo.isNotBlank() && cliente.isNotBlank()) {
+                            onConfirm(codice, titolo, cliente, controparte, indirizzo, note)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DavezBordeaux,
+                        disabledContainerColor = DavezBordeaux.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = titolo.isNotBlank() && cliente.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("btn_confirm_create_fascicolo")
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Annulla", color = AppleLabelSecondary)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (titolo.isNotBlank() && cliente.isNotBlank()) {
-                                onConfirm(codice, titolo, cliente, controparte, indirizzo, note)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Crea Fascicolo", color = AppleWhite, fontWeight = FontWeight.Bold)
-                    }
+                    Text(
+                        "Crea Fascicolo",
+                        color = AppleWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+
+                Spacer(Modifier.height(6.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                ) {
+                    Text("Annulla", color = AppleLabelSecondary, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

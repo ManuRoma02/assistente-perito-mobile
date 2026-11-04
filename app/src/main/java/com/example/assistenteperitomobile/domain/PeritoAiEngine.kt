@@ -39,6 +39,7 @@ class PeritoAiEngine(private val context: Context? = null) {
         isLenient = true
     }
 
+    @Volatile
     private var loadedGgufPath: String? = null
 
     @Volatile
@@ -155,8 +156,11 @@ class PeritoAiEngine(private val context: Context? = null) {
      * Inizializza o aggiorna il motore nativo llama.cpp (LlamaBridge) per i modelli .gguf
      * (Qwen 3.5 2B GPT-5.1 HighIQ Q4_K_M GGUF) scaricati sul dispositivo.
      */
-    @Synchronized
-    fun ensureGgufLoaded(config: AiEngineConfig): Boolean {
+    suspend fun ensureGgufLoaded(config: AiEngineConfig): Boolean = llamaMutex.withLock {
+        ensureGgufLoadedLocked(config)
+    }
+
+    private fun ensureGgufLoadedLocked(config: AiEngineConfig): Boolean {
         if (!config.useMediaPipeOnDevice) return false
         val resolution = resolveReasoningModel(config)
         currentResolution = resolution
@@ -595,11 +599,13 @@ class PeritoAiEngine(private val context: Context? = null) {
             "fissa", "fissiamo", "segna", "agenda", "calendario", "udienza",
             "riunione", "perizia", "visita", "rilievo", "collaudo", "ape", "sanatoria",
             "domani", "dopodomani", "luned", "marted", "mercoled", "gioved", "venerd", "sabat", "domenic",
-            "alle ", "ore ",
+            "alle ore",
             "colazione", "pranzo", "cena", "caffè", "caffe", "aperitivo",
             "vado con", "devo andare", "vedo ", "trovo "
         )
-        val hasTrigger = appointmentTriggers.any { lower.contains(it) }
+        val hasTrigger = appointmentTriggers.any { lower.contains(it) } ||
+            Regex("""\balle\s+\d{1,2}([:.]\d{2})?\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower) ||
+            Regex("""\bore\s+\d{1,2}([:.]\d{2})?\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
         if (!hasTrigger) {
             return AppointmentParseResult(has_appointment = false)
         }
@@ -1461,7 +1467,7 @@ LINEE GUIDA RIGIDE:
 
         withTimeoutOrNull(120_000L) {
             llamaMutex.withLock {
-                if (ensureGgufLoaded(config)) {
+                if (ensureGgufLoadedLocked(config)) {
                     try {
                         val sanitized = sanitizePromptInput(clean)
                         val prompt = "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$sanitized<|im_end|>\n<|im_start|>assistant\n"
@@ -1490,7 +1496,7 @@ LINEE GUIDA RIGIDE:
         withTimeoutOrNull(45_000L) {
             // 1. Prova prima il motore nativo llama.cpp (LlamaBridge) sui file .gguf scaricati (Qwen 3.5 2B Q4_K_M)
             val ggufResult = llamaMutex.withLock {
-                if (ensureGgufLoaded(config)) {
+                if (ensureGgufLoadedLocked(config)) {
                     try {
                         val sanitizedPrompt = sanitizePromptInput(prompt)
                         val formattedPrompt = "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$sanitizedPrompt<|im_end|>\n<|im_start|>assistant\n"

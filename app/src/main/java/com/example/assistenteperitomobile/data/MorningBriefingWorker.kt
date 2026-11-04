@@ -37,6 +37,8 @@ class MorningBriefingWorker(
         const val WORK_NAME = "perito_daily_briefing_0800"
         const val CHANNEL_ID = "perito_morning_briefing"
         const val NOTIFICATION_ID = 8001
+        const val CONFIG_FILE_NAME = "ai_config.json"
+        private const val LEGACY_CONFIG_FILE_NAME = "ai_engine_config.json"
 
         private val json = Json { ignoreUnknownKeys = true }
 
@@ -53,10 +55,19 @@ class MorningBriefingWorker(
         }
 
         fun getBriefingConfig(context: Context): Pair<Boolean, String> {
-            val file = File(context.filesDir, "ai_engine_config.json")
-            if (!file.exists()) return Pair(true, "08:30")
+            return getBriefingConfigFromDir(context.filesDir)
+        }
+
+        internal fun getBriefingConfigFromDir(filesDir: File): Pair<Boolean, String> {
+            val file = File(filesDir, CONFIG_FILE_NAME)
+            val legacyFile = File(filesDir, LEGACY_CONFIG_FILE_NAME)
+            val targetFile = when {
+                file.exists() -> file
+                legacyFile.exists() -> legacyFile
+                else -> return Pair(true, "08:30")
+            }
             return try {
-                val cfg = json.decodeFromString<AiEngineConfig>(file.readText())
+                val cfg = json.decodeFromString<AiEngineConfig>(targetFile.readText())
                 Pair(cfg.morningBriefingEnabled, cfg.morningBriefingTime.ifBlank { "08:30" })
             } catch (_: Throwable) {
                 Pair(true, "08:30")

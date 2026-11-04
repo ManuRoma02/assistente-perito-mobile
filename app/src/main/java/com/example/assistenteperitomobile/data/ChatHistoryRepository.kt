@@ -14,7 +14,10 @@ import java.io.File
  * Repository robusto e thread-safe per la persistenza atomica della cronologia Chat.
  * Evita la perdita di messaggi tra un riavvio e l'altro dell'app dello studio.
  */
-class ChatHistoryRepository(private val context: Context) {
+class ChatHistoryRepository(
+    private val context: Context? = null,
+    private val overrideHistoryFile: File? = null
+) {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -24,13 +27,14 @@ class ChatHistoryRepository(private val context: Context) {
     private val mutex = Mutex()
 
     private val historyFile: File
-        get() = File(context.filesDir, "chat_history.json")
+        get() = overrideHistoryFile ?: File(context?.filesDir, "chat_history.json")
 
     suspend fun loadMessages(): List<ChatMessage> = withContext(Dispatchers.IO) {
         mutex.withLock {
+            AtomicFileUtils.syncBackupBeforeRead(historyFile)
             if (!historyFile.exists()) return@withContext emptyList()
             try {
-                val raw = historyFile.readText()
+                val raw = AtomicFileUtils.readText(historyFile)
                 if (raw.isBlank()) return@withContext emptyList()
                 json.decodeFromString<List<ChatMessage>>(raw)
             } catch (_: Throwable) {
@@ -43,12 +47,7 @@ class ChatHistoryRepository(private val context: Context) {
         mutex.withLock {
             try {
                 val serialized = json.encodeToString(messages)
-                val tempFile = File(context.filesDir, "chat_history.json.tmp")
-                tempFile.writeText(serialized, Charsets.UTF_8)
-                if (tempFile.exists()) {
-                    if (historyFile.exists()) historyFile.delete()
-                    tempFile.renameTo(historyFile)
-                }
+                AtomicFileUtils.writeText(historyFile, serialized)
             } catch (_: Throwable) {
                 // Silently keep previous history if write fails
             }
@@ -58,9 +57,7 @@ class ChatHistoryRepository(private val context: Context) {
     suspend fun clearHistory() = withContext(Dispatchers.IO) {
         mutex.withLock {
             try {
-                if (historyFile.exists()) {
-                    historyFile.delete()
-                }
+                AtomicFileUtils.delete(historyFile)
             } catch (_: Throwable) {
             }
         }

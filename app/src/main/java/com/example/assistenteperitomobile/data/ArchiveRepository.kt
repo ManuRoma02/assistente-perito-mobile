@@ -231,12 +231,13 @@ class ArchiveRepository(
             if (!forceRefresh && lockedCached != null) {
                 return@withContext Result.success(lockedCached)
             }
+            AtomicFileUtils.syncBackupBeforeRead(indexFile)
             if (!indexFile.exists()) {
                 cachedDocuments = emptyList()
                 return@withContext Result.success(emptyList())
             }
             try {
-                val list = json.decodeFromString<List<ArchivedDocument>>(indexFile.readText())
+                val list = json.decodeFromString<List<ArchivedDocument>>(AtomicFileUtils.readText(indexFile))
                 val filtered = list.filter { File(it.filePath).exists() }
                     .sortedByDescending { it.createdAtMillis }
                 cachedDocuments = filtered
@@ -334,14 +335,9 @@ class ArchiveRepository(
     }
 
     private fun saveIndex(docs: List<ArchivedDocument>) {
+        val serialized = json.encodeToString(docs)
+        AtomicFileUtils.writeText(indexFile, serialized)
         cachedDocuments = docs.filter { File(it.filePath).exists() }
             .sortedByDescending { it.createdAtMillis }
-        val serialized = json.encodeToString(docs)
-        val tmp = File(archiveRootDir, "archive_index.json.tmp")
-        tmp.writeText(serialized, Charsets.UTF_8)
-        if (tmp.exists()) {
-            if (indexFile.exists()) indexFile.delete()
-            tmp.renameTo(indexFile)
-        }
     }
 }
