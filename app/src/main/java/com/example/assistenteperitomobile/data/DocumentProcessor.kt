@@ -33,7 +33,8 @@ data class ProcessedDocumentPayload(
     val cleanFileName: String,
     val extractedBytes: ByteArray,
     val extractedText: String,
-    val wasP7mUnwrapped: Boolean = false
+    val wasP7mUnwrapped: Boolean = false,
+    val isSignatureVerified: Boolean = false
 )
 
 class DocumentProcessor(private val context: Context) {
@@ -119,7 +120,8 @@ class DocumentProcessor(private val context: Context) {
                 cleanFileName = workingName,
                 extractedBytes = workingBytes,
                 extractedText = extractedText.trim(),
-                wasP7mUnwrapped = wasP7m
+                wasP7mUnwrapped = wasP7m,
+                isSignatureVerified = false
             )
         }
 

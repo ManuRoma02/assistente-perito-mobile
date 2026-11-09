@@ -1,10 +1,10 @@
 {
-  "latestVersionCode": 22,
-  "latestVersionName": "1.0.21",
-  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.21/app-release.apk",
-  "releaseNotes": "• **Persistenza Atomica**: transazioni protette da corruzioni e blackout.\n• **Cancellazione Sicura**: guardie con token esatti e conferma modale.\n• **Dark Mode Apple**: tema scuro OLED ed edge-to-edge adattivo.\n• **Touch Target 44dp**: pulsanti conformi a Apple HIG e accessibilità.\n• **Animazioni Fluide**: rendering offloaded su GPU e scroll stabile.\n• **Taps Riga Intera**: switch attivabili toccando ovunque sulla riga.\n• **Pulsanti Ergonomici**: azioni primarie a piena larghezza ancorate in basso.\n• **Microcopy Concisa**: rimossi testi prolissi e verbi generici.\n• **Design Agentico**: tag semantici e transizioni reattive integrate.",
+  "latestVersionCode": 23,
+  "latestVersionName": "1.0.22",
+  "downloadUrl": "https://github.com/ManuRoma02/assistente-perito-mobile/releases/download/v1.0.22/app-release.apk",
+  "releaseNotes": "• **Integrità OTA**: verifica SHA-256 e firma crittografica obbligatorie.\n• **Canale Sicuro**: download manifest e APK vincolato su HTTPS.\n• **Isolamento Dati**: perizie confinate nella sandbox privata di sistema.\n• **Firma Digitale**: tracciamento integrità atti su buste CAdES .p7m.",
   "mandatory": false,
-  "publishedAt": "2026-11-04T16:10:00Z",
-  "sha256": "05d979fa852ef49a43d67ea64896eba6b2298d028cb7c2a3e937c785296762d3",
-  "fileSize": 22937364
+  "publishedAt": "2026-11-09T18:38:00Z",
+  "sha256": "13e43ebae1a7ebff299d43ce1a029525b4fbcf57f32b3203a62d79a3be207eeb",
+  "fileSize": 22937300
 }

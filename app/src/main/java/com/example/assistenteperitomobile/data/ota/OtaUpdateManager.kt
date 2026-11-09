@@ -2,6 +2,7 @@ package com.example.assistenteperitomobile.data.ota
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -89,26 +90,71 @@ class OtaUpdateManager(private val context: Context) {
                 return Result.failure(IllegalStateException("File APK inesistente o vuoto"))
             }
 
-            // 1. Verifica crittografica SHA-256 se dichiarata nel manifest
-            if (expectedSha256.isNotBlank()) {
-                val computedHash = calculateSha256(apkFile)
-                if (!computedHash.equals(expectedSha256.trim(), ignoreCase = true)) {
-                    return Result.failure(
-                        SecurityException("Integrità SHA-256 fallita: atteso $expectedSha256, calcolato $computedHash")
-                    )
-                }
+            // 1. Verifica crittografica SHA-256 obbligatoria (CWE-353 / SUPPLY-CHAIN:OTA)
+            if (expectedSha256.isBlank()) {
+                return Result.failure(
+                    SecurityException("Verifica integrità OTA fallita: checksum SHA-256 obbligatorio mancante nel manifest")
+                )
+            }
+            val computedHash = calculateSha256(apkFile)
+            if (!computedHash.equals(expectedSha256.trim(), ignoreCase = true)) {
+                return Result.failure(
+                    SecurityException("Integrità SHA-256 fallita: atteso $expectedSha256, calcolato $computedHash")
+                )
             }
 
-            // 2. Verifica parsing pacchetto Android nativo (evita 'Errore di analisi pacchetto')
+            // 2. Verifica parsing pacchetto Android nativo e conformità firma (CWE-347)
             val pm = try { context.packageManager } catch (_: Throwable) { null }
             if (pm != null) {
-                val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, 0)
+                val archiveFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                } else {
+                    @Suppress("DEPRECATION")
+                    PackageManager.GET_SIGNATURES
+                }
+                val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, archiveFlags)
                     ?: return Result.failure(IllegalStateException("Il file scaricato non è un pacchetto Android valido (APK corrotto)"))
 
                 if (archiveInfo.packageName != context.packageName) {
                     return Result.failure(
                         SecurityException("Package APK non corrispondente: ${archiveInfo.packageName} (atteso: ${context.packageName})")
                     )
+                }
+
+                // Verifica firma rispetto al pacchetto installato
+                val currentPkgInfo = runCatching {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+                    }
+                }.getOrNull()
+
+                if (currentPkgInfo != null) {
+                    val signatureMatch = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val curSign = currentPkgInfo.signingInfo
+                        val archSign = archiveInfo.signingInfo
+                        if (curSign != null && archSign != null) {
+                            val curCerts = if (curSign.hasMultipleSigners()) curSign.apkContentsSigners else curSign.signingCertificateHistory
+                            val archCerts = if (archSign.hasMultipleSigners()) archSign.apkContentsSigners else archSign.signingCertificateHistory
+                            curCerts != null && archCerts != null && curCerts.any { cur -> archCerts.any { it == cur } }
+                        } else true
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val curSigs = currentPkgInfo.signatures
+                        @Suppress("DEPRECATION")
+                        val archSigs = archiveInfo.signatures
+                        if (curSigs != null && archSigs != null) {
+                            curSigs.any { cur -> archSigs.any { it == cur } }
+                        } else true
+                    }
+
+                    if (!signatureMatch) {
+                        return Result.failure(
+                            SecurityException("Firma crittografica APK non corrispondente a quella dell'applicazione installata")
+                        )
+                    }
                 }
 
                 val apkVersionCode = PackageInfoCompat.getLongVersionCode(archiveInfo).toInt()
@@ -187,6 +233,9 @@ class OtaUpdateManager(private val context: Context) {
      */
     suspend fun fetchRemoteManifest(manifestUrl: String): Result<OtaUpdateManifest> = withContext(Dispatchers.IO) {
         runCatching {
+            if (!manifestUrl.startsWith("https://", ignoreCase = true)) {
+                error("URL manifest non sicuro: è richiesto il protocollo HTTPS (CWE-319)")
+            }
             var currentUrl = manifestUrl
             var connection: HttpURLConnection? = null
             var redirects = 0
@@ -271,6 +320,9 @@ class OtaUpdateManager(private val context: Context) {
         onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
+            if (!downloadUrl.startsWith("https://", ignoreCase = true)) {
+                error("URL download APK non sicuro: è richiesto il protocollo HTTPS (CWE-319)")
+            }
             val updatesDir = File(context.cacheDir, "updates").apply {
                 if (!exists()) mkdirs()
             }

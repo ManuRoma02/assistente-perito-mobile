@@ -24,7 +24,8 @@ import java.util.UUID
 
 class ArchiveRepository(
     private val context: Context,
-    private val aiEngine: PeritoAiEngine
+    private val aiEngine: PeritoAiEngine,
+    var isPublicSyncEnabled: Boolean = false
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -66,7 +67,9 @@ class ArchiveRepository(
 
     init {
         archiveRootDir // Inizializza le 6 cartelle interne all'avvio
-        runCatching { publicSyncRootDir } // Prepara le 6 cartelle pubbliche per Sync PC (Dropbox/OneDrive/Syncthing)
+        if (isPublicSyncEnabled) {
+            runCatching { publicSyncRootDir } // Prepara le cartelle pubbliche solo se sync abilitato
+        }
     }
 
     suspend fun saveAndArchiveDocument(
@@ -95,8 +98,10 @@ class ArchiveRepository(
 
         targetFile.writeBytes(bytes)
 
-        // Copia speculare automatica nella cartella pubblica Documents/Perizie_Archivio/<Categoria> per Sync PC (compatibile Scoped Storage Android 10-15)
-        mirrorToPublicDocuments(category, targetFile.name, bytes)
+        // Copia speculare nella cartella pubblica Documents/Perizie_Archivio/<Categoria> solo se abilitata dall'utente (CWE-200)
+        if (isPublicSyncEnabled) {
+            mirrorToPublicDocuments(category, targetFile.name, bytes)
+        }
 
         val record = ArchivedDocument(
             id = UUID.randomUUID().toString(),
@@ -140,10 +145,12 @@ class ArchiveRepository(
                 oldFile.delete()
             }
 
-            // Aggiorna anche la cartella pubblica sincronizzata col PC (Scoped Storage)
-            deleteFromPublicDocuments(existing.categoryFolder, existing.fileName)
-            if (newFile.exists()) {
-                mirrorToPublicDocuments(newCategory, existing.fileName, newFile.readBytes())
+            // Aggiorna anche la cartella pubblica sincronizzata col PC solo se abilitata
+            if (isPublicSyncEnabled) {
+                deleteFromPublicDocuments(existing.categoryFolder, existing.fileName)
+                if (newFile.exists()) {
+                    mirrorToPublicDocuments(newCategory, existing.fileName, newFile.readBytes())
+                }
             }
 
             val updated = existing.copy(
@@ -161,7 +168,9 @@ class ArchiveRepository(
             val docs = loadAllDocuments(forceRefresh = true).toMutableList()
             val doc = docs.firstOrNull { it.id == documentId } ?: return@withContext false
             File(doc.filePath).delete()
-            deleteFromPublicDocuments(doc.categoryFolder, doc.fileName)
+            if (isPublicSyncEnabled) {
+                deleteFromPublicDocuments(doc.categoryFolder, doc.fileName)
+            }
             docs.removeAll { it.id == documentId }
             saveIndex(docs)
             true
