@@ -15,13 +15,18 @@ import androidx.core.app.NotificationCompat
 import com.example.assistenteperitomobile.MainActivity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.coroutineContext
 
 @Immutable
@@ -90,17 +95,22 @@ class ModelDownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_CANCEL_DOWNLOAD -> {
+                isCancellationRequested = true
                 onCancelRequestedCallback?.invoke()
+                runCatching {
+                    sendBroadcast(Intent(ACTION_DOWNLOAD_CANCELLED).setPackage(packageName))
+                }
                 stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                stopSelf(startId)
                 return START_NOT_STICKY
             }
             ACTION_STOP_SERVICE -> {
                 stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                stopSelf(startId)
                 return START_NOT_STICKY
             }
             else -> {
+                isCancellationRequested = false
                 val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Download Modello IA in corso..."
                 val sub = intent?.getStringExtra(EXTRA_SUBTITLE) ?: "Connessione a Hugging Face..."
                 val percent = intent?.getIntExtra(EXTRA_PERCENT, 0) ?: 0
@@ -123,14 +133,21 @@ class ModelDownloadService : Service() {
                     } else {
                         startForeground(NOTIFICATION_ID_PROGRESS, notification)
                     }
-                } catch (_: Throwable) {
-                    // Se il sistema blocca startForeground per restrizioni OEM, pubblica comunque la notifica standard
-                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    runCatching { nm.notify(NOTIFICATION_ID_PROGRESS, notification) }
+                } catch (t: Throwable) {
+                    android.util.Log.e("ModelDownloadService", "startForeground failed", t)
+                    stopSelf(startId)
+                    throw t
                 }
             }
         }
         return START_NOT_STICKY
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        isCancellationRequested = true
+        onCancelRequestedCallback?.invoke()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
     }
 
     companion object {
@@ -142,11 +159,15 @@ class ModelDownloadService : Service() {
         const val ACTION_START_OR_UPDATE = "com.example.assistenteperitomobile.action.DOWNLOAD_UPDATE"
         const val ACTION_STOP_SERVICE = "com.example.assistenteperitomobile.action.DOWNLOAD_STOP"
         const val ACTION_CANCEL_DOWNLOAD = "com.example.assistenteperitomobile.action.DOWNLOAD_CANCEL"
+        const val ACTION_DOWNLOAD_CANCELLED = "com.example.assistenteperitomobile.action.DOWNLOAD_CANCELLED"
 
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_SUBTITLE = "extra_subtitle"
         const val EXTRA_PERCENT = "extra_percent"
         const val EXTRA_INDETERMINATE = "extra_indeterminate"
+
+        @Volatile
+        var isCancellationRequested: Boolean = false
 
         @Volatile
         var onCancelRequestedCallback: (() -> Unit)? = null
@@ -195,12 +216,21 @@ class ModelDownloadService : Service() {
             val cancelIntent = Intent(context, ModelDownloadService::class.java).apply {
                 action = ACTION_CANCEL_DOWNLOAD
             }
-            val cancelPending = PendingIntent.getService(
-                context,
-                1,
-                cancelIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val cancelPending = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(
+                    context,
+                    1,
+                    cancelIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                PendingIntent.getService(
+                    context,
+                    1,
+                    cancelIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
 
             return NotificationCompat.Builder(context, CHANNEL_PROGRESS_ID)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
@@ -227,6 +257,25 @@ class ModelDownloadManager(
     private val context: Context? = null,
     private val overrideModelsDir: File? = null
 ) {
+
+    companion object {
+        private val fileMutexes = ConcurrentHashMap<String, Mutex>()
+
+        private fun mutexFor(file: File): Mutex =
+            fileMutexes.getOrPut(file.canonicalPath) { Mutex() }
+
+        private fun hasValidGgufMagic(file: File): Boolean {
+            if (!file.exists() || file.length() < 4L) return false
+            val header = ByteArray(4)
+            return runCatching {
+                file.inputStream().use { input -> input.read(header) == 4 } &&
+                    header[0] == 'G'.code.toByte() &&
+                    header[1] == 'G'.code.toByte() &&
+                    header[2] == 'U'.code.toByte() &&
+                    header[3] == 'F'.code.toByte()
+            }.getOrDefault(false)
+        }
+    }
 
     /**
      * Cartella privata interna dell'app (/data/user/0/com.example.assistenteperitomobile/files/models).
@@ -488,10 +537,7 @@ class ModelDownloadManager(
         val ctx = context ?: return
         runCatching {
             ModelDownloadService.ensureChannels(ctx)
-            val stopIntent = Intent(ctx, ModelDownloadService::class.java).apply {
-                action = ModelDownloadService.ACTION_STOP_SERVICE
-            }
-            ctx.startService(stopIntent)
+            ctx.stopService(Intent(ctx, ModelDownloadService::class.java))
 
             val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(ModelDownloadService.NOTIFICATION_ID_PROGRESS)
@@ -527,155 +573,191 @@ class ModelDownloadManager(
         onProgress: (downloadedBytes: Long, totalBytes: Long, bytesPerSecond: Long) -> Unit
     ): File = withContext(Dispatchers.IO) {
         val targetFile = File(modelsDir, model.fileName)
-        val tempFile = File(modelsDir, "${model.fileName}.part")
+        mutexFor(targetFile).withLock {
+            val tempFile = File(modelsDir, "${model.fileName}.part")
+            val activeConnRef = AtomicReference<HttpURLConnection?>(null)
+            val completionHandle = coroutineContext[Job]?.invokeOnCompletion { cause ->
+                if (cause != null) {
+                    runCatching { activeConnRef.get()?.disconnect() }
+                }
+            }
 
-        // Supporta il resume automatico se un download precedente si era interrotto
-        val existingPartBytes = if (tempFile.exists()) tempFile.length() else 0L
-
-        var currentUrl = model.downloadUrl
-        var redirects = 0
-        var connection: HttpURLConnection? = null
-        var activeConn: HttpURLConnection? = null
-
-        try {
-            while (redirects < 8) {
-                val url = URL(currentUrl)
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    instanceFollowRedirects = false
-                    connectTimeout = 20_000
-                    readTimeout = 45_000
-                    setRequestProperty("User-Agent", "PeritoAI-Android/2.8")
-                    if (existingPartBytes > 0L) {
-                        setRequestProperty("Range", "bytes=$existingPartBytes-")
+            fun openFollowingRedirects(startUrl: String, rangeOffset: Long): HttpURLConnection {
+                var currentUrl = startUrl
+                var redirects = 0
+                while (redirects < 8) {
+                    coroutineContext.ensureActive()
+                    if (ModelDownloadService.isCancellationRequested) {
+                        throw CancellationException("Download interrotto dall'utente")
                     }
-                }
-                val code = conn.responseCode
-                if (code in 301..308) {
-                    val loc = conn.getHeaderField("Location")
-                    conn.disconnect()
-                    if (loc.isNullOrBlank()) break
-                    currentUrl = if (loc.startsWith("http")) loc else URL(url, loc).toString()
-                    redirects++
-                } else {
-                    connection = conn
-                    break
-                }
-            }
-
-            activeConn = connection ?: throw IllegalStateException("Impossibile connettersi a Hugging Face")
-            var responseCode = activeConn.responseCode
-
-            // Se il server risponde con HTTP 416 (Range Not Satisfiable), il file .part è corrotto o completato
-            if (responseCode == 416 && existingPartBytes > 0L) {
-                activeConn.disconnect()
-                tempFile.delete()
-                val freshConn = (URL(model.downloadUrl).openConnection() as HttpURLConnection).apply {
-                    instanceFollowRedirects = true
-                    connectTimeout = 20_000
-                    readTimeout = 45_000
-                    setRequestProperty("User-Agent", "PeritoAI-Android/2.8")
-                }
-                activeConn = freshConn
-                connection = freshConn
-                responseCode = activeConn.responseCode
-            }
-
-            var isResume = false
-            var rangeTotal: Long? = null
-
-            if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
-                if (existingPartBytes <= 0L || !tempFile.exists()) {
-                    throw java.io.IOException("Risposta HTTP 206 inattesa per ${model.fileName}: nessun download parziale precedente")
-                }
-                val contentRange = activeConn.getHeaderField("Content-Range")
-                if (contentRange.isNullOrBlank()) {
-                    throw java.io.IOException("Risposta HTTP 206 non valida per ${model.fileName}: header Content-Range assente")
-                }
-                val match = Regex("""^bytes\s+(\d+)-(\d+)/(\d+|\*)$""", RegexOption.IGNORE_CASE).find(contentRange.trim())
-                    ?: throw java.io.IOException("Header Content-Range malformato per ${model.fileName}: '$contentRange'")
-
-                val rangeStart = match.groupValues[1].toLongOrNull()
-                    ?: throw java.io.IOException("Start range non valido in Content-Range: '$contentRange'")
-                val rangeEnd = match.groupValues[2].toLongOrNull()
-                    ?: throw java.io.IOException("End range non valido in Content-Range: '$contentRange'")
-                val totalStr = match.groupValues[3]
-                val parsedTotal = if (totalStr == "*") null else totalStr.toLongOrNull()
-
-                if (rangeStart != existingPartBytes) {
-                    throw java.io.IOException("Offset Content-Range non corrispondente per ${model.fileName}: start=$rangeStart, atteso=$existingPartBytes")
-                }
-                if (rangeEnd < rangeStart) {
-                    throw java.io.IOException("Estremi Content-Range incoerenti per ${model.fileName}: end ($rangeEnd) < start ($rangeStart)")
-                }
-                if (parsedTotal != null && parsedTotal <= rangeEnd) {
-                    throw java.io.IOException("Estremi Content-Range incoerenti rispetto al totale per ${model.fileName}: total=$parsedTotal <= end=$rangeEnd")
-                }
-
-                rangeTotal = parsedTotal
-                isResume = true
-            } else if (responseCode == HttpURLConnection.HTTP_OK) {
-                // Se il server ignora l'header Range e risponde 200 OK, sovrascrive .part dall'inizio in modo sicuro
-                isResume = false
-            } else {
-                throw IllegalStateException("Errore HTTP $responseCode durante il download da Hugging Face")
-            }
-
-            val contentLength = activeConn.contentLengthLong.coerceAtLeast(0L)
-            val totalBytes = rangeTotal ?: if (isResume) {
-                existingPartBytes + contentLength
-            } else {
-                if (contentLength > 0L) contentLength else model.expectedBytes
-            }
-            var downloaded = if (isResume) existingPartBytes else 0L
-            onProgress(downloaded, totalBytes, 0L)
-
-            activeConn.inputStream.use { input ->
-                FileOutputStream(tempFile, isResume).use { output ->
-                    val buffer = ByteArray(256 * 1024)
-                    var lastReportTimeMs = System.nanoTime() / 1_000_000L
-                    var lastReportBytes = downloaded
-                    while (true) {
-                        coroutineContext.ensureActive()
-                        val read = input.read(buffer)
-                        if (read == -1) break
-                        output.write(buffer, 0, read)
-                        downloaded += read
-                        val nowMs = System.nanoTime() / 1_000_000L
-                        val deltaMs = nowMs - lastReportTimeMs
-                        // Throttle a 350ms per evitare ricomposizioni eccessive della UI durante lo scroll
-                        if (deltaMs >= 350L || downloaded >= totalBytes) {
-                            val speed = if (deltaMs > 0) ((downloaded - lastReportBytes) * 1000L) / deltaMs else 0L
-                            lastReportTimeMs = nowMs
-                            lastReportBytes = downloaded
-                            onProgress(downloaded, totalBytes, speed)
+                    val url = URL(currentUrl)
+                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                        instanceFollowRedirects = false
+                        connectTimeout = 20_000
+                        readTimeout = 45_000
+                        setRequestProperty("User-Agent", "PeritoAI-Android/2.8")
+                        if (rangeOffset > 0L) {
+                            setRequestProperty("Range", "bytes=$rangeOffset-")
                         }
                     }
-                    output.flush()
+                    activeConnRef.set(conn)
+                    val code = conn.responseCode
+                    if (code in 301..308) {
+                        val loc = conn.getHeaderField("Location")
+                        conn.disconnect()
+                        activeConnRef.compareAndSet(conn, null)
+                        if (loc.isNullOrBlank()) break
+                        currentUrl = if (loc.startsWith("http", ignoreCase = true)) loc else URL(url, loc).toString()
+                        redirects++
+                    } else {
+                        return conn
+                    }
                 }
+                throw IllegalStateException("Impossibile connettersi a Hugging Face")
             }
 
-            val finalLength = tempFile.length()
-            if (totalBytes > 0L && finalLength < totalBytes) {
-                throw java.io.IOException("Download incompleto per ${model.fileName}: scaricati $finalLength byte su $totalBytes attesi.")
-            }
-            if (model.expectedBytes > 0L && finalLength != model.expectedBytes) {
-                throw java.io.IOException("Dimensione finale non corrispondente per ${model.fileName}: scaricati $finalLength byte, attesi ${model.expectedBytes} byte.")
-            }
+            try {
+                // Supporta il resume automatico se un download precedente si era interrotto
+                var existingPartBytes = if (tempFile.exists()) tempFile.length() else 0L
+                var activeConn = openFollowingRedirects(model.downloadUrl, existingPartBytes)
+                var responseCode = activeConn.responseCode
 
-            if (targetFile.exists()) targetFile.delete()
-            val promoted = tempFile.renameTo(targetFile)
-            if (!promoted) {
-                throw java.io.IOException("Impossibile promuovere il file scaricato ${tempFile.name} in ${targetFile.name}")
+                // Se il server risponde con HTTP 416 (Range Not Satisfiable), verifica prima la lunghezza totale del server
+                if (responseCode == 416 && existingPartBytes > 0L) {
+                    val contentRange416 = activeConn.getHeaderField("Content-Range")
+                    val serverTotal416 = contentRange416?.let {
+                        Regex("""^bytes\s+\*/(\d+)$""", RegexOption.IGNORE_CASE).find(it.trim())
+                            ?.groupValues?.getOrNull(1)?.toLongOrNull()
+                    }
+                    val alreadyComplete = serverTotal416 != null &&
+                        existingPartBytes == serverTotal416 &&
+                        (!model.fileName.endsWith(".gguf", ignoreCase = true) || model.expectedBytes < 10_000_000L || hasValidGgufMagic(tempFile))
+
+                    if (alreadyComplete) {
+                        activeConn.disconnect()
+                        activeConnRef.compareAndSet(activeConn, null)
+                        if (targetFile.exists()) targetFile.delete()
+                        if (!tempFile.renameTo(targetFile)) {
+                            throw java.io.IOException("Impossibile promuovere il file scaricato ${tempFile.name} in ${targetFile.name}")
+                        }
+                        onProgress(existingPartBytes, serverTotal416!!, 0L)
+                        return@withLock targetFile
+                    }
+
+                    activeConn.disconnect()
+                    activeConnRef.compareAndSet(activeConn, null)
+                    tempFile.delete()
+                    existingPartBytes = 0L
+                    activeConn = openFollowingRedirects(model.downloadUrl, 0L)
+                    responseCode = activeConn.responseCode
+                }
+
+                var isResume = false
+                var rangeTotal: Long? = null
+
+                if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
+                    if (existingPartBytes <= 0L || !tempFile.exists()) {
+                        throw java.io.IOException("Risposta HTTP 206 inattesa per ${model.fileName}: nessun download parziale precedente")
+                    }
+                    val contentRange = activeConn.getHeaderField("Content-Range")
+                    if (contentRange.isNullOrBlank()) {
+                        throw java.io.IOException("Risposta HTTP 206 non valida per ${model.fileName}: header Content-Range assente")
+                    }
+                    val match = Regex("""^bytes\s+(\d+)-(\d+)/(\d+|\*)$""", RegexOption.IGNORE_CASE).find(contentRange.trim())
+                        ?: throw java.io.IOException("Header Content-Range malformato per ${model.fileName}: '$contentRange'")
+
+                    val rangeStart = match.groupValues[1].toLongOrNull()
+                        ?: throw java.io.IOException("Start range non valido in Content-Range: '$contentRange'")
+                    val rangeEnd = match.groupValues[2].toLongOrNull()
+                        ?: throw java.io.IOException("End range non valido in Content-Range: '$contentRange'")
+                    val totalStr = match.groupValues[3]
+                    val parsedTotal = if (totalStr == "*") null else totalStr.toLongOrNull()
+
+                    if (rangeStart != existingPartBytes) {
+                        throw java.io.IOException("Offset Content-Range non corrispondente per ${model.fileName}: start=$rangeStart, atteso=$existingPartBytes")
+                    }
+                    if (rangeEnd < rangeStart) {
+                        throw java.io.IOException("Estremi Content-Range incoerenti per ${model.fileName}: end ($rangeEnd) < start ($rangeStart)")
+                    }
+                    if (parsedTotal != null && parsedTotal <= rangeEnd) {
+                        throw java.io.IOException("Estremi Content-Range incoerenti rispetto al totale per ${model.fileName}: total=$parsedTotal <= end=$rangeEnd")
+                    }
+
+                    rangeTotal = parsedTotal
+                    isResume = true
+                } else if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Se il server ignora l'header Range e risponde 200 OK, sovrascrive .part dall'inizio in modo sicuro
+                    isResume = false
+                } else {
+                    throw IllegalStateException("Errore HTTP $responseCode durante il download da Hugging Face")
+                }
+
+                val contentLength = activeConn.contentLengthLong.coerceAtLeast(0L)
+                val serverTotalBytes: Long? = rangeTotal ?: if (contentLength > 0L) {
+                    if (isResume) existingPartBytes + contentLength else contentLength
+                } else null
+                val totalBytes = serverTotalBytes ?: model.expectedBytes
+                var downloaded = if (isResume) existingPartBytes else 0L
+                onProgress(downloaded, totalBytes, 0L)
+
+                activeConn.inputStream.use { input ->
+                    FileOutputStream(tempFile, isResume).use { output ->
+                        val buffer = ByteArray(256 * 1024)
+                        var lastReportTimeMs = System.nanoTime() / 1_000_000L
+                        var lastReportBytes = downloaded
+                        while (true) {
+                            coroutineContext.ensureActive()
+                            if (ModelDownloadService.isCancellationRequested) {
+                                throw CancellationException("Download interrotto dall'utente")
+                            }
+                            val read = input.read(buffer)
+                            if (read == -1) break
+                            output.write(buffer, 0, read)
+                            downloaded += read
+                            val nowMs = System.nanoTime() / 1_000_000L
+                            val deltaMs = nowMs - lastReportTimeMs
+                            // Throttle a 350ms per evitare ricomposizioni eccessive della UI durante lo scroll
+                            if (deltaMs >= 350L || downloaded >= totalBytes) {
+                                val speed = if (deltaMs > 0) ((downloaded - lastReportBytes) * 1000L) / deltaMs else 0L
+                                lastReportTimeMs = nowMs
+                                lastReportBytes = downloaded
+                                onProgress(downloaded, totalBytes, speed)
+                            }
+                        }
+                        output.flush()
+                    }
+                }
+
+                val finalLength = tempFile.length()
+                if (serverTotalBytes != null && serverTotalBytes > 0L && finalLength != serverTotalBytes) {
+                    throw java.io.IOException("Download incompleto per ${model.fileName}: scaricati $finalLength byte su $serverTotalBytes attesi.")
+                }
+                if (model.expectedBytes > 0L) {
+                    if (serverTotalBytes == null || serverTotalBytes <= 0L || model.expectedBytes < 10_000_000L) {
+                        if (finalLength != model.expectedBytes) {
+                            throw java.io.IOException("Dimensione finale non corrispondente per ${model.fileName}: scaricati $finalLength byte, attesi ${model.expectedBytes} byte.")
+                        }
+                    } else if (kotlin.math.abs(finalLength - model.expectedBytes) > model.expectedBytes / 5) {
+                        throw java.io.IOException("Dimensione finale non corrispondente per ${model.fileName}: scaricati $finalLength byte, attesi ~${model.expectedBytes} byte.")
+                    }
+                }
+                if (model.fileName.endsWith(".gguf", ignoreCase = true) && model.expectedBytes >= 10_000_000L && !hasValidGgufMagic(tempFile)) {
+                    throw java.io.IOException("Header GGUF non valido per ${model.fileName}: file corrotto o risposta non valida.")
+                }
+
+                if (targetFile.exists()) targetFile.delete()
+                val promoted = tempFile.renameTo(targetFile)
+                if (!promoted) {
+                    throw java.io.IOException("Impossibile promuovere il file scaricato ${tempFile.name} in ${targetFile.name}")
+                }
+                targetFile
+            } catch (e: CancellationException) {
+                // Mantiene il file .part così l'utente può riprendere il download dal punto in cui era rimasto!
+                throw e
+            } finally {
+                completionHandle?.dispose()
+                activeConnRef.getAndSet(null)?.disconnect()
             }
-            targetFile
-        } catch (e: CancellationException) {
-            // Mantiene il file .part così l'utente può riprendere il download dal punto in cui era rimasto!
-            throw e
-        } catch (e: Throwable) {
-            throw e
-        } finally {
-            activeConn?.disconnect()
-            connection?.disconnect()
         }
     }
 }

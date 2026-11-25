@@ -304,7 +304,13 @@ class FascicoloRepository(
             throw FascicoloCorruptedException("Lettura fallita per fascicoli_studio.json", ioe, corruptBackup)
         }
 
-        if (raw.isBlank()) return emptyList()
+        if (raw.isBlank()) {
+            if (bakFile.exists() && bakFile.length() > 0L) {
+                val corruptBackup = quarantineCorruptFile(fascicoliFile)
+                throw FascicoloCorruptedException("File fascicoli_studio.json vuoto o corrotto", null, corruptBackup)
+            }
+            return emptyList()
+        }
 
         return try {
             val list = json.decodeFromString<List<Fascicolo>>(raw)

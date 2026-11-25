@@ -3,9 +3,8 @@ package com.example.assistenteperitomobile.ui
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -78,18 +77,7 @@ import com.example.assistenteperitomobile.domain.CalendarEventItem
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
 import com.example.assistenteperitomobile.domain.resolveEventCategoryVisuals
-import com.example.assistenteperitomobile.theme.AppleBlueDark
-import com.example.assistenteperitomobile.theme.AppleBlueSoft
-import com.example.assistenteperitomobile.theme.AppleGreen
-import com.example.assistenteperitomobile.theme.AppleLabelPrimary
-import com.example.assistenteperitomobile.theme.AppleLabelSecondary
-import com.example.assistenteperitomobile.theme.AppleLabelTertiary
-import com.example.assistenteperitomobile.theme.AppleRed
-import com.example.assistenteperitomobile.theme.AppleWhite
-import com.example.assistenteperitomobile.theme.DavezAlabaster
-import com.example.assistenteperitomobile.theme.DavezBordeaux
-import com.example.assistenteperitomobile.theme.DavezStoneBorder
-import com.example.assistenteperitomobile.theme.DavezTravertine
+import com.example.assistenteperitomobile.theme.LocalPeritoSemanticColors
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -109,6 +97,9 @@ fun AgendaVisivaScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val semantic = LocalPeritoSemanticColors.current
+    val haptic = LocalHapticFeedback.current
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
     var eventToReschedule by remember { mutableStateOf<CalendarEventItem?>(null) }
 
     LaunchedEffect(Unit) {
@@ -177,12 +168,12 @@ fun AgendaVisivaScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DavezAlabaster)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        // Top Card Informativa Agenda con sfondo uniforme DavezAlabaster
+        // Top Card Informativa Agenda con sfondo uniforme semantico
         Surface(
-            color = DavezAlabaster,
-            border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f)),
+            color = MaterialTheme.colorScheme.background,
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -201,7 +192,7 @@ fun AgendaVisivaScreen(
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = AppleLabelPrimary,
+                            color = MaterialTheme.colorScheme.onBackground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -215,7 +206,7 @@ fun AgendaVisivaScreen(
                                     modifier = Modifier
                                         .size(6.dp)
                                         .clip(CircleShape)
-                                        .background(DavezBordeaux)
+                                        .background(MaterialTheme.colorScheme.primary)
                                 )
                             }
                             Text(
@@ -225,7 +216,7 @@ fun AgendaVisivaScreen(
                                     else -> "$todayCount sopralluoghi in programma oggi"
                                 },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (todayCount > 0) DavezBordeaux else AppleLabelSecondary,
+                                color = if (todayCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = if (todayCount > 0) FontWeight.SemiBold else FontWeight.Normal
                             )
                         }
@@ -240,27 +231,32 @@ fun AgendaVisivaScreen(
 
                         Surface(
                             onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                                 coroutineScope.launch {
                                     refreshRotation.animateTo(
                                         targetValue = refreshRotation.value + 360f,
-                                        animationSpec = tween(
-                                            durationMillis = 480,
-                                            easing = FastOutSlowInEasing
-                                        )
+                                        animationSpec = if (animationsEnabled) {
+                                            tween(
+                                                durationMillis = 480,
+                                                easing = FastOutSlowInEasing
+                                            )
+                                        } else {
+                                            snap()
+                                        }
                                     )
                                 }
                                 viewModel.refreshAllData()
                             },
                             shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            border = BorderStroke(0.5.dp, DavezStoneBorder),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.size(44.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "Aggiorna Agenda",
-                                    tint = DavezBordeaux,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
                                         .size(18.dp)
                                         .graphicsLayer { rotationZ = refreshRotation.value }
@@ -269,14 +265,22 @@ fun AgendaVisivaScreen(
                         }
 
                         Button(
-                            onClick = onDirectVoiceClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onDirectVoiceClick()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                         ) {
-                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(Modifier.width(6.dp))
-                            Text("Detta Impegno", color = AppleWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Detta Impegno", color = MaterialTheme.colorScheme.onPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -285,8 +289,8 @@ fun AgendaVisivaScreen(
                     Spacer(Modifier.height(8.dp))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFFFF3CD),
-                        border = BorderStroke(0.5.dp, Color(0xFFFFC107)),
+                        color = semantic.warningSoft,
+                        border = BorderStroke(0.5.dp, semantic.warning),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -300,7 +304,7 @@ fun AgendaVisivaScreen(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFF856404), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = semantic.warning, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     text = if (!uiState.hasNativeCalendarPermission) {
@@ -309,11 +313,12 @@ fun AgendaVisivaScreen(
                                         "Calendario scollegato. Salvataggio locale."
                                     },
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF856404)
+                                    color = semantic.warning
                                 )
                             }
                             TextButton(
                                 onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                                     if (!uiState.hasNativeCalendarPermission) {
                                         onRequestCalendarPerm()
                                     } else {
@@ -323,7 +328,7 @@ fun AgendaVisivaScreen(
                             ) {
                                 Text(
                                     text = if (!uiState.hasNativeCalendarPermission) "Attiva" else "Collega",
-                                    color = DavezBordeaux,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.5.sp
                                 )
@@ -343,10 +348,13 @@ fun AgendaVisivaScreen(
 
                     Spacer(Modifier.height(8.dp))
                     Surface(
-                        onClick = { showCalendarAccountDialog = true },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            showCalendarAccountDialog = true
+                        },
                         shape = RoundedCornerShape(10.dp),
-                        color = AppleWhite,
-                        border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.7f)),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -364,13 +372,13 @@ fun AgendaVisivaScreen(
                                 Icon(
                                     imageVector = Icons.Default.FilterList,
                                     contentDescription = null,
-                                    tint = DavezBordeaux,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Text(
                                     text = "Account: ",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = AppleLabelSecondary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium
                                 )
                                 val accountLabel = remember(uiState.aiConfig.selectedCalendarName, uiState.aiConfig.selectedCalendarAccount) {
@@ -385,7 +393,7 @@ fun AgendaVisivaScreen(
                                 Text(
                                     text = accountLabel,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = DavezBordeaux,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -395,7 +403,7 @@ fun AgendaVisivaScreen(
                             Text(
                                 text = "Cambia ▾",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = DavezBordeaux,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -404,172 +412,192 @@ fun AgendaVisivaScreen(
             }
         }
 
-        // Timeline Giornaliera
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Sezione OGGI
-            item(key = "header_today") {
-                SectionHeaderBadge(
-                    title = "OGGI",
-                    count = uiState.todayEvents.size,
-                    color = DavezBordeaux
-                )
-            }
+        val allAgendaEmpty = uiState.todayEvents.isEmpty() &&
+            uiState.tomorrowEvents.isEmpty() &&
+            currentWeekEvents.isEmpty() &&
+            nextWeekEvents.isEmpty() &&
+            laterEvents.isEmpty()
 
-            if (uiState.todayEvents.isEmpty()) {
-                item(key = "empty_today") {
-                    EmptyEventPlaceholder(message = "Nessun impegno o sopralluogo fissato per oggi.")
-                }
-            } else {
-                items(uiState.todayEvents, key = { it.id }) { ev ->
-                    AgendaEventCard(
-                        event = ev,
-                        isToday = true,
-                        onOpenMap = {
-                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
-                        },
-                        onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev),
-                        categories = uiState.aiConfig.categories
-                    )
-                }
-            }
-
-            // Sezione DOMANI
-            item(key = "header_tomorrow") {
-                SectionHeaderBadge(
-                    title = "DOMANI",
-                    count = uiState.tomorrowEvents.size,
-                    color = AppleBlueDark
-                )
-            }
-
-            if (uiState.tomorrowEvents.isEmpty()) {
-                item(key = "empty_tomorrow") {
-                    EmptyEventPlaceholder(message = "Nessun sopralluogo programmato per domani.")
-                }
-            } else {
-                items(uiState.tomorrowEvents, key = { it.id }) { ev ->
-                    AgendaEventCard(
-                        event = ev,
-                        isToday = false,
-                        onOpenMap = {
-                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
-                        },
-                        onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev),
-                        categories = uiState.aiConfig.categories
-                    )
-                }
-            }
-
-            // Sezione QUESTA SETTIMANA • GIORNI RIMANENTI (se ci sono giorni da dopodomani a domenica)
-            if (remainingWeekDays.isNotEmpty()) {
-                item(key = "header_this_week") {
+        if (allAgendaEmpty) {
+            PeritoEmptyErrorState(
+                icon = Icons.Default.CalendarMonth,
+                title = "Agenda libera",
+                subtitle = "Nessun sopralluogo o udienza in programma.",
+                actionLabel = "Detta Impegno",
+                onAction = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    onDirectVoiceClick()
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // Timeline Giornaliera
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Sezione OGGI
+                item(key = "header_today") {
                     SectionHeaderBadge(
-                        title = "QUESTA SETTIMANA • GIORNI RIMANENTI",
-                        count = currentWeekEvents.size,
-                        color = DavezBordeaux
+                        title = "OGGI",
+                        count = uiState.todayEvents.size,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
-                remainingWeekDays.forEach { day ->
-                    val dayIso = day.toString()
-                    val dayLabel = dayFormatter.format(day).replaceFirstChar { it.uppercase(Locale.ITALIAN) }
-                    val dayEvents = currentWeekEvents.filter { it.startIso.take(10) == dayIso }
+                if (uiState.todayEvents.isEmpty()) {
+                    item(key = "empty_today") {
+                        EmptyEventPlaceholder(message = "Nessun impegno o sopralluogo fissato per oggi.")
+                    }
+                } else {
+                    items(uiState.todayEvents, key = { "today_${it.id}" }) { ev ->
+                        AgendaEventCard(
+                            event = ev,
+                            isToday = true,
+                            onOpenMap = {
+                                viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
+                            },
+                            onReschedule = { eventToReschedule = ev },
+                            onDelete = { viewModel.deleteCalendarEvent(ev) },
+                            formattedTitle = viewModel.formatEventReference(ev),
+                            categories = uiState.aiConfig.categories
+                        )
+                    }
+                }
 
-                    item(key = "day_header_$dayIso") {
-                        DaySubHeaderBadge(
-                            dayLabel = dayLabel,
-                            eventCount = dayEvents.size
+                // Sezione DOMANI
+                item(key = "header_tomorrow") {
+                    SectionHeaderBadge(
+                        title = "DOMANI",
+                        count = uiState.tomorrowEvents.size,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (uiState.tomorrowEvents.isEmpty()) {
+                    item(key = "empty_tomorrow") {
+                        EmptyEventPlaceholder(message = "Nessun sopralluogo programmato per domani.")
+                    }
+                } else {
+                    items(uiState.tomorrowEvents, key = { "tomorrow_${it.id}" }) { ev ->
+                        AgendaEventCard(
+                            event = ev,
+                            isToday = false,
+                            onOpenMap = {
+                                viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
+                            },
+                            onReschedule = { eventToReschedule = ev },
+                            onDelete = { viewModel.deleteCalendarEvent(ev) },
+                            formattedTitle = viewModel.formatEventReference(ev),
+                            categories = uiState.aiConfig.categories
+                        )
+                    }
+                }
+
+                // Sezione QUESTA SETTIMANA • GIORNI RIMANENTI (se ci sono giorni da dopodomani a domenica)
+                if (remainingWeekDays.isNotEmpty()) {
+                    item(key = "header_this_week") {
+                        SectionHeaderBadge(
+                            title = "QUESTA SETTIMANA • GIORNI RIMANENTI",
+                            count = currentWeekEvents.size,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
-                    if (dayEvents.isEmpty()) {
-                        item(key = "day_empty_$dayIso") {
-                            EmptyDaySlotPlaceholder(dayName = dayLabel)
-                        }
-                    } else {
-                        items(dayEvents, key = { it.id }) { ev ->
-                            AgendaEventCard(
-                                event = ev,
-                                isToday = false,
-                                onOpenMap = {
-                                    viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
-                                },
-                                onReschedule = { eventToReschedule = ev },
-                                onDelete = { viewModel.deleteCalendarEvent(ev) },
-                                formattedTitle = viewModel.formatEventReference(ev),
-                                categories = uiState.aiConfig.categories
+                    remainingWeekDays.forEach { day ->
+                        val dayIso = day.toString()
+                        val dayLabel = dayFormatter.format(day).replaceFirstChar { it.uppercase(Locale.ITALIAN) }
+                        val dayEvents = currentWeekEvents.filter { it.startIso.take(10) == dayIso }
+
+                        item(key = "day_header_$dayIso") {
+                            DaySubHeaderBadge(
+                                dayLabel = dayLabel,
+                                eventCount = dayEvents.size
                             )
+                        }
+
+                        if (dayEvents.isEmpty()) {
+                            item(key = "day_empty_$dayIso") {
+                                EmptyDaySlotPlaceholder(dayName = dayLabel)
+                            }
+                        } else {
+                            items(dayEvents, key = { "week_${dayIso}_${it.id}" }) { ev ->
+                                AgendaEventCard(
+                                    event = ev,
+                                    isToday = false,
+                                    onOpenMap = {
+                                        viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
+                                    },
+                                    onReschedule = { eventToReschedule = ev },
+                                    onDelete = { viewModel.deleteCalendarEvent(ev) },
+                                    formattedTitle = viewModel.formatEventReference(ev),
+                                    categories = uiState.aiConfig.categories
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // Sezione SETTIMANA SUCCESSIVA (Card compatte ed espandibili al tap con fisica a molla Emil Kowalski)
-            item(key = "header_next_week") {
-                Column(modifier = Modifier.padding(top = 4.dp)) {
-                    SectionHeaderBadge(
-                        title = "SETTIMANA SUCCESSIVA",
-                        count = nextWeekEvents.size,
-                        color = AppleBlueDark
-                    )
-                    Text(
-                        text = "$nextWeekRangeLabel • Tocca per espandere i dettagli",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary,
-                        modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 4.dp)
-                    )
-                }
-            }
-
-            if (nextWeekEvents.isEmpty()) {
-                item(key = "empty_next_week") {
-                    EmptyEventPlaceholder(message = "Nessun sopralluogo programmato per la settimana successiva ($nextWeekRangeLabel).")
-                }
-            } else {
-                items(nextWeekEvents, key = { it.id }) { ev ->
-                    NextWeekExpandableEventCard(
-                        event = ev,
-                        onOpenMap = {
-                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
-                        },
-                        onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev),
-                        categories = uiState.aiConfig.categories
-                    )
-                }
-            }
-
-            // Se ci sono ulteriori impegni oltre la settimana successiva
-            if (laterEvents.isNotEmpty()) {
-                item(key = "header_later") {
-                    SectionHeaderBadge(
-                        title = "SUCCESSIVI • OLTRE LA SETTIMANA SUCCESSIVA",
-                        count = laterEvents.size,
-                        color = AppleLabelSecondary
-                    )
+                // Sezione SETTIMANA SUCCESSIVA (Card compatte ed espandibili al tap con fisica a molla Emil Kowalski)
+                item(key = "header_next_week") {
+                    Column(modifier = Modifier.padding(top = 4.dp)) {
+                        SectionHeaderBadge(
+                            title = "SETTIMANA SUCCESSIVA",
+                            count = nextWeekEvents.size,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "$nextWeekRangeLabel • Tocca per espandere i dettagli",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 4.dp)
+                        )
+                    }
                 }
 
-                items(laterEvents, key = { it.id }) { ev ->
-                    AgendaEventCard(
-                        event = ev,
-                        isToday = false,
-                        onOpenMap = {
-                            viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
-                        },
-                        onReschedule = { eventToReschedule = ev },
-                        onDelete = { viewModel.deleteCalendarEvent(ev) },
-                        formattedTitle = viewModel.formatEventReference(ev),
-                        categories = uiState.aiConfig.categories
-                    )
+                if (nextWeekEvents.isEmpty()) {
+                    item(key = "empty_next_week") {
+                        EmptyEventPlaceholder(message = "Nessun sopralluogo programmato per la settimana successiva ($nextWeekRangeLabel).")
+                    }
+                } else {
+                    items(nextWeekEvents, key = { "next_week_${it.id}" }) { ev ->
+                        NextWeekExpandableEventCard(
+                            event = ev,
+                            onOpenMap = {
+                                viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
+                            },
+                            onReschedule = { eventToReschedule = ev },
+                            onDelete = { viewModel.deleteCalendarEvent(ev) },
+                            formattedTitle = viewModel.formatEventReference(ev),
+                            categories = uiState.aiConfig.categories
+                        )
+                    }
+                }
+
+                // Se ci sono ulteriori impegni oltre la settimana successiva
+                if (laterEvents.isNotEmpty()) {
+                    item(key = "header_later") {
+                        SectionHeaderBadge(
+                            title = "SUCCESSIVI • OLTRE LA SETTIMANA SUCCESSIVA",
+                            count = laterEvents.size,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    items(laterEvents, key = { "later_${it.id}" }) { ev ->
+                        AgendaEventCard(
+                            event = ev,
+                            isToday = false,
+                            onOpenMap = {
+                                viewModel.calendarRepo.launchGoogleMaps(context, ev.luogo)
+                            },
+                            onReschedule = { eventToReschedule = ev },
+                            onDelete = { viewModel.deleteCalendarEvent(ev) },
+                            formattedTitle = viewModel.formatEventReference(ev),
+                            categories = uiState.aiConfig.categories
+                        )
+                    }
                 }
             }
         }
@@ -581,6 +609,7 @@ fun AgendaVisivaScreen(
             availableCategories = uiState.aiConfig.categories,
             onDismiss = { eventToReschedule = null },
             onConfirm = { newTitle, newCategory, newStartIso, newEndIso, newNotes ->
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                 viewModel.updateCalendarEvent(
                     event = ev,
                     newTitle = newTitle,
@@ -641,15 +670,15 @@ fun NextWeekExpandableEventCard(
     formattedTitle: String? = null,
     categories: List<PeritoCategoryDefinition> = emptyList()
 ) {
+    val context = LocalContext.current
+    val semantic = LocalPeritoSemanticColors.current
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
     var isExpanded by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.65f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "next_week_chevron_rot"
     )
 
@@ -671,25 +700,22 @@ fun NextWeekExpandableEventCard(
 
     Surface(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
             isExpanded = !isExpanded
         },
         interactionSource = interactionSource,
         shape = RoundedCornerShape(14.dp),
-        color = AppleWhite,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             if (isExpanded) 1.dp else 0.5.dp,
-            if (isExpanded) AppleBlueDark.copy(alpha = 0.45f) else DavezStoneBorder
+            if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline
         ),
         shadowElevation = if (isExpanded) 2.dp else 0.5.dp,
         modifier = Modifier
             .fillMaxWidth()
             .cartoonPressSquash(interactionSource, pressedScaleY = 0.97f, squashScaleX = 1.015f)
             .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = 0.72f,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                animationSpec = if (animationsEnabled) PeritoMotionTokens.contentSizeSpring else snap()
             )
     ) {
         Column(
@@ -703,13 +729,13 @@ fun NextWeekExpandableEventCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Pillola di accento verticale blu Apple
+                // Pillola di accento verticale primaria
                 Box(
                     modifier = Modifier
                         .width(3.5.dp)
                         .height(34.dp)
                         .background(
-                            color = AppleBlueDark,
+                            color = MaterialTheme.colorScheme.primary,
                             shape = RoundedCornerShape(2.dp)
                         )
                 )
@@ -725,13 +751,13 @@ fun NextWeekExpandableEventCard(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = DavezTravertine,
-                            border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.6f))
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
                         ) {
                             Text(
                                 text = "$dateLabel • $startTime-$endTime",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = AppleLabelPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 fontSize = 11.sp
                             )
@@ -739,13 +765,13 @@ fun NextWeekExpandableEventCard(
 
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = AppleBlueDark.copy(alpha = 0.10f),
-                            border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.25f))
+                            color = semantic.brandSoft,
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                         ) {
                             Text(
                                 text = "$catEmoji $catName",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = AppleBlueDark,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 fontSize = 10.5.sp
                             )
@@ -759,7 +785,7 @@ fun NextWeekExpandableEventCard(
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.1).sp
                         ),
-                        color = AppleLabelPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = if (isExpanded) Int.MAX_VALUE else 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -775,7 +801,7 @@ fun NextWeekExpandableEventCard(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = if (isExpanded) "Comprimi dettagli" else "Espandi tutti i dettagli",
-                        tint = AppleLabelSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -788,7 +814,7 @@ fun NextWeekExpandableEventCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(0.6.dp)
-                        .background(DavezStoneBorder.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                 )
                 Spacer(Modifier.height(10.dp))
 
@@ -798,11 +824,11 @@ fun NextWeekExpandableEventCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp))
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
                         Text(
                             text = "Cliente: ${event.cliente}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Spacer(Modifier.height(6.dp))
@@ -817,13 +843,13 @@ fun NextWeekExpandableEventCard(
                         Icon(
                             Icons.Default.Description,
                             contentDescription = null,
-                            tint = AppleLabelSecondary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(13.dp).padding(top = 1.dp)
                         )
                         Text(
                             text = event.note,
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -840,11 +866,11 @@ fun NextWeekExpandableEventCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = AppleRed, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                         Text(
                             text = event.luogo,
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -852,19 +878,22 @@ fun NextWeekExpandableEventCard(
 
                     if (event.luogo.isNotBlank() && event.luogo != "Da definire") {
                         Surface(
-                            onClick = onOpenMap,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onOpenMap()
+                            },
                             shape = RoundedCornerShape(8.dp),
-                            color = DavezTravertine,
-                            border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.35f)),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                             modifier = Modifier.height(28.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Map, contentDescription = null, tint = AppleBlueDark, modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Google Maps", color = AppleBlueDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Google Maps", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -879,23 +908,29 @@ fun NextWeekExpandableEventCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
-                        onClick = onReschedule,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onReschedule()
+                        },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, tint = DavezBordeaux, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Modifica", color = DavezBordeaux, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Modifica", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
 
                     Spacer(Modifier.width(4.dp))
 
                     TextButton(
-                        onClick = onDelete,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                            onDelete()
+                        },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = AppleRed.copy(alpha = 0.85f), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f), modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Elimina", color = AppleRed.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Elimina", color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -913,6 +948,9 @@ fun AgendaEventCard(
     formattedTitle: String? = null,
     categories: List<PeritoCategoryDefinition> = emptyList()
 ) {
+    val semantic = LocalPeritoSemanticColors.current
+    val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
     val startTime = event.startIso.drop(11).take(5)
     val endTime = event.endIso.drop(11).take(5)
     val dateLabel = event.startIso.take(10)
@@ -922,11 +960,21 @@ fun AgendaEventCard(
     }
 
     Surface(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            onReschedule()
+        },
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(16.dp),
-        color = AppleWhite,
-        border = BorderStroke(if (isToday) 1.dp else 0.5.dp, if (isToday) DavezBordeaux.copy(alpha = 0.45f) else DavezStoneBorder),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            if (isToday) 1.dp else 0.5.dp,
+            if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline
+        ),
         shadowElevation = if (isToday) 2.dp else 0.5.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .emilPressScale(interactionSource)
     ) {
         Row(
             modifier = Modifier
@@ -940,7 +988,7 @@ fun AgendaEventCard(
                     .width(4.dp)
                     .height(52.dp)
                     .background(
-                        color = if (isToday) DavezBordeaux else AppleBlueDark,
+                        color = MaterialTheme.colorScheme.primary,
                         shape = RoundedCornerShape(2.dp)
                     )
             )
@@ -961,7 +1009,7 @@ fun AgendaEventCard(
                         Icon(
                             Icons.Default.Schedule,
                             contentDescription = null,
-                            tint = if (isToday) DavezBordeaux else AppleLabelSecondary,
+                            tint = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
@@ -970,13 +1018,13 @@ fun AgendaEventCard(
                                 letterSpacing = (-0.2).sp
                             ),
                             fontWeight = FontWeight.Bold,
-                            color = if (isToday) DavezBordeaux else AppleLabelPrimary
+                            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                         if (!isToday) {
                             Text(
                                 text = "($dateLabel)",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -986,24 +1034,30 @@ fun AgendaEventCard(
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         IconButton(
-                            onClick = onReschedule,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onReschedule()
+                            },
                             modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = "Modifica orario",
-                                tint = DavezBordeaux,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
                         IconButton(
-                            onClick = onDelete,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                                onDelete()
+                            },
                             modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
                                 Icons.Default.DeleteOutline,
                                 contentDescription = "Rimuovi appuntamento",
-                                tint = AppleRed.copy(alpha = 0.85f),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1015,13 +1069,13 @@ fun AgendaEventCard(
                 // Categoria Badge
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = DavezBordeaux.copy(alpha = 0.10f),
-                    border = BorderStroke(0.6.dp, DavezBordeaux.copy(alpha = 0.30f))
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
                 ) {
                     Text(
                         text = "$catEmoji $catName",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = DavezBordeaux,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         fontSize = 11.sp
                     )
@@ -1036,16 +1090,16 @@ fun AgendaEventCard(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = (-0.1).sp
                     ),
-                    color = AppleLabelPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 // Cliente (mostrato solo se specificato e diverso da titolo e categoria)
                 if (event.cliente.isNotBlank() && event.cliente != "Cliente" && !event.cliente.equals(event.titolo, ignoreCase = true) && !event.cliente.equals(event.categoria, ignoreCase = true)) {
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp))
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(text = event.cliente, style = MaterialTheme.typography.bodySmall, color = AppleLabelSecondary)
+                        Text(text = event.cliente, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -1053,12 +1107,12 @@ fun AgendaEventCard(
                 if (event.note.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Default.Description, contentDescription = null, tint = AppleLabelSecondary, modifier = Modifier.size(13.dp).padding(top = 1.dp))
+                        Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp).padding(top = 1.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = event.note,
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1076,12 +1130,12 @@ fun AgendaEventCard(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = AppleRed, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = event.luogo,
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1089,19 +1143,22 @@ fun AgendaEventCard(
 
                     if (event.luogo.isNotBlank() && event.luogo != "Da definire") {
                         Surface(
-                            onClick = onOpenMap,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onOpenMap()
+                            },
                             shape = RoundedCornerShape(8.dp),
-                            color = DavezTravertine,
-                            border = BorderStroke(0.5.dp, AppleBlueDark.copy(alpha = 0.35f)),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                             modifier = Modifier.height(28.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Map, contentDescription = null, tint = AppleBlueDark, modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Google Maps", color = AppleBlueDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Google Maps", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -1110,12 +1167,12 @@ fun AgendaEventCard(
                 // Promemoria automatici
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = AppleGreen, modifier = Modifier.size(12.dp))
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = semantic.success, modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = "Promemoria automatici attivi (24h, 1h, 30m prima)",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppleGreen
+                        color = semantic.success
                     )
                 }
             }
@@ -1128,6 +1185,7 @@ fun DaySubHeaderBadge(
     dayLabel: String,
     eventCount: Int
 ) {
+    val semantic = LocalPeritoSemanticColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1142,24 +1200,24 @@ fun DaySubHeaderBadge(
             Icon(
                 imageVector = Icons.Default.CalendarToday,
                 contentDescription = null,
-                tint = DavezBordeaux,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(15.dp)
             )
             Text(
                 text = dayLabel,
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = AppleLabelPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         if (eventCount > 0) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = DavezBordeaux.copy(alpha = 0.12f)
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             ) {
                 Text(
                     text = if (eventCount == 1) "1 sopralluogo" else "$eventCount sopralluoghi",
                     style = MaterialTheme.typography.labelSmall,
-                    color = DavezBordeaux,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
@@ -1168,7 +1226,7 @@ fun DaySubHeaderBadge(
             Text(
                 text = "Libero",
                 style = MaterialTheme.typography.labelSmall,
-                color = AppleLabelTertiary
+                color = semantic.labelTertiary
             )
         }
     }
@@ -1176,10 +1234,11 @@ fun DaySubHeaderBadge(
 
 @Composable
 fun EmptyDaySlotPlaceholder(dayName: String) {
+    val semantic = LocalPeritoSemanticColors.current
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = DavezAlabaster,
-        border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.45f)),
+        color = MaterialTheme.colorScheme.background,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -1192,13 +1251,13 @@ fun EmptyDaySlotPlaceholder(dayName: String) {
             Icon(
                 imageVector = Icons.Default.Schedule,
                 contentDescription = null,
-                tint = AppleLabelTertiary,
+                tint = semantic.labelTertiary,
                 modifier = Modifier.size(14.dp)
             )
             Text(
                 text = "Nessun sopralluogo programmato per $dayName",
                 style = MaterialTheme.typography.bodySmall,
-                color = AppleLabelSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -1208,14 +1267,14 @@ fun EmptyDaySlotPlaceholder(dayName: String) {
 fun EmptyEventPlaceholder(message: String) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = DavezAlabaster,
-        border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f)),
+        color = MaterialTheme.colorScheme.background,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
             text = message,
             style = MaterialTheme.typography.bodySmall,
-            color = AppleLabelSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(14.dp)
         )
     }

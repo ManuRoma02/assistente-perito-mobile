@@ -105,60 +105,67 @@ class OtaUpdateManager(private val context: Context) {
 
             // 2. Verifica parsing pacchetto Android nativo e conformità firma (CWE-347)
             val pm = try { context.packageManager } catch (_: Throwable) { null }
-            if (pm != null) {
-                val archiveFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    PackageManager.GET_SIGNING_CERTIFICATES
+                ?: return Result.failure(SecurityException("PackageManager non disponibile per verifica firma APK"))
+            val archiveFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                @Suppress("DEPRECATION")
+                PackageManager.GET_SIGNATURES
+            }
+            val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, archiveFlags)
+                ?: return Result.failure(IllegalStateException("Il file scaricato non è un pacchetto Android valido (APK corrotto)"))
+
+            if (archiveInfo.packageName != context.packageName) {
+                return Result.failure(
+                    SecurityException("Package APK non corrispondente: ${archiveInfo.packageName} (atteso: ${context.packageName})")
+                )
+            }
+
+            // Verifica firma rispetto al pacchetto installato (fail-closed)
+            val currentPkgInfo = runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
                 } else {
                     @Suppress("DEPRECATION")
-                    PackageManager.GET_SIGNATURES
+                    pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
                 }
-                val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, archiveFlags)
-                    ?: return Result.failure(IllegalStateException("Il file scaricato non è un pacchetto Android valido (APK corrotto)"))
+            }.getOrNull()
+                ?: return Result.failure(SecurityException("Impossibile verificare la firma dell'applicazione installata"))
 
-                if (archiveInfo.packageName != context.packageName) {
+            val signatureMatch = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val curSign = currentPkgInfo.signingInfo
+                val archSign = archiveInfo.signingInfo
+                if (curSign != null && archSign != null) {
+                    val curCerts = curSign.apkContentsSigners
+                    val archCerts = archSign.apkContentsSigners
+                    !curCerts.isNullOrEmpty() && !archCerts.isNullOrEmpty() &&
+                        curCerts.any { cur -> archCerts.any { it == cur } }
+                } else false
+            } else {
+                @Suppress("DEPRECATION")
+                val curSigs = currentPkgInfo.signatures
+                @Suppress("DEPRECATION")
+                val archSigs = archiveInfo.signatures
+                if (!curSigs.isNullOrEmpty() && !archSigs.isNullOrEmpty()) {
+                    curSigs.any { cur -> archSigs.any { it == cur } }
+                } else false
+            }
+
+            if (!signatureMatch) {
+                return Result.failure(
+                    SecurityException("Firma crittografica APK non corrispondente a quella dell'applicazione installata")
+                )
+            }
+
+            val apkVersionCode = PackageInfoCompat.getLongVersionCode(archiveInfo).toInt()
+            if (!allowAnyVersion) {
+                val installedVersionCode = PackageInfoCompat.getLongVersionCode(currentPkgInfo).toInt()
+                if (apkVersionCode < installedVersionCode) {
                     return Result.failure(
-                        SecurityException("Package APK non corrispondente: ${archiveInfo.packageName} (atteso: ${context.packageName})")
+                        SecurityException("Downgrade APK non consentito: build $apkVersionCode < versione installata $installedVersionCode")
                     )
                 }
-
-                // Verifica firma rispetto al pacchetto installato
-                val currentPkgInfo = runCatching {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
-                    }
-                }.getOrNull()
-
-                if (currentPkgInfo != null) {
-                    val signatureMatch = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        val curSign = currentPkgInfo.signingInfo
-                        val archSign = archiveInfo.signingInfo
-                        if (curSign != null && archSign != null) {
-                            val curCerts = if (curSign.hasMultipleSigners()) curSign.apkContentsSigners else curSign.signingCertificateHistory
-                            val archCerts = if (archSign.hasMultipleSigners()) archSign.apkContentsSigners else archSign.signingCertificateHistory
-                            curCerts != null && archCerts != null && curCerts.any { cur -> archCerts.any { it == cur } }
-                        } else true
-                    } else {
-                        @Suppress("DEPRECATION")
-                        val curSigs = currentPkgInfo.signatures
-                        @Suppress("DEPRECATION")
-                        val archSigs = archiveInfo.signatures
-                        if (curSigs != null && archSigs != null) {
-                            curSigs.any { cur -> archSigs.any { it == cur } }
-                        } else true
-                    }
-
-                    if (!signatureMatch) {
-                        return Result.failure(
-                            SecurityException("Firma crittografica APK non corrispondente a quella dell'applicazione installata")
-                        )
-                    }
-                }
-
-                val apkVersionCode = PackageInfoCompat.getLongVersionCode(archiveInfo).toInt()
-                if (!allowAnyVersion && targetVersionCode > 0 && apkVersionCode < targetVersionCode) {
+                if (targetVersionCode > 0 && apkVersionCode < targetVersionCode) {
                     return Result.failure(
                         IllegalStateException("Versione APK inferiore al target richiesto: build $apkVersionCode < $targetVersionCode")
                     )
@@ -175,7 +182,7 @@ class OtaUpdateManager(private val context: Context) {
     fun getExistingDownloadedApk(
         targetVersionCode: Int,
         expectedSha256: String = "",
-        allowAnyVersion: Boolean = true
+        allowAnyVersion: Boolean = false
     ): File? {
         val updatesDir = File(context.cacheDir, "updates")
         if (!updatesDir.exists()) return null
@@ -237,48 +244,59 @@ class OtaUpdateManager(private val context: Context) {
                 error("URL manifest non sicuro: è richiesto il protocollo HTTPS (CWE-319)")
             }
             var currentUrl = manifestUrl
-            var connection: HttpURLConnection? = null
+            var activeConn: HttpURLConnection? = null
             var redirects = 0
             val maxRedirects = 5
 
-            while (redirects < maxRedirects) {
-                val url = URL(currentUrl)
-                connection = (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = CONNECT_TIMEOUT_MS
-                    readTimeout = READ_TIMEOUT_MS
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "PeritoAI-Android/${getCurrentVersionName()}")
-                    setRequestProperty("Accept", "application/json")
-                    instanceFollowRedirects = true
-                }
+            try {
+                while (redirects < maxRedirects) {
+                    if (!currentUrl.startsWith("https://", ignoreCase = true)) {
+                        error("URL manifest non sicuro: è richiesto il protocollo HTTPS (CWE-319)")
+                    }
+                    val url = URL(currentUrl)
+                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                        requestMethod = "GET"
+                        setRequestProperty("User-Agent", "PeritoAI-Android/${getCurrentVersionName()}")
+                        setRequestProperty("Accept", "application/json")
+                        instanceFollowRedirects = false
+                    }
+                    activeConn = conn
 
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
-                    responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-                    responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
-                    responseCode == 307 || responseCode == 308
-                ) {
-                    val newLocation = connection.getHeaderField("Location")
-                    connection.disconnect()
-                    if (newLocation != null) {
+                    val responseCode = conn.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+                        responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                        responseCode == 307 || responseCode == 308
+                    ) {
+                        val newLocation = conn.getHeaderField("Location")
+                        conn.disconnect()
+                        activeConn = null
+                        if (newLocation.isNullOrBlank()) {
+                            error("Redirect HTTP $responseCode senza header Location")
+                        }
                         currentUrl = resolveRedirectUrl(currentUrl, newLocation)
+                        if (!currentUrl.startsWith("https://", ignoreCase = true)) {
+                            error("Redirect manifest non sicuro bloccato (CWE-319): $currentUrl")
+                        }
                         redirects++
                         continue
                     }
+                    break
                 }
-                break
+
+                val conn = activeConn ?: error("Connessione non inizializzata (troppi redirect)")
+                if (conn.responseCode !in 200..299) {
+                    error("Errore HTTP ${conn.responseCode}: ${conn.responseMessage}")
+                }
+
+                val rawJson = conn.inputStream.bufferedReader().use { it.readText() }
+                val parsed = OtaUpdateManifest.fromJson(rawJson)
+                parsed.getOrThrow()
+            } finally {
+                activeConn?.disconnect()
             }
-
-            val conn = connection ?: error("Connessione non inizializzata")
-            if (conn.responseCode !in 200..299) {
-                error("Errore HTTP ${conn.responseCode}: ${conn.responseMessage}")
-            }
-
-            val rawJson = conn.inputStream.bufferedReader().use { it.readText() }
-            conn.disconnect()
-
-            val parsed = OtaUpdateManifest.fromJson(rawJson)
-            parsed.getOrThrow()
         }
     }
 
@@ -316,7 +334,7 @@ class OtaUpdateManager(private val context: Context) {
         downloadUrl: String,
         targetVersionCode: Int = 0,
         expectedSha256: String = "",
-        allowAnyVersion: Boolean = true,
+        allowAnyVersion: Boolean = false,
         onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
@@ -339,42 +357,51 @@ class OtaUpdateManager(private val context: Context) {
 
             val destinationFile = File(updatesDir, "perito_update_${targetVersionCode}_${System.currentTimeMillis()}.apk")
             val tempFile = File(updatesDir, "${destinationFile.name}.tmp")
+            var activeConn: HttpURLConnection? = null
 
             try {
                 var currentUrl = downloadUrl
-                var connection: HttpURLConnection? = null
                 var redirects = 0
                 val maxRedirects = 5
 
                 while (redirects < maxRedirects) {
+                    if (!currentUrl.startsWith("https://", ignoreCase = true)) {
+                        error("URL download APK non sicuro: è richiesto il protocollo HTTPS (CWE-319)")
+                    }
                     val url = URL(currentUrl)
-                    connection = (url.openConnection() as HttpURLConnection).apply {
+                    val conn = (url.openConnection() as HttpURLConnection).apply {
                         connectTimeout = CONNECT_TIMEOUT_MS
                         readTimeout = READ_TIMEOUT_MS * 2
                         requestMethod = "GET"
                         setRequestProperty("User-Agent", "PeritoAI-Android/${getCurrentVersionName()}")
                         setRequestProperty("Accept", "application/vnd.android.package-archive, application/octet-stream, */*")
-                        instanceFollowRedirects = true
+                        instanceFollowRedirects = false
                     }
+                    activeConn = conn
 
-                    val responseCode = connection.responseCode
+                    val responseCode = conn.responseCode
                     if (responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
                         responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
                         responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
                         responseCode == 307 || responseCode == 308
                     ) {
-                        val newLocation = connection.getHeaderField("Location")
-                        connection.disconnect()
-                        if (newLocation != null) {
-                            currentUrl = resolveRedirectUrl(currentUrl, newLocation)
-                            redirects++
-                            continue
+                        val newLocation = conn.getHeaderField("Location")
+                        conn.disconnect()
+                        activeConn = null
+                        if (newLocation.isNullOrBlank()) {
+                            error("Redirect HTTP $responseCode senza header Location")
                         }
+                        currentUrl = resolveRedirectUrl(currentUrl, newLocation)
+                        if (!currentUrl.startsWith("https://", ignoreCase = true)) {
+                            error("Redirect download APK non sicuro bloccato (CWE-319): $currentUrl")
+                        }
+                        redirects++
+                        continue
                     }
                     break
                 }
 
-                val conn = connection ?: error("Connessione non inizializzata")
+                val conn = activeConn ?: error("Connessione non inizializzata (troppi redirect)")
                 if (conn.responseCode !in 200..299) {
                     error("Errore download APK: HTTP ${conn.responseCode} ${conn.responseMessage}")
                 }
@@ -412,7 +439,6 @@ class OtaUpdateManager(private val context: Context) {
                         output.flush()
                     }
                 }
-                conn.disconnect()
 
                 if (tempFile.exists() && tempFile.length() > 0) {
                     if (destinationFile.exists()) destinationFile.delete()
@@ -420,8 +446,8 @@ class OtaUpdateManager(private val context: Context) {
                         error("Impossibile rinominare il file temporaneo dell'aggiornamento")
                     }
 
-                    // 3. Verifica di sicurezza post-download (validità APK, package name e hash)
-                    val verifyResult = verifyApkArchive(context, destinationFile, targetVersionCode, expectedSha256)
+                    // 3. Verifica di sicurezza post-download (validità APK, package name, versione e hash)
+                    val verifyResult = verifyApkArchive(context, destinationFile, targetVersionCode, expectedSha256, allowAnyVersion)
                     if (verifyResult.isFailure) {
                         destinationFile.delete()
                         throw verifyResult.exceptionOrNull() ?: IllegalStateException("Verifica APK fallita")
@@ -434,6 +460,8 @@ class OtaUpdateManager(private val context: Context) {
             } catch (t: Throwable) {
                 if (tempFile.exists()) tempFile.delete()
                 throw t
+            } finally {
+                activeConn?.disconnect()
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.example.assistenteperitomobile.ui
 
 import android.app.Application
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
@@ -31,6 +32,7 @@ import com.example.assistenteperitomobile.data.ota.OtaUpdateManifest
 import com.example.assistenteperitomobile.data.ota.UpdateCheckResult
 import com.example.assistenteperitomobile.data.ota.UpdateCheckStatus
 import com.example.assistenteperitomobile.domain.AiEngineConfig
+import com.example.assistenteperitomobile.domain.AppContainer
 import com.example.assistenteperitomobile.domain.AppointmentParseResult
 import com.example.assistenteperitomobile.domain.ArchivedDocument
 import com.example.assistenteperitomobile.domain.CalendarEventItem
@@ -54,12 +56,14 @@ import com.example.assistenteperitomobile.domain.detectCategoryCorrection
 import com.example.assistenteperitomobile.domain.StudioProfile
 import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import com.example.assistenteperitomobile.domain.defaultCategoryFormats
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,6 +83,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 @Immutable
 data class PeritoUiState(
@@ -87,6 +92,7 @@ data class PeritoUiState(
     val isClearingHistory: Boolean = false,
     val fascicoli: List<Fascicolo> = emptyList(),
     val selectedFascicoloId: String? = null,
+    val activeFascicoloId: String? = null,
     val archivedDocuments: List<ArchivedDocument> = emptyList(),
     val selectedCategoryFilter: PeritoCategory? = null,
     val archiveSearchQuery: String = "",
@@ -123,17 +129,21 @@ data class PeritoUiState(
 class PeritoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val appContext = application.applicationContext
-    val aiEngine = PeritoAiEngine(appContext)
-    val agentOrchestrator = AgentPipelineOrchestrator(aiEngine)
-    val archiveRepo = ArchiveRepository(appContext, aiEngine)
-    val calendarRepo = CalendarRepository(appContext)
-    val docProcessor = DocumentProcessor(appContext)
-    val modelDownloadManager = ModelDownloadManager(appContext)
-    val chatHistoryRepo = ChatHistoryRepository(appContext)
-    val fascicoloRepo = FascicoloRepository(appContext)
-    val otaUpdateManager = OtaUpdateManager(appContext)
+    private val container = AppContainer(appContext)
+    val aiEngine get() = container.aiEngine
+    val agentOrchestrator get() = container.agentOrchestrator
+    val archiveRepo get() = container.archiveRepo
+    val calendarRepo get() = container.calendarRepo
+    val docProcessor get() = container.docProcessor
+    val modelDownloadManager get() = container.modelDownloadManager
+    val chatHistoryRepo get() = container.chatHistoryRepo
+    val fascicoloRepo get() = container.fascicoloRepo
+    val otaUpdateManager get() = container.otaUpdateManager
 
     private var activeDownloadJob: Job? = null
+    private var refreshJob: Job? = null
+    private var archiveSearchDebounceJob: Job? = null
+    private val activeProcessingCount = AtomicInteger(0)
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         Log.e("PeritoViewModel", "Unhandled coroutine exception in appScope", throwable)
@@ -260,7 +270,8 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     )
 
     fun refreshAllData() {
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             val currentConfig = _uiState.value.aiConfig
             val searchQuery = _uiState.value.archiveSearchQuery
 
@@ -462,7 +473,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         val appContext = getApplication<Application>()
         if (!MainActivity.isAppInForeground) {
             ReasoningBackgroundService.notifyCompletion(appContext, replyTitle, replyText)
-        } else {
+        } else if (activeProcessingCount.get() <= 1) {
             ReasoningBackgroundService.stopReasoning(appContext)
         }
     }
@@ -501,6 +512,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             routedIntent.category == UserIntentCategory.CORRECTION_OR_DELETE || lowerText.startsWith("/elimina") || lowerText.startsWith("/cancella") -> "🗑️ Classificazione richiesta • Verifica cancellazione..."
             else -> "🧠 ${getActiveReasoningModelLabel()} • Analisi richiesta e controllo conflitti..."
         }
+        activeProcessingCount.incrementAndGet()
         _uiState.update {
             it.copy(
                 messages = it.messages + userMsg,
@@ -758,22 +770,92 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                         )
                         notifyOrStopBackgroundService("📂 Documenti Trovati", "Trovati ${fallbackDocs.size} documenti in archivio")
                     } else {
-                        val generalResp = agentOrchestrator.askReasoning(
-                            question = text,
-                            config = _uiState.value.aiConfig,
-                            traceId = traceId
-                        )
-                        val generalAnswer = generalResp.getOrNull()
+                        val activeFascicolo = _uiState.value.activeFascicoloId?.let { fId ->
+                            _uiState.value.fascicoli.firstOrNull { it.id == fId }
+                        }
+                        val reasoningPrompt = if (activeFascicolo != null) {
+                            "[Fascicolo attivo: ${activeFascicolo.codice} - ${activeFascicolo.titolo}, Cliente: ${activeFascicolo.cliente}" +
+                                (if (activeFascicolo.indirizzo.isNotBlank()) ", Indirizzo: ${activeFascicolo.indirizzo}" else "") +
+                                "]\n\n$text"
+                        } else {
+                            text
+                        }
+                        val streamMsgId = UUID.randomUUID().toString()
+                        val headerPrefix = "🧠 **Risposta PeritoAI (${getActiveReasoningModelLabel()}):**\n\n"
+                        val streamBuffer = StringBuilder()
+                        val streamLock = Any()
+                        var lastUiUpdateMs = 0L
+                        var streamMessageInserted = false
+
+                        val generalAnswer = aiEngine.askReasoningAssistantStreaming(
+                            reasoningPrompt,
+                            _uiState.value.aiConfig
+                        ) { delta ->
+                            if (delta.isEmpty()) return@askReasoningAssistantStreaming
+                            val snapshot: String
+                            val shouldInsert: Boolean
+                            val shouldEmit: Boolean
+                            synchronized(streamLock) {
+                                streamBuffer.append(delta)
+                                val now = System.currentTimeMillis()
+                                shouldInsert = !streamMessageInserted
+                                shouldEmit = shouldInsert || (now - lastUiUpdateMs >= 70L)
+                                if (shouldEmit) {
+                                    streamMessageInserted = true
+                                    lastUiUpdateMs = now
+                                }
+                                snapshot = streamBuffer.toString()
+                            }
+                            if (shouldEmit) {
+                                _uiState.update { state ->
+                                    if (shouldInsert && state.messages.none { it.id == streamMsgId }) {
+                                        state.copy(
+                                            messages = state.messages + ChatMessage(
+                                                id = streamMsgId,
+                                                isUser = false,
+                                                text = headerPrefix + snapshot
+                                            )
+                                        )
+                                    } else {
+                                        state.copy(
+                                            messages = state.messages.map { msg ->
+                                                if (msg.id == streamMsgId) msg.copy(text = headerPrefix + snapshot) else msg
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         if (!generalAnswer.isNullOrBlank()) {
-                            appendAssistantMessage(
-                                ChatMessage(
-                                    id = UUID.randomUUID().toString(),
-                                    isUser = false,
-                                    text = "🧠 **Risposta PeritoAI (${getActiveReasoningModelLabel()}):**\n\n$generalAnswer"
-                                )
-                            )
+                            _uiState.update { state ->
+                                val finalBody = headerPrefix + generalAnswer
+                                if (state.messages.any { it.id == streamMsgId }) {
+                                    state.copy(
+                                        messages = state.messages.map { msg ->
+                                            if (msg.id == streamMsgId) msg.copy(text = finalBody) else msg
+                                        }
+                                    )
+                                } else {
+                                    state.copy(
+                                        messages = state.messages + ChatMessage(
+                                            id = streamMsgId,
+                                            isUser = false,
+                                            text = finalBody
+                                        )
+                                    )
+                                }
+                            }
+                            appScope.launch {
+                                chatHistoryRepo.saveMessages(_uiState.value.messages)
+                            }
                             notifyOrStopBackgroundService("🧠 Risposta PeritoAI", generalAnswer)
                         } else {
+                            if (streamMessageInserted) {
+                                _uiState.update { state ->
+                                    state.copy(messages = state.messages.filterNot { it.id == streamMsgId })
+                                }
+                            }
                             appendAssistantMessage(
                                 ChatMessage(
                                     id = UUID.randomUUID().toString(),
@@ -847,6 +929,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     notifyOrStopBackgroundService("📅 Appuntamento Confermato", "Fissato in agenda: ${created.titolo} (${created.startIso.replace('T', ' ').take(16)})")
                 }
             } catch (e: Throwable) {
+                if (e is CancellationException) throw e
                 Log.e("PeritoViewModel", "Error processing user message: $text", e)
                 appendAssistantMessage(
                     ChatMessage(
@@ -857,8 +940,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 notifyOrStopBackgroundService("⚠️ Errore", e.localizedMessage ?: "Errore elaborazione")
             } finally {
-                _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
-                ReasoningBackgroundService.stopReasoning(appContext)
+                if (activeProcessingCount.decrementAndGet() <= 0) {
+                    activeProcessingCount.set(0)
+                    _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
+                    ReasoningBackgroundService.stopReasoning(appContext)
+                }
             }
         }
     }
@@ -925,6 +1011,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun processDocumentUri(uri: Uri, nameHint: String? = null, isExternalShare: Boolean = false) {
         if (!requireReasoningModelReady(nameHint ?: "Documento allegato")) return
 
+        activeProcessingCount.incrementAndGet()
         _uiState.update {
             it.copy(
                 isProcessing = true,
@@ -945,9 +1032,10 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     bytes = payload.extractedBytes,
                     extractedText = payload.extractedText,
                     wasP7m = payload.wasP7mUnwrapped,
-                    fascicoloId = if (isExternalShare) null else _uiState.value.selectedFascicoloId
+                    fascicoloId = if (isExternalShare) null else (_uiState.value.activeFascicoloId ?: _uiState.value.selectedFascicoloId)
                 )
             } catch (e: Throwable) {
+                if (e is CancellationException) throw e
                 appendAssistantMessage(
                     ChatMessage(
                         id = UUID.randomUUID().toString(),
@@ -957,8 +1045,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 notifyOrStopBackgroundService("⚠️ Errore Documento", e.localizedMessage ?: "Formato non leggibile")
             } finally {
-                _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
-                ReasoningBackgroundService.stopReasoning(appContext)
+                if (activeProcessingCount.decrementAndGet() <= 0) {
+                    activeProcessingCount.set(0)
+                    _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
+                    ReasoningBackgroundService.stopReasoning(appContext)
+                }
             }
         }
     }
@@ -970,6 +1061,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun processCameraBitmap(bitmap: Bitmap, scanPreset: Int = 1, fascicoloId: String? = null) {
         if (!requireReasoningModelReady("Foto Perizia / Scansione")) return
 
+        activeProcessingCount.incrementAndGet()
         _uiState.update {
             it.copy(
                 isProcessing = true,
@@ -1000,12 +1092,15 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     extractedText = rawOcrText,
                     wasP7m = false,
                     explicitType = "CAMERA_SCAN",
-                    fascicoloId = fascicoloId ?: _uiState.value.selectedFascicoloId
+                    fascicoloId = fascicoloId ?: _uiState.value.activeFascicoloId ?: _uiState.value.selectedFascicoloId
                 )
             } finally {
                 runCatching { bitmap.recycle() }
-                _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
-                ReasoningBackgroundService.stopReasoning(appContext)
+                if (activeProcessingCount.decrementAndGet() <= 0) {
+                    activeProcessingCount.set(0)
+                    _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
+                    ReasoningBackgroundService.stopReasoning(appContext)
+                }
             }
         }
     }
@@ -1017,6 +1112,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun processCameraBurstFiles(files: List<File>, fascicoloId: String? = null) {
         if (files.isEmpty()) return
+        activeProcessingCount.incrementAndGet()
         _uiState.update {
             it.copy(
                 isProcessing = true,
@@ -1033,7 +1129,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val archivedList = mutableListOf<ArchivedDocument>()
                 val timestampBase = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(LocalDateTime.now())
-                val targetFascicoloId = fascicoloId ?: _uiState.value.selectedFascicoloId
+                val targetFascicoloId = fascicoloId ?: _uiState.value.activeFascicoloId ?: _uiState.value.selectedFascicoloId
                 val targetFascicolo = _uiState.value.fascicoli.firstOrNull { it.id == targetFascicoloId }
                 val clientLabel = targetFascicolo?.cliente ?: "Sopralluogo Peritale"
 
@@ -1085,8 +1181,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 notifyOrStopBackgroundService("📸 Raffica Salvata", "${archivedList.size} foto archiviate con successo")
             } finally {
                 files.forEach { runCatching { it.delete() } }
-                _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
-                ReasoningBackgroundService.stopReasoning(appContext)
+                if (activeProcessingCount.decrementAndGet() <= 0) {
+                    activeProcessingCount.set(0)
+                    _uiState.update { it.copy(isProcessing = false, processingLabel = "") }
+                    ReasoningBackgroundService.stopReasoning(appContext)
+                }
             }
         }
     }
@@ -1102,17 +1201,21 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        val burstDir = File(getApplication<Application>().cacheDir, "camera_burst").apply { mkdirs() }
-        val tempFiles = bitmaps.mapIndexed { idx, bmp ->
-            val f = File(burstDir, "burst_compat_${System.currentTimeMillis()}_$idx.jpg")
-            try {
-                f.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 88, out) }
-            } finally {
-                runCatching { bmp.recycle() }
+        appScope.launch {
+            val tempFiles = withContext(Dispatchers.IO) {
+                val burstDir = File(getApplication<Application>().cacheDir, "camera_burst").apply { mkdirs() }
+                bitmaps.mapIndexed { idx, bmp ->
+                    val f = File(burstDir, "burst_compat_${System.currentTimeMillis()}_$idx.jpg")
+                    try {
+                        f.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 88, out) }
+                    } finally {
+                        runCatching { bmp.recycle() }
+                    }
+                    f
+                }
             }
-            f
+            processCameraBurstFiles(tempFiles, fascicoloId)
         }
-        processCameraBurstFiles(tempFiles, fascicoloId)
     }
 
     /**
@@ -1280,7 +1383,11 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setArchiveSearchQuery(query: String) {
         _uiState.update { it.copy(archiveSearchQuery = query) }
-        refreshAllData()
+        archiveSearchDebounceJob?.cancel()
+        archiveSearchDebounceJob = viewModelScope.launch {
+            delay(150L)
+            refreshAllData()
+        }
     }
 
     fun updateAiConfig(newConfig: AiEngineConfig) {
@@ -1494,7 +1601,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         }
         kotlinx.coroutines.delay(420L)
 
-        val targetFascicoloId = fascicoloId ?: _uiState.value.selectedFascicoloId
+        val targetFascicoloId = fascicoloId ?: _uiState.value.activeFascicoloId ?: _uiState.value.selectedFascicoloId
         val targetFascicolo = _uiState.value.fascicoli.firstOrNull { it.id == targetFascicoloId }
 
         // Se è una foto/immagine e l'OCR non rileva testo, è un RILIEVO FOTOGRAFICO reale
@@ -2148,6 +2255,10 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(selectedFascicoloId = id) }
     }
 
+    fun setActiveFascicolo(fascicoloId: String?) {
+        _uiState.update { it.copy(activeFascicoloId = fascicoloId) }
+    }
+
     fun openFascicolo(id: String) {
         selectFascicoloFilter(id)
         _uiState.update { it.copy(openArchiveSheetRequested = true) }
@@ -2221,8 +2332,13 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteFascicolo(id: String) {
         viewModelScope.launch {
             fascicoloRepo.deleteFascicolo(id)
-            if (_uiState.value.selectedFascicoloId == id) {
-                _uiState.update { it.copy(selectedFascicoloId = null) }
+            if (_uiState.value.selectedFascicoloId == id || _uiState.value.activeFascicoloId == id) {
+                _uiState.update { state ->
+                    state.copy(
+                        selectedFascicoloId = if (state.selectedFascicoloId == id) null else state.selectedFascicoloId,
+                        activeFascicoloId = if (state.activeFascicoloId == id) null else state.activeFascicoloId
+                    )
+                }
             }
             refreshAllData()
             _uiState.update { it.copy(statusBanner = "Fascicolo rimosso con successo") }
@@ -2367,7 +2483,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
      * in background con Foreground Service e Notifica Android di avanzamento.
      */
     fun downloadAllMissingModels() {
-        if (_uiState.value.downloadProgress.isDownloading) return
+        if (activeDownloadJob?.isActive == true || _uiState.value.downloadProgress.isDownloading) return
         val missing = getMissingModelsForActiveConfig()
         if (missing.isEmpty()) {
             dismissFirstRunModelDialog()
@@ -2397,12 +2513,18 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        val previousJob = activeDownloadJob
+        _uiState.update {
+            it.copy(downloadProgress = it.downloadProgress.copy(isDownloading = true, error = null))
+        }
         com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = {
             cancelModelDownload()
         }
 
         activeDownloadJob = viewModelScope.launch {
+            val currentJob = coroutineContext[Job]
             try {
+                previousJob?.join()
                 missing.forEachIndexed { idx, model ->
                     _uiState.update {
                         it.copy(
@@ -2513,42 +2635,53 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
             } finally {
-                com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
+                if (activeDownloadJob === currentJob) {
+                    activeDownloadJob = null
+                    com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
+                }
+                _uiState.update {
+                    if (it.downloadProgress.isDownloading) {
+                        it.copy(downloadProgress = it.downloadProgress.copy(isDownloading = false))
+                    } else it
+                }
             }
         }
     }
 
     fun startModelDownload(model: DownloadableAiModel) {
-        if (_uiState.value.downloadProgress.isDownloading) return
+        if (activeDownloadJob?.isActive == true || _uiState.value.downloadProgress.isDownloading) return
 
+        val previousJob = activeDownloadJob
+        _uiState.update {
+            it.copy(
+                downloadProgress = ModelDownloadProgress(
+                    isDownloading = true,
+                    modelId = model.id,
+                    modelTitle = model.title,
+                    downloadedBytes = 0L,
+                    totalBytes = model.expectedBytes,
+                    currentQueueIndex = 1,
+                    totalQueueCount = 1,
+                    error = null
+                )
+            )
+        }
         com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = {
             cancelModelDownload()
         }
 
         activeDownloadJob = viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    downloadProgress = ModelDownloadProgress(
-                        isDownloading = true,
-                        modelId = model.id,
-                        modelTitle = model.title,
-                        downloadedBytes = 0L,
-                        totalBytes = model.expectedBytes,
-                        currentQueueIndex = 1,
-                        totalQueueCount = 1,
-                        error = null
-                    )
-                )
-            }
-            modelDownloadManager.notifyDownloadProgress(
-                modelTitle = model.title,
-                downloadedBytes = 0L,
-                totalBytes = model.expectedBytes,
-                queueIndex = 1,
-                queueTotal = 1,
-                isFirstStart = true
-            )
+            val currentJob = coroutineContext[Job]
             try {
+                previousJob?.join()
+                modelDownloadManager.notifyDownloadProgress(
+                    modelTitle = model.title,
+                    downloadedBytes = 0L,
+                    totalBytes = model.expectedBytes,
+                    queueIndex = 1,
+                    queueTotal = 1,
+                    isFirstStart = true
+                )
                 val downloadedFile = modelDownloadManager.downloadModel(model) { readBytes, totalBytes, speedBytes ->
                     _uiState.update { state ->
                         state.copy(
@@ -2628,15 +2761,27 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
             } finally {
-                com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
+                if (activeDownloadJob === currentJob) {
+                    activeDownloadJob = null
+                    com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
+                }
+                _uiState.update {
+                    if (it.downloadProgress.isDownloading) {
+                        it.copy(downloadProgress = it.downloadProgress.copy(isDownloading = false))
+                    } else it
+                }
             }
         }
     }
 
     fun cancelModelDownload() {
         activeDownloadJob?.cancel()
-        activeDownloadJob = null
         com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
+        _uiState.update {
+            if (it.downloadProgress.isDownloading) {
+                it.copy(downloadProgress = it.downloadProgress.copy(isDownloading = false))
+            } else it
+        }
     }
 
     fun activateDownloadedModel(model: DownloadableAiModel) {
@@ -2711,9 +2856,21 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } else {
                 @Suppress("DEPRECATION")
-                val streamUri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                val streamUri = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
                 if (streamUri != null) {
-                    processDocumentUri(streamUri, isExternalShare = true)
+                    val ownAuthority = "${appContext.packageName}.fileprovider"
+                    if (streamUri.scheme == ContentResolver.SCHEME_CONTENT &&
+                        !streamUri.authority.isNullOrBlank() &&
+                        streamUri.authority != ownAuthority
+                    ) {
+                        processDocumentUri(streamUri, isExternalShare = true)
+                    } else {
+                        Log.w("PeritoViewModel", "Ignored invalid or internal EXTRA_STREAM URI: $streamUri")
+                    }
                 }
             }
         }
@@ -2923,6 +3080,7 @@ class PeritoViewModel(application: Application) : AndroidViewModel(application) 
         super.onCleared()
         com.example.assistenteperitomobile.data.ModelDownloadService.onCancelRequestedCallback = null
         appScope.cancel()
+        runCatching { container.close() }
         calendarContentObserver?.let {
             try {
                 appContext.contentResolver.unregisterContentObserver(it)

@@ -1,8 +1,11 @@
 package com.example.assistenteperitomobile.domain
 
 import android.content.Context
+import com.llamatik.library.platform.GenStream
 import com.llamatik.library.platform.LlamaBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -10,6 +13,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -25,6 +29,10 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class PeritoAiEngine(private val context: Context? = null) {
 
@@ -32,19 +40,23 @@ class PeritoAiEngine(private val context: Context? = null) {
         // Mutex singleton di processo per serializzare gli accessi al motore nativo C++ llama.cpp (LlamaBridge)
         // previene SIGSEGV e corruzione di memoria da chiamate concorrenti.
         private val llamaMutex = Mutex()
+        private val generationSeq = AtomicLong(0L)
+
+        @Volatile
+        private var activeGenerationToken: Long = 0L
+
+        @Volatile
+        private var loadedGgufPath: String? = null
+
+        @Volatile
+        var currentResolution: ReasoningModelResolution? = null
+            private set
     }
 
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
     }
-
-    @Volatile
-    private var loadedGgufPath: String? = null
-
-    @Volatile
-    var currentResolution: ReasoningModelResolution? = null
-        private set
 
     fun getLoadedGgufPath(): String? = loadedGgufPath
     fun isUsingFallbackModel(): Boolean = currentResolution?.isFallback ?: false
@@ -168,6 +180,10 @@ class PeritoAiEngine(private val context: Context? = null) {
         if (loadedGgufPath == modelFile.absolutePath) return true
 
         return try {
+            if (loadedGgufPath != null) {
+                loadedGgufPath = null
+                runCatching { LlamaBridge.shutdown() }
+            }
             val threads = 4
             // Parametri ultra-ottimizzati per smartphone Android ARMv8/v9 con Q4_K_M:
             // 1. maxTokens = 1024 (risposte esaurienti senza troncamenti, si ferma al token <|im_end|>)
@@ -207,9 +223,10 @@ class PeritoAiEngine(private val context: Context? = null) {
      */
     suspend fun tryClassifyWithRizzoFlow(text: String, config: AiEngineConfig): String? = withContext(Dispatchers.IO) {
         if (!config.useRizzoFlow || config.rizzoFlowUrl.isBlank()) return@withContext null
+        var conn: HttpURLConnection? = null
         try {
             val url = URL(config.rizzoFlowUrl)
-            val conn = (url.openConnection() as HttpURLConnection).apply {
+            conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 1500
                 readTimeout = 3000
@@ -230,13 +247,17 @@ class PeritoAiEngine(private val context: Context? = null) {
                 val rootObj = json.parseToJsonElement(body) as? JsonObject
                 val decisions = rootObj?.get("decisions") as? JsonObject
                 val cartellaDecision = decisions?.get("cartella_peritale") as? JsonObject
-                val value = cartellaDecision?.get("value")?.jsonPrimitive?.content
+                val value = (cartellaDecision?.get("value") as? JsonPrimitive)?.contentOrNull
                 if (!value.isNullOrBlank()) {
                     PeritoCategory.fromFolderName(value).folderName
                 } else null
             } else null
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Throwable) {
             null
+        } finally {
+            conn?.disconnect()
         }
     }
 
@@ -1390,8 +1411,10 @@ class PeritoAiEngine(private val context: Context? = null) {
             .replace(Regex("""[<>:"/\\|?*\x00-\x1F]"""), "_")
             .replace(Regex("""\s+"""), "_")
             .replace(Regex("""_+"""), "_")
-            .trim('_')
-        return if (cleaned.isEmpty()) fallback else cleaned.take(40)
+            .trim('_', '.')
+            .take(40)
+            .trim('_', '.')
+        return if (cleaned.isEmpty() || cleaned == ".") fallback else cleaned
     }
 
     fun buildNormalizedFilename(
@@ -1437,17 +1460,7 @@ class PeritoAiEngine(private val context: Context? = null) {
         return words.size >= 2
     }
 
-    /**
-     * Risponde a domande tecniche, quesiti peritali o richieste di chiarimento
-     * utilizzando direttamente il modello locale di Reasoning (Qwen 3.5 2B Q4_K_M) con timeout di sicurezza e cancellazione nativa.
-     */
-    suspend fun askReasoningAssistant(
-        question: String,
-        config: AiEngineConfig = AiEngineConfig()
-    ): String? = withContext(Dispatchers.Default) {
-        val clean = question.trim()
-        if (clean.length < 3) return@withContext null
-
+    private fun buildReasoningChatPrompt(cleanQuestion: String, config: AiEngineConfig): String {
         val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
         val professionista = config.studioProfile.professionistaNome.ifBlank { "Perito Tecnico Estimativo" }
         val albo = if (config.studioProfile.alboIscrizione.isNotBlank()) " | Albo: ${config.studioProfile.alboIscrizione}" else ""
@@ -1464,73 +1477,216 @@ LINEE GUIDA RIGIDE:
 4. ANTI-ALLUCINAZIONE: Basa le valutazioni su principi tecnici accertati. Se un dettaglio varia per comune o richiede verifica documentale/catastale, segnalalo con chiarezza.
 5. SINTESI OPERATIVA: Evita introduzioni prolisse o convenevoli generici; entra subito nel merito operativo del quesito.
         """.trimIndent()
+        val sanitized = sanitizePromptInput(cleanQuestion)
+        return "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$sanitized<|im_end|>\n<|im_start|>assistant\n"
+    }
 
+    /**
+     * Risponde a domande tecniche, quesiti peritali o richieste di chiarimento
+     * utilizzando direttamente il modello locale di Reasoning (Qwen 3.5 2B Q4_K_M) con timeout di sicurezza e cancellazione nativa.
+     */
+    suspend fun askReasoningAssistant(
+        question: String,
+        config: AiEngineConfig = AiEngineConfig()
+    ): String? = withContext(Dispatchers.IO) {
+        val clean = question.trim()
+        if (clean.length < 3) return@withContext null
+
+        val myToken = generationSeq.incrementAndGet()
         withTimeoutOrNull(120_000L) {
             llamaMutex.withLock {
                 if (ensureGgufLoadedLocked(config)) {
+                    activeGenerationToken = myToken
                     try {
-                        val sanitized = sanitizePromptInput(clean)
-                        val prompt = "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$sanitized<|im_end|>\n<|im_start|>assistant\n"
+                        val prompt = buildReasoningChatPrompt(clean, config)
                         val res = LlamaBridge.generate(prompt).trim()
                         val cleanRes = res
                             .substringBefore("<|im_end|>")
                             .substringBefore("<|endoftext|>")
                             .trim()
                         if (cleanRes.isNotBlank()) return@withTimeoutOrNull cleanRes
+                    } catch (e: CancellationException) {
+                        if (activeGenerationToken == myToken) {
+                            runCatching { LlamaBridge.nativeCancelGenerate() }
+                        }
+                        throw e
                     } catch (_: Throwable) {
-                        try { LlamaBridge.nativeCancelGenerate() } catch (_: Throwable) {}
+                        if (activeGenerationToken == myToken) {
+                            runCatching { LlamaBridge.nativeCancelGenerate() }
+                        }
+                    } finally {
+                        if (activeGenerationToken == myToken) {
+                            activeGenerationToken = 0L
+                        }
                     }
                 }
                 null
             }
         } ?: run {
-            try { LlamaBridge.nativeCancelGenerate() } catch (_: Throwable) {}
+            if (activeGenerationToken == myToken) {
+                runCatching { LlamaBridge.nativeCancelGenerate() }
+            }
             null
         }
     }
 
-    private suspend fun tryCallLocalLlm(prompt: String, config: AiEngineConfig): String? = withContext(Dispatchers.Default) {
+    suspend fun askReasoningAssistantStreaming(
+        prompt: String,
+        config: AiEngineConfig = AiEngineConfig(),
+        onTokenDelta: (String) -> Unit
+    ): String? = withContext(Dispatchers.IO) {
+        val clean = prompt.trim()
+        if (clean.length < 3) return@withContext null
+
+        val myToken = generationSeq.incrementAndGet()
+        var ggufAvailable = true
+        val streamed = withTimeoutOrNull(120_000L) {
+            llamaMutex.withLock {
+                if (!ensureGgufLoadedLocked(config)) {
+                    ggufAvailable = false
+                    return@withLock null
+                }
+                activeGenerationToken = myToken
+                try {
+                    val formattedPrompt = buildReasoningChatPrompt(clean, config)
+                    val accumulated = StringBuilder()
+                    var streamFailed = false
+                    suspendCancellableCoroutine { cont ->
+                        val finished = AtomicBoolean(false)
+                        cont.invokeOnCancellation {
+                            if (activeGenerationToken == myToken) {
+                                runCatching { LlamaBridge.nativeCancelGenerate() }
+                            }
+                        }
+                        try {
+                            LlamaBridge.generateStream(formattedPrompt, object : GenStream {
+                                override fun onDelta(text: String) {
+                                    if (text.isEmpty() || finished.get()) return
+                                    val cleanedDelta = text
+                                        .replace("<|im_end|>", "")
+                                        .replace("<|endoftext|>", "")
+                                    if (cleanedDelta.isNotEmpty()) {
+                                        accumulated.append(cleanedDelta)
+                                        runCatching { onTokenDelta(cleanedDelta) }
+                                    }
+                                }
+
+                                override fun onComplete() {
+                                    if (finished.compareAndSet(false, true) && cont.isActive) {
+                                        cont.resume(accumulated.toString().trim())
+                                    }
+                                }
+
+                                override fun onError(message: String) {
+                                    streamFailed = true
+                                    if (finished.compareAndSet(false, true) && cont.isActive) {
+                                        cont.resume(null)
+                                    }
+                                }
+                            })
+                            if (finished.compareAndSet(false, true) && cont.isActive) {
+                                cont.resume(if (!streamFailed) accumulated.toString().trim() else null)
+                            }
+                        } catch (t: Throwable) {
+                            if (finished.compareAndSet(false, true) && cont.isActive) {
+                                cont.resumeWithException(t)
+                            }
+                        }
+                    }?.takeIf { it.isNotBlank() }
+                } catch (e: CancellationException) {
+                    if (activeGenerationToken == myToken) {
+                        runCatching { LlamaBridge.nativeCancelGenerate() }
+                    }
+                    throw e
+                } catch (_: Throwable) {
+                    if (activeGenerationToken == myToken) {
+                        runCatching { LlamaBridge.nativeCancelGenerate() }
+                    }
+                    null
+                } finally {
+                    if (activeGenerationToken == myToken) {
+                        activeGenerationToken = 0L
+                    }
+                }
+            }
+        } ?: run {
+            if (activeGenerationToken == myToken) {
+                runCatching { LlamaBridge.nativeCancelGenerate() }
+            }
+            null
+        }
+
+        if (!ggufAvailable) {
+            return@withContext askReasoningAssistant(prompt, config)
+        }
+        streamed
+    }
+
+    private suspend fun tryCallLocalLlm(prompt: String, config: AiEngineConfig): String? = withContext(Dispatchers.IO) {
         val studio = config.studioProfile.studioName.ifBlank { "Studio Tecnico Peritale" }
         val systemPrompt = "Sei il motore di elaborazione ed estrazione dati di $studio. Rispondi ESCLUSIVAMENTE con un singolo oggetto JSON valido conforme allo schema richiesto, senza alcun commento o testo prima o dopo."
 
+        val myToken = generationSeq.incrementAndGet()
         withTimeoutOrNull(45_000L) {
             // 1. Prova prima il motore nativo llama.cpp (LlamaBridge) sui file .gguf scaricati (Qwen 3.5 2B Q4_K_M)
             val ggufResult = llamaMutex.withLock {
                 if (ensureGgufLoadedLocked(config)) {
+                    activeGenerationToken = myToken
                     try {
                         val sanitizedPrompt = sanitizePromptInput(prompt)
                         val formattedPrompt = "<|im_start|>system\n$systemPrompt<|im_end|>\n<|im_start|>user\n$sanitizedPrompt<|im_end|>\n<|im_start|>assistant\n"
                         val res = LlamaBridge.generateJson(formattedPrompt)
                         extractJsonBlock(res)
+                    } catch (e: CancellationException) {
+                        if (activeGenerationToken == myToken) {
+                            runCatching { LlamaBridge.nativeCancelGenerate() }
+                        }
+                        throw e
                     } catch (_: Throwable) {
-                        try { LlamaBridge.nativeCancelGenerate() } catch (_: Throwable) {}
+                        if (activeGenerationToken == myToken) {
+                            runCatching { LlamaBridge.nativeCancelGenerate() }
+                        }
                         null
+                    } finally {
+                        if (activeGenerationToken == myToken) {
+                            activeGenerationToken = 0L
+                        }
                     }
                 } else null
             }
             if (!ggufResult.isNullOrBlank()) return@withTimeoutOrNull ggufResult
             // 2. Prova Ollama Locale / Termux / LAN se abilitato
             if (config.useLocalOllama && config.ollamaUrl.isNotBlank()) {
+                var conn: HttpURLConnection? = null
                 try {
                     val url = URL(config.ollamaUrl)
-                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                    conn = (url.openConnection() as HttpURLConnection).apply {
                         requestMethod = "POST"
                         connectTimeout = 1500
                         readTimeout = 3000
                         doOutput = true
                         setRequestProperty("Content-Type", "application/json")
                     }
-                    val payload = """{"model":"${config.ollamaModel}","messages":[{"role":"system","content":${json.encodeToString(systemPrompt)}},{"role":"user","content":${json.encodeToString(prompt)}}],"temperature":0.1}"""
+                    val payload = """{"model":${json.encodeToString(config.ollamaModel)},"messages":[{"role":"system","content":${json.encodeToString(systemPrompt)}},{"role":"user","content":${json.encodeToString(prompt)}}],"temperature":0.1}"""
                     OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload) }
                     if (conn.responseCode == 200) {
                         val body = conn.inputStream.bufferedReader().readText()
                         val unwrapped = extractContentFromApiResponse(body) ?: body
                         extractJsonBlock(unwrapped)
                     } else null
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (_: Throwable) {
                     null
+                } finally {
+                    conn?.disconnect()
                 }
             } else null
+        } ?: run {
+            if (activeGenerationToken == myToken) {
+                runCatching { LlamaBridge.nativeCancelGenerate() }
+            }
+            null
         }
     }
 
@@ -1722,10 +1878,10 @@ LINEE GUIDA RIGIDE:
     private fun parseClassificationJson(rawJson: String, fallbackDate: LocalDate): DocumentClassificationResult? {
         return try {
             val obj = json.parseToJsonElement(rawJson) as? JsonObject ?: return null
-            val cat = PeritoCategory.fromFolderName(obj["categoria"]?.jsonPrimitive?.content).folderName
-            val cli = sanitizeComponent(obj["cliente_o_controparte"]?.jsonPrimitive?.content, "Generico")
-            val ogg = sanitizeComponent(obj["oggetto_sintetico"]?.jsonPrimitive?.content, "Documento")
-            val dt = obj["data_documento"]?.jsonPrimitive?.content ?: fallbackDate.toString()
+            val cat = PeritoCategory.fromFolderName((obj["categoria"] as? JsonPrimitive)?.contentOrNull).folderName
+            val cli = sanitizeComponent((obj["cliente_o_controparte"] as? JsonPrimitive)?.contentOrNull, "Generico")
+            val ogg = sanitizeComponent((obj["oggetto_sintetico"] as? JsonPrimitive)?.contentOrNull, "Documento")
+            val dt = (obj["data_documento"] as? JsonPrimitive)?.contentOrNull ?: fallbackDate.toString()
             DocumentClassificationResult(cat, cli, ogg, dt)
         } catch (_: Throwable) {
             null
@@ -1735,19 +1891,20 @@ LINEE GUIDA RIGIDE:
     private fun parseAppointmentJson(rawJson: String): AppointmentParseResult? {
         return try {
             val obj = json.parseToJsonElement(rawJson) as? JsonObject ?: return null
-            val hasApp = obj["has_appointment"]?.jsonPrimitive?.booleanOrNull ?: false
+            val hasApp = (obj["has_appointment"] as? JsonPrimitive)?.booleanOrNull ?: false
             if (!hasApp) return AppointmentParseResult(has_appointment = false)
+            val titoloVal = (obj["titolo"] as? JsonPrimitive)?.contentOrNull
             AppointmentParseResult(
                 has_appointment = true,
-                titolo = obj["titolo"]?.jsonPrimitive?.content ?: "Appuntamento",
-                data_inizio_iso = obj["data_inizio_iso"]?.jsonPrimitive?.content,
-                data_fine_iso = obj["data_fine_iso"]?.jsonPrimitive?.content,
-                luogo = obj["luogo"]?.jsonPrimitive?.content ?: "Da definire",
-                cliente = obj["cliente"]?.jsonPrimitive?.content ?: "Cliente",
-                note = obj["note"]?.jsonPrimitive?.content ?: "",
-                is_ambiguo = obj["is_ambiguo"]?.jsonPrimitive?.booleanOrNull ?: false,
-                motivo_ambiguita = obj["motivo_ambiguita"]?.jsonPrimitive?.content ?: "",
-                categoria = obj["categoria"]?.jsonPrimitive?.content ?: PeritoEventCategory.fromString(obj["titolo"]?.jsonPrimitive?.content).displayName
+                titolo = titoloVal ?: "Appuntamento",
+                data_inizio_iso = (obj["data_inizio_iso"] as? JsonPrimitive)?.contentOrNull,
+                data_fine_iso = (obj["data_fine_iso"] as? JsonPrimitive)?.contentOrNull,
+                luogo = (obj["luogo"] as? JsonPrimitive)?.contentOrNull ?: "Da definire",
+                cliente = (obj["cliente"] as? JsonPrimitive)?.contentOrNull ?: "Cliente",
+                note = (obj["note"] as? JsonPrimitive)?.contentOrNull ?: "",
+                is_ambiguo = (obj["is_ambiguo"] as? JsonPrimitive)?.booleanOrNull ?: false,
+                motivo_ambiguita = (obj["motivo_ambiguita"] as? JsonPrimitive)?.contentOrNull ?: "",
+                categoria = (obj["categoria"] as? JsonPrimitive)?.contentOrNull ?: PeritoEventCategory.fromString(titoloVal).displayName
             )
         } catch (_: Throwable) {
             null

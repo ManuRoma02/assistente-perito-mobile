@@ -72,6 +72,13 @@ class ArchiveRepository(
         }
     }
 
+    private fun resolveContainedFile(filePath: String): File? {
+        val root = archiveRootDir.canonicalFile
+        val candidate = File(filePath).canonicalFile
+        val rootPath = root.path.let { if (it.endsWith(File.separator)) it else "$it${File.separator}" }
+        return if (candidate.path.startsWith(rootPath)) candidate else null
+    }
+
     suspend fun saveAndArchiveDocument(
         bytes: ByteArray,
         originalFileName: String,
@@ -81,47 +88,48 @@ class ArchiveRepository(
     ): ArchivedDocument = withContext(Dispatchers.IO) {
         val category = PeritoCategory.fromFolderName(classification.categoria)
         val categoryDir = File(archiveRootDir, category.folderName).apply { if (!exists()) mkdirs() }
-
         val normalizedBase = aiEngine.buildNormalizedFilename(classification, originalFileName)
-        var targetFile = File(categoryDir, normalizedBase)
-        var counter = 1
-        while (targetFile.exists()) {
-            val dotIdx = normalizedBase.lastIndexOf('.')
-            val candidateName = if (dotIdx > 0) {
-                "${normalizedBase.substring(0, dotIdx)}_$counter${normalizedBase.substring(dotIdx)}"
-            } else {
-                "${normalizedBase}_$counter"
-            }
-            targetFile = File(categoryDir, candidateName)
-            counter++
-        }
 
-        targetFile.writeBytes(bytes)
+        val record = mutex.withLock {
+            var targetFile = File(categoryDir, normalizedBase)
+            var counter = 1
+            while (targetFile.exists()) {
+                val dotIdx = normalizedBase.lastIndexOf('.')
+                val candidateName = if (dotIdx > 0) {
+                    "${normalizedBase.substring(0, dotIdx)}_$counter${normalizedBase.substring(dotIdx)}"
+                } else {
+                    "${normalizedBase}_$counter"
+                }
+                targetFile = File(categoryDir, candidateName)
+                counter++
+            }
+
+            AtomicFileUtils.writeBytes(targetFile, bytes)
+
+            val doc = ArchivedDocument(
+                id = UUID.randomUUID().toString(),
+                fileName = targetFile.name,
+                originalName = originalFileName,
+                categoryFolder = category.folderName,
+                cliente = classification.cliente_o_controparte,
+                oggetto = classification.oggetto_sintetico,
+                dateIso = classification.data_documento,
+                filePath = targetFile.absolutePath,
+                sizeBytes = targetFile.length(),
+                extractedTextSnippet = extractedSnippet.take(600),
+                createdAtMillis = System.currentTimeMillis(),
+                fascicoloId = fascicoloId
+            )
+
+            val current = loadAllDocuments(forceRefresh = true).toMutableList()
+            current.add(0, doc)
+            saveIndex(current)
+            doc
+        }
 
         // Copia speculare nella cartella pubblica Documents/Perizie_Archivio/<Categoria> solo se abilitata dall'utente (CWE-200)
         if (isPublicSyncEnabled) {
-            mirrorToPublicDocuments(category, targetFile.name, bytes)
-        }
-
-        val record = ArchivedDocument(
-            id = UUID.randomUUID().toString(),
-            fileName = targetFile.name,
-            originalName = originalFileName,
-            categoryFolder = category.folderName,
-            cliente = classification.cliente_o_controparte,
-            oggetto = classification.oggetto_sintetico,
-            dateIso = classification.data_documento,
-            filePath = targetFile.absolutePath,
-            sizeBytes = targetFile.length(),
-            extractedTextSnippet = extractedSnippet.take(600),
-            createdAtMillis = System.currentTimeMillis(),
-            fascicoloId = fascicoloId
-        )
-
-        mutex.withLock {
-            val current = loadAllDocuments(forceRefresh = true).toMutableList()
-            current.add(0, record)
-            saveIndex(current)
+            mirrorToPublicDocuments(category, record.fileName, bytes)
         }
         record
     }
@@ -136,29 +144,40 @@ class ArchiveRepository(
             if (idx < 0) return@withContext null
 
             val existing = docs[idx]
-            val oldFile = File(existing.filePath)
+            val oldFile = resolveContainedFile(existing.filePath)
+                ?: throw SecurityException("Percorso file non consentito fuori dall'archivio")
             val newDir = File(archiveRootDir, newCategory.folderName).apply { if (!exists()) mkdirs() }
-            val newFile = File(newDir, existing.fileName)
+            val safeFileName = File(existing.fileName).name
+            val newFile = File(newDir, safeFileName)
+            if (newFile.canonicalFile.parentFile != newDir.canonicalFile) {
+                throw SecurityException("Nome file non consentito fuori dalla cartella di destinazione")
+            }
 
-            if (oldFile.exists() && oldFile.absolutePath != newFile.absolutePath) {
-                oldFile.copyTo(newFile, overwrite = true)
-                oldFile.delete()
+            val movedDifferentPath = oldFile.exists() && oldFile.canonicalFile != newFile.canonicalFile
+            if (movedDifferentPath) {
+                AtomicFileUtils.writeBytes(newFile, oldFile.readBytes())
+            }
+
+            val updated = existing.copy(
+                categoryFolder = newCategory.folderName,
+                fileName = safeFileName,
+                filePath = newFile.absolutePath
+            )
+            docs[idx] = updated
+            saveIndex(docs)
+
+            if (movedDifferentPath) {
+                runCatching { oldFile.delete() }
             }
 
             // Aggiorna anche la cartella pubblica sincronizzata col PC solo se abilitata
             if (isPublicSyncEnabled) {
                 deleteFromPublicDocuments(existing.categoryFolder, existing.fileName)
                 if (newFile.exists()) {
-                    mirrorToPublicDocuments(newCategory, existing.fileName, newFile.readBytes())
+                    mirrorToPublicDocuments(newCategory, safeFileName, newFile.readBytes())
                 }
             }
 
-            val updated = existing.copy(
-                categoryFolder = newCategory.folderName,
-                filePath = newFile.absolutePath
-            )
-            docs[idx] = updated
-            saveIndex(docs)
             updated
         }
     }
@@ -167,7 +186,7 @@ class ArchiveRepository(
         mutex.withLock {
             val docs = loadAllDocuments(forceRefresh = true).toMutableList()
             val doc = docs.firstOrNull { it.id == documentId } ?: return@withContext false
-            File(doc.filePath).delete()
+            resolveContainedFile(doc.filePath)?.let { if (it.exists()) it.delete() }
             if (isPublicSyncEnabled) {
                 deleteFromPublicDocuments(doc.categoryFolder, doc.fileName)
             }
@@ -220,9 +239,10 @@ class ArchiveRepository(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val resolver = context.contentResolver
                 val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                val relPath = Environment.DIRECTORY_DOCUMENTS + "/Perizie_Archivio/" + categoryFolder + "/"
-                val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
-                val selectionArgs = arrayOf(fileName, "%$relPath%")
+                val relPathWithSlash = Environment.DIRECTORY_DOCUMENTS + "/Perizie_Archivio/" + categoryFolder + "/"
+                val relPathWithoutSlash = relPathWithSlash.trimEnd('/')
+                val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND (${MediaStore.MediaColumns.RELATIVE_PATH} = ? OR ${MediaStore.MediaColumns.RELATIVE_PATH} = ?)"
+                val selectionArgs = arrayOf(fileName, relPathWithSlash, relPathWithoutSlash)
                 resolver.delete(collection, selection, selectionArgs)
             } else {
                 File(File(publicSyncRootDir, categoryFolder), fileName).delete()
@@ -312,7 +332,7 @@ class ArchiveRepository(
     }
 
     fun createShareOrOpenIntent(doc: ArchivedDocument, asShare: Boolean = false): Intent? {
-        val file = File(doc.filePath)
+        val file = resolveContainedFile(doc.filePath) ?: return null
         if (!file.exists()) return null
         val uri = FileProvider.getUriForFile(
             context,

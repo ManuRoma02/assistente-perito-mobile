@@ -26,6 +26,7 @@ import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -63,6 +64,18 @@ class CalendarRepository(
         return isSyncEnabled && hasNativeCalendarPermissions()
     }
 
+    private fun parseIsoToLocalDateTime(iso: String, zone: ZoneId): LocalDateTime? {
+        val trimmed = iso.trim()
+        if (trimmed.isEmpty()) return null
+        return runCatching {
+            OffsetDateTime.parse(trimmed).atZoneSameInstant(zone).toLocalDateTime()
+        }.recoverCatching {
+            Instant.parse(trimmed).atZone(zone).toLocalDateTime()
+        }.recoverCatching {
+            LocalDateTime.parse(trimmed.take(19))
+        }.getOrNull()
+    }
+
     /**
      * Controlla conflitti bidirezionali (sia nel database locale dell'app sia nel Google/Android Calendar nativo del telefono)
      * con un buffer di sicurezza di ±15 minuti.
@@ -75,12 +88,10 @@ class CalendarRepository(
         val endIso = proposed.data_fine_iso ?: return@withContext emptyList()
 
         val zone = ZoneId.systemDefault()
-        val startMillis = runCatching {
-            LocalDateTime.parse(startIso.take(19)).atZone(zone).toInstant().toEpochMilli()
-        }.getOrNull() ?: return@withContext emptyList()
-        val endMillis = runCatching {
-            LocalDateTime.parse(endIso.take(19)).atZone(zone).toInstant().toEpochMilli()
-        }.getOrNull() ?: (startMillis + 3_600_000L)
+        val startMillis = parseIsoToLocalDateTime(startIso, zone)?.atZone(zone)?.toInstant()?.toEpochMilli()
+            ?: return@withContext emptyList()
+        val endMillis = parseIsoToLocalDateTime(endIso, zone)?.atZone(zone)?.toInstant()?.toEpochMilli()
+            ?: (startMillis + 3_600_000L)
 
         val windowMin = startMillis - bufferMinutes * 60_000L
         val windowMax = endMillis + bufferMinutes * 60_000L
@@ -101,10 +112,10 @@ class CalendarRepository(
     ): CalendarEventItem = withContext(Dispatchers.IO) {
         val zone = ZoneId.systemDefault()
         val startDt = proposed.data_inizio_iso?.let {
-            runCatching { LocalDateTime.parse(it.take(19)) }.getOrNull()
+            parseIsoToLocalDateTime(it, zone)
         } ?: LocalDateTime.now().plusHours(1)
         val endDt = proposed.data_fine_iso?.let {
-            runCatching { LocalDateTime.parse(it.take(19)) }.getOrNull()
+            parseIsoToLocalDateTime(it, zone)
         } ?: startDt.plusHours(1)
 
         val startMillis = startDt.atZone(zone).toInstant().toEpochMilli()
@@ -223,10 +234,8 @@ class CalendarRepository(
         newNotes: String = ""
     ): CalendarEventItem = withContext(Dispatchers.IO) {
         val zone = ZoneId.systemDefault()
-        val startDt = runCatching { LocalDateTime.parse(newStartIso.take(19)) }.getOrNull()
-            ?: LocalDateTime.now()
-        val endDt = runCatching { LocalDateTime.parse(newEndIso.take(19)) }.getOrNull()
-            ?: startDt.plusHours(1)
+        val startDt = parseIsoToLocalDateTime(newStartIso, zone) ?: LocalDateTime.now()
+        val endDt = parseIsoToLocalDateTime(newEndIso, zone) ?: startDt.plusHours(1)
         val startMillis = startDt.atZone(zone).toInstant().toEpochMilli()
         val endMillis = endDt.atZone(zone).toInstant().toEpochMilli()
 
@@ -548,41 +557,46 @@ class CalendarRepository(
         val ctx = context ?: return emptyList()
         val result = mutableListOf<CalendarEventItem>()
         val projection = arrayOf(
-            CalendarContract.Events._ID,
-            CalendarContract.Events.TITLE,
-            CalendarContract.Events.DTSTART,
-            CalendarContract.Events.DTEND,
-            CalendarContract.Events.EVENT_LOCATION,
-            CalendarContract.Events.DESCRIPTION,
-            CalendarContract.Events.ALL_DAY,
-            CalendarContract.Events.EVENT_TIMEZONE,
-            CalendarContract.Events.DURATION
+            CalendarContract.Instances.EVENT_ID,
+            CalendarContract.Instances.TITLE,
+            CalendarContract.Instances.BEGIN,
+            CalendarContract.Instances.END,
+            CalendarContract.Instances.EVENT_LOCATION,
+            CalendarContract.Instances.DESCRIPTION,
+            CalendarContract.Instances.ALL_DAY,
+            CalendarContract.Instances.EVENT_TIMEZONE,
+            CalendarContract.Instances.DURATION
         )
         val targetCalId = selectedCalendarId
         val selection: String
-        val selectionArgs: Array<String>
+        val selectionArgs: Array<String>?
 
         // Espandiamo la query al ContentProvider di 24h per catturare all-day events memorizzati in UTC
         // che potrebbero cadere all'interno del giorno locale dopo la normalizzazione
         val queryMin = minMillis - 86_400_000L
         val queryMax = maxMillis + 86_400_000L
 
+        val instancesUri = CalendarContract.Instances.CONTENT_URI.buildUpon().apply {
+            ContentUris.appendId(this, queryMin)
+            ContentUris.appendId(this, queryMax)
+        }.build()
+
         if (targetCalId != null) {
-            selection = "(${CalendarContract.Events.DTSTART} < ? AND (${CalendarContract.Events.DTEND} > ? OR ${CalendarContract.Events.DTEND} IS NULL)) AND ${CalendarContract.Events.DELETED} = 0 AND ${CalendarContract.Events.CALENDAR_ID} = ?"
-            selectionArgs = arrayOf(queryMax.toString(), queryMin.toString(), targetCalId.toString())
+            selection = "${CalendarContract.Events.DELETED} = 0 AND ${CalendarContract.Instances.CALENDAR_ID} = ?"
+            selectionArgs = arrayOf(targetCalId.toString())
         } else {
-            selection = "(${CalendarContract.Events.DTSTART} < ? AND (${CalendarContract.Events.DTEND} > ? OR ${CalendarContract.Events.DTEND} IS NULL)) AND ${CalendarContract.Events.DELETED} = 0"
-            selectionArgs = arrayOf(queryMax.toString(), queryMin.toString())
+            selection = "${CalendarContract.Events.DELETED} = 0"
+            selectionArgs = null
         }
 
         try {
             val zone = ZoneId.systemDefault()
             ctx.contentResolver.query(
-                CalendarContract.Events.CONTENT_URI,
+                instancesUri,
                 projection,
                 selection,
                 selectionArgs,
-                "${CalendarContract.Events.DTSTART} ASC"
+                "${CalendarContract.Instances.BEGIN} ASC"
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val sysId = cursor.getLong(0)
@@ -604,7 +618,7 @@ class CalendarRepository(
 
                         result.add(
                             CalendarEventItem(
-                                id = "sys_$sysId",
+                                id = "sys_${sysId}_$dtStart",
                                 systemCalendarEventId = sysId,
                                 titolo = title,
                                 startIso = startIso,

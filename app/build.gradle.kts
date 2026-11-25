@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.assistenteperitomobile"
         minSdk = 26
         targetSdk = 37
-        versionCode = 23
-        versionName = "1.0.22"
+        versionCode = 24
+        versionName = "1.0.23"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -72,6 +72,9 @@ dependencies {
   // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.navigation3.runtime)
+  implementation(libs.androidx.navigation3.ui)
+  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
   // Compose
   implementation(libs.androidx.compose.ui)

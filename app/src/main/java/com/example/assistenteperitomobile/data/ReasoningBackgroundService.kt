@@ -44,6 +44,7 @@ class ReasoningBackgroundService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 runCatching { nm.cancel(NOTIFICATION_ID_ONGOING) }
+                stopSelf(startId)
                 return START_NOT_STICKY
             }
             ACTION_NOTIFY_COMPLETION -> {
@@ -54,6 +55,7 @@ class ReasoningBackgroundService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 runCatching { nm.cancel(NOTIFICATION_ID_ONGOING) }
+                stopSelf(startId)
                 return START_NOT_STICKY
             }
             else -> {
@@ -72,13 +74,22 @@ class ReasoningBackgroundService : Service() {
                     } else {
                         startForeground(NOTIFICATION_ID_ONGOING, notification)
                     }
-                } catch (_: Throwable) {
-                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    runCatching { nm.notify(NOTIFICATION_ID_ONGOING, notification) }
+                } catch (t: Throwable) {
+                    releaseWakeLock()
+                    stopSelf(startId)
+                    throw t
                 }
             }
         }
         return START_NOT_STICKY
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        runCatching { nm.cancel(NOTIFICATION_ID_ONGOING) }
+        stopSelf(startId)
     }
 
     private fun acquireWakeLock() {
@@ -178,15 +189,12 @@ class ReasoningBackgroundService : Service() {
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    if (MainActivity.isAppInForeground) {
-                        context.startService(intent)
-                    } else {
-                        context.startForegroundService(intent)
-                    }
+                    context.startForegroundService(intent)
                 } else {
                     context.startService(intent)
                 }
-            } catch (_: Throwable) {
+            } catch (t: Throwable) {
+                android.util.Log.w("ReasoningService", "Impossibile avviare il foreground service: ${t.message}")
             }
         }
 
@@ -226,18 +234,8 @@ class ReasoningBackgroundService : Service() {
         }
 
         fun stopReasoning(context: Context) {
-            val intent = Intent(context, ReasoningBackgroundService::class.java).apply {
-                action = ACTION_STOP_REASONING
-            }
-            try {
-                if (MainActivity.isAppInForeground) {
-                    context.startService(intent)
-                } else {
-                    context.stopService(intent)
-                }
-            } catch (_: Throwable) {
-                runCatching { context.stopService(intent) }
-            }
+            val intent = Intent(context, ReasoningBackgroundService::class.java)
+            runCatching { context.stopService(intent) }
         }
     }
 }

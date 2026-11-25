@@ -1,49 +1,27 @@
 package com.example.assistenteperitomobile.ui
 
 import android.Manifest
-import android.animation.ValueAnimator
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Matrix
-import android.media.AudioFormat
-import android.media.AudioRecord
 import android.media.MediaPlayer
-import android.media.MediaRecorder
-import android.os.Build
-import android.os.Bundle
-import android.os.ParcelFileDescriptor
 import android.provider.Settings
-import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.widget.Toast
-import com.example.assistenteperitomobile.data.MorningBriefingWorker
-import androidx.activity.compose.BackHandler
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.compose.runtime.DisposableEffect
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
-import androidx.compose.ui.unit.IntSize
-import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
-import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
-import com.example.assistenteperitomobile.domain.defaultCategoriesList
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -54,12 +32,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
@@ -69,6 +44,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.InteractionSource
@@ -78,69 +54,56 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.ClipEntry
-import android.content.ClipData
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.LinkOff
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
@@ -153,18 +116,16 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -174,18 +135,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.ui.graphics.vector.ImageVector
-import com.example.assistenteperitomobile.domain.MainAppTab
-import com.example.assistenteperitomobile.domain.PeritoEventCategory
-import com.example.assistenteperitomobile.domain.StudioProfile
-import com.example.assistenteperitomobile.domain.SystemCalendarInfo
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -193,13 +149,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -209,32 +165,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -249,6 +203,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -256,42 +211,27 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.assistenteperitomobile.R
-import com.example.assistenteperitomobile.data.DownloadableAiModel
+import com.example.assistenteperitomobile.data.MorningBriefingWorker
 import com.example.assistenteperitomobile.data.ota.OtaUpdateManager
 import com.example.assistenteperitomobile.data.ota.OtaUpdateManifest
 import com.example.assistenteperitomobile.domain.ArchivedDocument
 import com.example.assistenteperitomobile.domain.CalendarEventItem
 import com.example.assistenteperitomobile.domain.ChatMessage
+import com.example.assistenteperitomobile.domain.Fascicolo
+import com.example.assistenteperitomobile.domain.MainAppTab
 import com.example.assistenteperitomobile.domain.PeritoCategory
-import com.example.assistenteperitomobile.theme.AppleBlue
-import com.example.assistenteperitomobile.theme.AppleBlueDark
-import com.example.assistenteperitomobile.theme.AppleBlueSoft
-import com.example.assistenteperitomobile.theme.AppleGreen
-import com.example.assistenteperitomobile.theme.AppleGreenSoft
-import com.example.assistenteperitomobile.theme.AppleGroupedBg
-import com.example.assistenteperitomobile.theme.AppleLabelPrimary
-import com.example.assistenteperitomobile.theme.AppleLabelSecondary
-import com.example.assistenteperitomobile.theme.AppleLabelTertiary
-import com.example.assistenteperitomobile.theme.AppleOrange
-import com.example.assistenteperitomobile.theme.AppleOrangeSoft
-import com.example.assistenteperitomobile.theme.AppleRed
-import com.example.assistenteperitomobile.theme.AppleRedSoft
-import com.example.assistenteperitomobile.theme.AppleSecondaryGroupedBg
-import com.example.assistenteperitomobile.theme.AppleWhite
-import com.example.assistenteperitomobile.theme.DavezAlabaster
-import com.example.assistenteperitomobile.theme.DavezBordeaux
-import com.example.assistenteperitomobile.theme.DavezBordeauxHover
-import com.example.assistenteperitomobile.theme.DavezBordeauxSoft
-import com.example.assistenteperitomobile.theme.DavezFotografiaSlate
-import com.example.assistenteperitomobile.theme.DavezStoneBorder
-import com.example.assistenteperitomobile.theme.DavezTravertine
+import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
+import com.example.assistenteperitomobile.domain.PeritoEventCategory
+import com.example.assistenteperitomobile.domain.SystemCalendarInfo
+import com.example.assistenteperitomobile.domain.defaultCategoriesList
+import com.example.assistenteperitomobile.theme.LocalPeritoSemanticColors
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -302,7 +242,6 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -314,18 +253,12 @@ fun Modifier.emilPressScale(
     interactionSource: InteractionSource,
     pressedScale: Float = 0.96f
 ): Modifier = composed {
+    val context = LocalContext.current
     val isPressed by interactionSource.collectIsPressedAsState()
-    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
     val scale by animateFloatAsState(
         targetValue = if (isPressed) pressedScale else 1f,
-        animationSpec = if (animationsEnabled) {
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        } else {
-            snap()
-        },
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "emil_press_scale"
     )
     this.graphicsLayer {
@@ -344,26 +277,17 @@ fun Modifier.cartoonPressSquash(
     pressedScaleY: Float = 0.92f,
     squashScaleX: Float = 1.05f
 ): Modifier = composed {
+    val context = LocalContext.current
     val isPressed by interactionSource.collectIsPressedAsState()
-    val animationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
     val scaleY by animateFloatAsState(
         targetValue = if (isPressed) pressedScaleY else 1f,
-        animationSpec = if (animationsEnabled) {
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        } else snap(),
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "cartoon_squash_y"
     )
     val scaleX by animateFloatAsState(
         targetValue = if (isPressed) squashScaleX else 1f,
-        animationSpec = if (animationsEnabled) {
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        } else snap(),
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "cartoon_squash_x"
     )
     this.graphicsLayer {
@@ -416,6 +340,7 @@ fun Perito3DThinkingOrb(
     size: Dp = 54.dp,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val infiniteTransition = rememberInfiniteTransition(label = "orb_3d_rotation")
     val animatedPhase = infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -443,6 +368,14 @@ fun Perito3DThinkingOrb(
     var userYaw by remember { mutableFloatStateOf(0.35f) }
     var userPitch by remember { mutableFloatStateOf(-0.28f) }
 
+    // Architectural Orb Palette — crisp contrast on both Light & Dark surfaces
+    val orbBordeaux = Color(0xFF4F0B18)
+    val orbBordeauxHover = Color(0xFF6A1628)
+    val orbBordeauxSoft = Color(0xFF7D2A3B)
+    val orbAlabaster = Color(0xFFF8F4F1)
+    val orbTravertine = Color(0xFFEFE7E2)
+    val orbGold = Color(0xFFF5D0A9)
+
     Canvas(
         modifier = modifier
             .size(size)
@@ -458,8 +391,9 @@ fun Perito3DThinkingOrb(
                 testTag = "perito_3d_thinking_orb"
             }
     ) {
-        val phase = if (isThinking) animatedPhase.value else 0.35f
-        val pulse = if (isThinking) animatedPulse.value else 1.0f
+        val animationsEnabled = PeritoMotionTokens.areAnimationsEnabled(context)
+        val phase = if (isThinking && animationsEnabled) animatedPhase.value else 0.35f
+        val pulse = if (isThinking && animationsEnabled) animatedPulse.value else 1.0f
         val cx = this.size.width / 2f
         val cy = this.size.height / 2f
         val r = (this.size.minDimension / 2f) * 0.84f * pulse
@@ -469,15 +403,15 @@ fun Perito3DThinkingOrb(
             brush = Brush.radialGradient(
                 colors = if (isThinking) {
                     listOf(
-                        DavezBordeauxHover.copy(alpha = 0.45f),
-                        DavezBordeauxSoft.copy(alpha = 0.24f),
-                        Color(0xFFF5D0A9).copy(alpha = 0.12f),
+                        orbBordeauxHover.copy(alpha = 0.48f),
+                        orbBordeauxSoft.copy(alpha = 0.26f),
+                        orbGold.copy(alpha = 0.14f),
                         Color.Transparent
                     )
                 } else {
                     listOf(
-                        DavezBordeaux.copy(alpha = 0.26f),
-                        DavezBordeauxSoft.copy(alpha = 0.12f),
+                        orbBordeaux.copy(alpha = 0.28f),
+                        orbBordeauxSoft.copy(alpha = 0.14f),
                         Color.Transparent
                     )
                 },
@@ -493,8 +427,8 @@ fun Perito3DThinkingOrb(
             brush = Brush.radialGradient(
                 colors = listOf(
                     Color(0xFF8C2D40),
-                    DavezBordeauxHover,
-                    DavezBordeaux,
+                    orbBordeauxHover,
+                    orbBordeaux,
                     Color(0xFF2B050C)
                 ),
                 center = Offset(cx - r * 0.25f, cy - r * 0.25f),
@@ -525,9 +459,9 @@ fun Perito3DThinkingOrb(
 
             val depthAlpha = ((z2 + 1.1f) / 2.2f).coerceIn(0.18f, 0.95f)
             val nodeColor = if (isThinking && idx % 3 == 0) {
-                Color(0xFFF5D0A9).copy(alpha = depthAlpha)
+                orbGold.copy(alpha = depthAlpha)
             } else {
-                DavezAlabaster.copy(alpha = depthAlpha * 0.82f)
+                orbAlabaster.copy(alpha = depthAlpha * 0.84f)
             }
             val dotRadius = if (z2 > 0f) 2.2.dp.toPx() else 1.3.dp.toPx()
             drawCircle(
@@ -560,7 +494,7 @@ fun Perito3DThinkingOrb(
             val alpha = ((avgZ + 1.0f) / 1.8f).coerceIn(0.38f, 1.0f)
             val isRoofEdge = i == 8 || j == 8
             drawLine(
-                color = if (isRoofEdge) DavezAlabaster.copy(alpha = alpha) else DavezTravertine.copy(alpha = alpha),
+                color = if (isRoofEdge) orbAlabaster.copy(alpha = alpha) else orbTravertine.copy(alpha = alpha),
                 start = Offset(projX[i], projY[i]),
                 end = Offset(projX[j], projY[j]),
                 strokeWidth = if (isRoofEdge) 1.8.dp.toPx() else 1.3.dp.toPx(),
@@ -570,7 +504,7 @@ fun Perito3DThinkingOrb(
 
         // 5. Champagne Gold AI Spark at the Roof Apex
         drawCircle(
-            color = Color(0xFFF5D0A9),
+            color = orbGold,
             radius = if (isThinking) 3.6.dp.toPx() else 2.6.dp.toPx(),
             center = Offset(projX[8], projY[8])
         )
@@ -594,10 +528,11 @@ fun PeritoAiBrandEmblem(
     showOnlineBadge: Boolean = true,
     modelStatus: ModelVisualStatus = ModelVisualStatus.READY
 ) {
+    val semanticColors = LocalPeritoSemanticColors.current
     val badgeColor = when (modelStatus) {
-        ModelVisualStatus.READY -> AppleGreen
-        ModelVisualStatus.DOWNLOADING -> AppleOrange
-        ModelVisualStatus.NOT_CONFIGURED -> AppleLabelTertiary
+        ModelVisualStatus.READY -> semanticColors.success
+        ModelVisualStatus.DOWNLOADING -> semanticColors.warning
+        ModelVisualStatus.NOT_CONFIGURED -> semanticColors.labelTertiary
     }
     val badgeDesc = "Logo PeritoAI RD • ${modelStatus.label}"
 
@@ -618,7 +553,7 @@ fun PeritoAiBrandEmblem(
                     .size(11.dp)
                     .align(Alignment.BottomEnd)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(1.5.dp)
                     .clip(CircleShape)
                     .background(badgeColor)
@@ -627,11 +562,13 @@ fun PeritoAiBrandEmblem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun AssistentePeritoApp(viewModel: PeritoViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
 
     var showArchiveSheet by rememberSaveable { mutableStateOf(false) }
     var showAiSettingsSheet by rememberSaveable { mutableStateOf(false) }
@@ -809,400 +746,444 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
         }
     }
 
-    Scaffold(
-        containerColor = DavezAlabaster,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            PeritoStudioTopBar(
-                archivedCount = uiState.archivedDocuments.size,
-                hasCalendarPermission = uiState.hasCalendarPermission,
-                isProcessing = uiState.isProcessing,
-                isModelReady = uiState.isReasoningReady,
-                isModelDownloading = uiState.downloadProgress.isDownloading,
-                studioTitle = uiState.aiConfig.studioProfile.studioName,
-                onOpenArchive = { showArchiveSheet = true },
-                onOpenAiModels = { showAiSettingsSheet = true },
-                onRequestCalendarPerm = handleCalendarConnect,
-                onClearChat = if (uiState.selectedTab == MainAppTab.CHAT) {
-                    { viewModel.clearChatHistory() }
-                } else null
-            )
+    var agendaBackProgress by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler(
+        enabled = uiState.selectedTab == MainAppTab.AGENDA &&
+            !showArchiveSheet &&
+            !showAiSettingsSheet &&
+            !showInAppCameraSheet &&
+            !showAttachSheet
+    ) { progress: Flow<BackEventCompat> ->
+        try {
+            progress.collect { backEvent ->
+                agendaBackProgress = backEvent.progress
+            }
+            agendaBackProgress = 0f
+            viewModel.selectTab(MainAppTab.CHAT)
+        } catch (e: CancellationException) {
+            agendaBackProgress = 0f
+            throw e
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(DavezAlabaster)
-                .padding(innerPadding)
-                .imePadding()
-        ) {
-            // Toast/Banner di conferma stile iOS + davez Bordeaux
-            AnimatedVisibility(
-                visible = uiState.statusBanner != null,
-                enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) + scaleIn(
-                    initialScale = 0.94f,
-                    animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
-                ),
-                exit = fadeOut(tween(220, easing = FastOutLinearInEasing)) + scaleOut(
-                    targetScale = 0.96f,
-                    animationSpec = tween(220, easing = FastOutLinearInEasing)
-                )
-            ) {
-                uiState.statusBanner?.let { banner ->
-                    Surface(
-                        color = AppleBlueSoft,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = banner,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = AppleBlueDark,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = { viewModel.clearStatusBanner() },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Chiudi avviso",
-                                    tint = AppleBlueDark,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+    }
 
-            AnimatedVisibility(
-                visible = uiState.selectedTab == MainAppTab.CHAT && uiState.easterEggMessage != null,
-                enter = fadeIn(tween(240)) + expandVertically(),
-                exit = fadeOut(tween(180)) + shrinkVertically()
-            ) {
-                uiState.easterEggMessage?.let { message ->
-                    Surface(
-                        color = DavezBordeaux.copy(alpha = 0.055f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.12f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(text = "🤏", style = MaterialTheme.typography.labelMedium)
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = DavezBordeauxSoft,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = viewModel::dismissEasterEgg,
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Chiudi battuta",
-                                    tint = DavezBordeauxSoft,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Barra compatta non bloccante quando un modello IA si scarica in background
-            AnimatedVisibility(
-                visible = uiState.downloadProgress.isDownloading && !uiState.showFirstRunModelDialog && !showAiSettingsSheet,
-                enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) + expandVertically(
-                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                ),
-                exit = fadeOut(tween(220, easing = FastOutLinearInEasing)) + shrinkVertically(
-                    animationSpec = tween(220, easing = FastOutLinearInEasing)
-                )
-            ) {
-                val prog = uiState.downloadProgress
-                val dlMb = String.format(Locale.ITALIAN, "%.1f", prog.downloadedBytes / (1024.0 * 1024.0))
-                val totMb = if (prog.totalBytes > 0) {
-                    String.format(Locale.ITALIAN, "%.1f MB", prog.totalBytes / (1024.0 * 1024.0))
-                } else "..."
-                val queueBadge = if (prog.totalQueueCount > 1) " (${prog.currentQueueIndex}/${prog.totalQueueCount})" else ""
-                Surface(
-                    onClick = { showAiSettingsSheet = true },
-                    color = DavezAlabaster,
-                    border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "⬇️ Download in background$queueBadge: ${prog.modelTitle}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = DavezBordeaux,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "${prog.progressPercent}% ($dlMb/$totMb)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            TextButton(
-                                onClick = { viewModel.cancelModelDownload() },
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                modifier = Modifier.height(26.dp)
-                            ) {
-                                Text("Pausa", fontSize = 11.sp, color = AppleRed, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        LinearProgressIndicator(
-                            progress = { prog.progressFraction },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp)),
-                            color = DavezBordeaux,
-                            trackColor = AppleBlueSoft
-                        )
-                    }
-                }
-            }
-
-            // CONTENUTO A SCORRIMENTO ORIZZONTALE (HORIZONTAL PAGER)
-            // A sinistra (page 0): Assistente Chat
-            // Scroll verso destra (page 1): Agenda Sopralluoghi
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) { page ->
-                when (page) {
-                    0 -> {
-                        PeritoStudioChatScreen(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            onPrefillCommand = prefillCommandInChat,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    1 -> {
-                        AgendaVisivaScreen(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            onRequestCalendarPerm = handleCalendarConnect,
-                            onDirectVoiceClick = triggerSystemVoiceInput,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-            }
-
-            // BARRA DI SCRITTURA CON IL [+] DENTRO IL CONTENITORE DEI TASTI SEZIONE
-            // Unificato in tonalità DavezAlabaster identica allo sfondo della chat e dell'app
-            UnifiedStudioBottomBar(
-                selectedTab = uiState.selectedTab,
-                onSelectTab = { tab ->
-                    viewModel.selectTab(tab)
-                    val page = if (tab == MainAppTab.CHAT) 0 else 1
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(page)
-                    }
-                },
-                agendaCount = uiState.todayEvents.size,
-                inputFieldValue = inputFieldValue,
-                onInputFieldValueChange = { inputFieldValue = it },
-                inputFocusRequester = inputFocusRequester,
-                isRecordingVoice = isRecordingVoice,
-                onRecordingVoiceChange = { isRecordingVoice = it },
-                onOpenAttachSheet = { showAttachSheet = true },
-                onSendMessage = { text ->
-                    viewModel.sendUserMessage(text)
-                },
-                onSendVoiceNote = { transcript, dur, path ->
-                    viewModel.sendVoiceNoteMessage(transcript, dur, path)
-                },
-                onSystemVoiceClick = triggerSystemVoiceInput,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        // Foglio Modale Allegati Moderno Squircle (aperto dal tasto [+] della barra unificata)
-        if (showAttachSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showAttachSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                dragHandle = { AppleSheetDragHandle() },
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                containerColor = DavezAlabaster
-            ) {
-                ModernAttachmentSheet(
-                    onOpenScanner = {
-                        showAttachSheet = false
-                        showInAppCameraSheet = true
-                    },
-                    onPickSystemFile = {
-                        showAttachSheet = false
-                        try {
-                            documentPickerLauncher.launch(arrayOf("*/*"))
-                        } catch (_: Throwable) {
-                            Toast.makeText(context, "Selettore file non disponibile", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onStartVoiceNote = {
-                        showAttachSheet = false
-                        isRecordingVoice = true
-                    },
-                    onOpenFolders = {
-                        showAttachSheet = false
-                        showArchiveSheet = true
-                    },
-                    onClose = { showAttachSheet = false }
-                )
-            }
-        }
-
-        // Foglio Modale In-App Camera & Scanner Documentale & Rilievi con vera anteprima CameraX (come WhatsApp / iOS)
-        if (showInAppCameraSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showInAppCameraSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                sheetGesturesEnabled = false,
-                dragHandle = { AppleSheetDragHandle(tint = Color.White.copy(alpha = 0.4f)) },
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                containerColor = Color(0xFF141110)
-            ) {
-                InAppCameraScannerSheet(
-                    onCaptureRealBitmap = { bitmap, preset ->
-                        showInAppCameraSheet = false
-                        viewModel.processCameraBitmap(bitmap, preset)
-                    },
-                    onCaptureBurstFiles = { burstFiles ->
-                        showInAppCameraSheet = false
-                        viewModel.processCameraBurstFiles(burstFiles)
-                    },
-                    onOpenSystemCamera = {
-                        showInAppCameraSheet = false
-                        safeLaunchSystemCamera()
-                    },
-                    onPickFromGallery = {
-                        showInAppCameraSheet = false
-                        try {
-                            documentPickerLauncher.launch(arrayOf("image/*", "application/pdf"))
-                        } catch (_: Throwable) {
-                            Toast.makeText(context, "Galleria non disponibile", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onClose = { showInAppCameraSheet = false }
-                )
-            }
-        }
-
-        // Foglio Modale iOS per esplorare le 6 Cartelle Archivio
-        if (showArchiveSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showArchiveSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                dragHandle = { AppleSheetDragHandle() },
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                containerColor = AppleWhite
-            ) {
-                ArchiveFoldersSheetContent(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    onCameraClick = {
-                        showArchiveSheet = false
-                        showInAppCameraSheet = true
-                    },
-                    onPickDocumentClick = {
-                        showArchiveSheet = false
-                        try {
-                            documentPickerLauncher.launch(arrayOf("*/*"))
-                        } catch (_: Throwable) {
-                            Toast.makeText(context, "Selettore file non disponibile", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onClose = { showArchiveSheet = false }
-                )
-            }
-        }
-
-        // Foglio Modale iOS per Impostazioni & Modelli IA (3 Fissi + 1 Reasoning selezionabile)
-        if (showAiSettingsSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showAiSettingsSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                sheetGesturesEnabled = false,
-                dragHandle = { AppleSheetDragHandle() },
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                containerColor = AppleWhite
-            ) {
-                AiEngineSettingsSheetContent(
-                    uiState = uiState,
-                    viewModel = viewModel,
+    SharedTransitionLayout {
+        val sharedTransitionScope = this
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            topBar = {
+                PeritoStudioTopBar(
+                    archivedCount = uiState.archivedDocuments.size,
+                    hasCalendarPermission = uiState.hasCalendarPermission,
+                    isProcessing = uiState.isProcessing,
+                    isModelReady = uiState.isReasoningReady,
+                    isModelDownloading = uiState.downloadProgress.isDownloading,
+                    studioTitle = uiState.aiConfig.studioProfile.studioName,
+                    fascicoli = uiState.fascicoli,
+                    activeFascicoloId = uiState.activeFascicoloId,
+                    onSelectActiveFascicolo = { viewModel.setActiveFascicolo(it) },
+                    onOpenArchive = { showArchiveSheet = true },
+                    onOpenAiModels = { showAiSettingsSheet = true },
                     onRequestCalendarPerm = handleCalendarConnect,
-                    onClose = { showAiSettingsSheet = false }
+                    onClearChat = if (uiState.selectedTab == MainAppTab.CHAT) {
+                        { viewModel.clearChatHistory() }
+                    } else null
                 )
             }
-        }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding)
+                    .imePadding()
+            ) {
+                // Toast/Banner di conferma adattivo light/dark
+                AnimatedVisibility(
+                    visible = uiState.statusBanner != null,
+                    enter = fadeIn(PeritoMotionTokens.gentleFade) + scaleIn(
+                        initialScale = 0.94f,
+                        animationSpec = PeritoMotionTokens.snappySpring
+                    ),
+                    exit = fadeOut(PeritoMotionTokens.gentleFade) + scaleOut(
+                        targetScale = 0.96f,
+                        animationSpec = PeritoMotionTokens.gentleFade
+                    )
+                ) {
+                    uiState.statusBanner?.let { banner ->
+                        Surface(
+                            color = semanticColors.brandSoft,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .sharedBounds(
+                                    sharedTransitionScope.rememberSharedContentState("status_banner"),
+                                    animatedVisibilityScope = this@AnimatedVisibility
+                                )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = banner,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        viewModel.clearStatusBanner()
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Chiudi avviso",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
-        // Dialogo di Benvenuto / Scelta Modello Reasoning alla Prima Apertura
-        if (uiState.showFirstRunModelDialog) {
-            FirstRunModelDownloadDialog(
-                uiState = uiState,
-                viewModel = viewModel
-            )
-        }
+                AnimatedVisibility(
+                    visible = uiState.selectedTab == MainAppTab.CHAT && uiState.easterEggMessage != null,
+                    enter = fadeIn(PeritoMotionTokens.gentleFade) + expandVertically(),
+                    exit = fadeOut(PeritoMotionTokens.gentleFade) + shrinkVertically()
+                ) {
+                    uiState.easterEggMessage?.let { message ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                                .sharedBounds(
+                                    sharedTransitionScope.rememberSharedContentState("easter_egg_banner"),
+                                    animatedVisibilityScope = this@AnimatedVisibility
+                                )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 12.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(text = "🤏", style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text = message,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        viewModel.dismissEasterEgg()
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Chiudi battuta",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
-        // Dialogo di Aggiornamento In-App OTA
-        if (uiState.showUpdateDialog && uiState.availableUpdate != null) {
-            val currentCode = remember {
-                try {
-                    androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
-                        context.packageManager.getPackageInfo(context.packageName, 0)
-                    ).toInt()
-                } catch (_: Throwable) { 1 }
+                // Barra compatta non bloccante quando un modello IA si scarica in background
+                AnimatedVisibility(
+                    visible = uiState.downloadProgress.isDownloading && !uiState.showFirstRunModelDialog && !showAiSettingsSheet,
+                    enter = fadeIn(PeritoMotionTokens.gentleFade) + expandVertically(),
+                    exit = fadeOut(PeritoMotionTokens.gentleFade) + shrinkVertically()
+                ) {
+                    val prog = uiState.downloadProgress
+                    val dlMb = String.format(Locale.ITALIAN, "%.1f", prog.downloadedBytes / (1024.0 * 1024.0))
+                    val totMb = if (prog.totalBytes > 0) {
+                        String.format(Locale.ITALIAN, "%.1f MB", prog.totalBytes / (1024.0 * 1024.0))
+                    } else "..."
+                    val queueBadge = if (prog.totalQueueCount > 1) " (${prog.currentQueueIndex}/${prog.totalQueueCount})" else ""
+                    Surface(
+                        onClick = { showAiSettingsSheet = true },
+                        color = MaterialTheme.colorScheme.background,
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .sharedBounds(
+                                sharedTransitionScope.rememberSharedContentState("bg_download_banner"),
+                                animatedVisibilityScope = this@AnimatedVisibility
+                            )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "⬇️ Download in background$queueBadge: ${prog.modelTitle}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "${prog.progressPercent}% ($dlMb/$totMb)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                TextButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                                        viewModel.cancelModelDownload()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.heightIn(min = 44.dp)
+                                ) {
+                                    Text("Pausa", fontSize = 11.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            LinearProgressIndicator(
+                                progress = { prog.progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = semanticColors.brandSoft
+                            )
+                        }
+                    }
+                }
+
+                // CONTENUTO A SCORRIMENTO ORIZZONTALE (HORIZONTAL PAGER)
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            if (pagerState.currentPage == 1 && agendaBackProgress > 0f) {
+                                translationX = agendaBackProgress * 90f
+                                alpha = (1f - agendaBackProgress * 0.15f).coerceIn(0.6f, 1f)
+                            }
+                        }
+                ) { page ->
+                    when (page) {
+                        0 -> {
+                            PeritoStudioChatScreen(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                onPrefillCommand = prefillCommandInChat,
+                                sharedTransitionScope = sharedTransitionScope,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        1 -> {
+                            AgendaVisivaScreen(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                onRequestCalendarPerm = handleCalendarConnect,
+                                onDirectVoiceClick = triggerSystemVoiceInput,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+
+                UnifiedStudioBottomBar(
+                    selectedTab = uiState.selectedTab,
+                    onSelectTab = { tab ->
+                        viewModel.selectTab(tab)
+                        val page = if (tab == MainAppTab.CHAT) 0 else 1
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(page)
+                        }
+                    },
+                    agendaCount = uiState.todayEvents.size,
+                    inputFieldValue = inputFieldValue,
+                    onInputFieldValueChange = { inputFieldValue = it },
+                    inputFocusRequester = inputFocusRequester,
+                    isRecordingVoice = isRecordingVoice,
+                    onRecordingVoiceChange = { isRecordingVoice = it },
+                    onOpenAttachSheet = { showAttachSheet = true },
+                    onSendMessage = { text ->
+                        viewModel.sendUserMessage(text)
+                    },
+                    onSendVoiceNote = { transcript, dur, path ->
+                        viewModel.sendVoiceNoteMessage(transcript, dur, path)
+                    },
+                    onSystemVoiceClick = triggerSystemVoiceInput,
+                    sharedTransitionScope = sharedTransitionScope,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-            AppUpdateDialog(
-                manifest = uiState.availableUpdate!!,
-                downloadProgress = uiState.updateDownloadProgress,
-                statusMessage = uiState.updateStatusMessage,
-                currentVersionCode = currentCode,
-                onUpdateNow = { viewModel.startUpdateDownloadAndInstall(context) },
-                onContinueWithOldVersion = { viewModel.dismissUpdateDialog() }
-            )
+
+            if (showAttachSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showAttachSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    dragHandle = { AppleSheetDragHandle() },
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    containerColor = MaterialTheme.colorScheme.background
+                ) {
+                    ModernAttachmentSheet(
+                        onOpenScanner = {
+                            showAttachSheet = false
+                            showInAppCameraSheet = true
+                        },
+                        onPickSystemFile = {
+                            showAttachSheet = false
+                            try {
+                                documentPickerLauncher.launch(arrayOf("*/*"))
+                            } catch (_: Throwable) {
+                                Toast.makeText(context, "Selettore file non disponibile", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onStartVoiceNote = {
+                            showAttachSheet = false
+                            isRecordingVoice = true
+                        },
+                        onOpenFolders = {
+                            showAttachSheet = false
+                            showArchiveSheet = true
+                        },
+                        onClose = { showAttachSheet = false }
+                    )
+                }
+            }
+
+            if (showInAppCameraSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showInAppCameraSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    sheetGesturesEnabled = false,
+                    dragHandle = { AppleSheetDragHandle(tint = Color.White.copy(alpha = 0.4f)) },
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    containerColor = Color(0xFF141110)
+                ) {
+                    InAppCameraScannerSheet(
+                        onCaptureRealBitmap = { bitmap, preset ->
+                            showInAppCameraSheet = false
+                            viewModel.processCameraBitmap(bitmap, preset)
+                        },
+                        onCaptureBurstFiles = { burstFiles ->
+                            showInAppCameraSheet = false
+                            viewModel.processCameraBurstFiles(burstFiles)
+                        },
+                        onOpenSystemCamera = {
+                            showInAppCameraSheet = false
+                            safeLaunchSystemCamera()
+                        },
+                        onPickFromGallery = {
+                            showInAppCameraSheet = false
+                            try {
+                                documentPickerLauncher.launch(arrayOf("image/*", "application/pdf"))
+                            } catch (_: Throwable) {
+                                Toast.makeText(context, "Galleria non disponibile", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onClose = { showInAppCameraSheet = false }
+                    )
+                }
+            }
+
+            if (showArchiveSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showArchiveSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    dragHandle = { AppleSheetDragHandle() },
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    ArchiveFoldersSheetContent(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onCameraClick = {
+                            showArchiveSheet = false
+                            showInAppCameraSheet = true
+                        },
+                        onPickDocumentClick = {
+                            showArchiveSheet = false
+                            try {
+                                documentPickerLauncher.launch(arrayOf("*/*"))
+                            } catch (_: Throwable) {
+                                Toast.makeText(context, "Selettore file non disponibile", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onClose = { showArchiveSheet = false }
+                    )
+                }
+            }
+
+            if (showAiSettingsSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showAiSettingsSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    sheetGesturesEnabled = false,
+                    dragHandle = { AppleSheetDragHandle() },
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    AiEngineSettingsSheetContent(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onRequestCalendarPerm = handleCalendarConnect,
+                        onClose = { showAiSettingsSheet = false }
+                    )
+                }
+            }
+
+            if (uiState.showFirstRunModelDialog) {
+                FirstRunModelDownloadDialog(
+                    uiState = uiState,
+                    viewModel = viewModel
+                )
+            }
+
+            if (uiState.showUpdateDialog && uiState.availableUpdate != null) {
+                val currentCode = remember {
+                    try {
+                        androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                            context.packageManager.getPackageInfo(context.packageName, 0)
+                        ).toInt()
+                    } catch (_: Throwable) { 1 }
+                }
+                AppUpdateDialog(
+                    manifest = uiState.availableUpdate!!,
+                    downloadProgress = uiState.updateDownloadProgress,
+                    statusMessage = uiState.updateStatusMessage,
+                    currentVersionCode = currentCode,
+                    onUpdateNow = { viewModel.startUpdateDownloadAndInstall(context) },
+                    onContinueWithOldVersion = { viewModel.dismissUpdateDialog() }
+                )
+            }
         }
     }
 }
@@ -1212,7 +1193,8 @@ fun AssistentePeritoApp(viewModel: PeritoViewModel) {
 // Standard iOS Modal grabber pill (36x5dp, continuous rounded corners)
 // =============================================================================
 @Composable
-fun AppleSheetDragHandle(tint: Color = AppleLabelTertiary.copy(alpha = 0.35f)) {
+fun AppleSheetDragHandle(tint: Color? = null) {
+    val resolvedTint = tint ?: LocalPeritoSemanticColors.current.labelTertiary.copy(alpha = 0.35f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1224,7 +1206,7 @@ fun AppleSheetDragHandle(tint: Color = AppleLabelTertiary.copy(alpha = 0.35f)) {
                 .width(36.dp)
                 .height(5.dp)
                 .background(
-                    color = tint,
+                    color = resolvedTint,
                     shape = RoundedCornerShape(2.5.dp)
                 )
         )
@@ -1238,6 +1220,7 @@ fun AppleSheetDragHandle(tint: Color = AppleLabelTertiary.copy(alpha = 0.35f)) {
 // Contenitore unificato in tonalità DavezAlabaster identica allo sfondo dell'app:
 // ospita la barra di scrittura con il [+] e i tasti per cambiare sezione (Assistente / Agenda)
 // =============================================================================
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun UnifiedStudioBottomBar(
     selectedTab: MainAppTab,
@@ -1252,16 +1235,16 @@ fun UnifiedStudioBottomBar(
     onSendMessage: (String) -> Unit,
     onSendVoiceNote: (transcript: String, durationSec: Int, audioPath: String?) -> Unit,
     onSystemVoiceClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null
 ) {
     val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val semanticColors = LocalPeritoSemanticColors.current
     val isSlashMode = inputFieldValue.text.startsWith("/")
 
     Surface(
-        color = DavezAlabaster,
-        border = BorderStroke(1.dp, DavezStoneBorder.copy(alpha = 0.50f)),
+        color = MaterialTheme.colorScheme.background,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.50f)),
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         shadowElevation = 2.dp,
         modifier = modifier
@@ -1276,10 +1259,10 @@ fun UnifiedStudioBottomBar(
             // 1. POPUP SUGGERIMENTI COMANDI SLASH (/)
             AnimatedVisibility(
                 visible = isSlashMode && !isRecordingVoice,
-                enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) + expandVertically(
+                enter = fadeIn(PeritoMotionTokens.gentleFade) + expandVertically(
                     animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
                 ),
-                exit = fadeOut(tween(200, easing = FastOutLinearInEasing)) + shrinkVertically(
+                exit = fadeOut(PeritoMotionTokens.gentleFade) + shrinkVertically(
                     animationSpec = tween(200, easing = FastOutLinearInEasing)
                 )
             ) {
@@ -1297,206 +1280,222 @@ fun UnifiedStudioBottomBar(
                     }
                 }
 
-                SlashCommandsPopupCard(
-                    commands = filtered,
-                    typedQuery = typedQuery,
-                    onSelectCommand = { cmd ->
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onInputFieldValueChange(
-                            TextFieldValue(
-                                text = cmd.insertText,
-                                selection = TextRange(cmd.insertText.length)
-                            )
+                val popupModifier = if (sharedTransitionScope != null) {
+                    with(sharedTransitionScope) {
+                        Modifier.sharedBounds(
+                            rememberSharedContentState("slash_commands_popup"),
+                            animatedVisibilityScope = this@AnimatedVisibility
                         )
-                    },
-                    onExecuteDirectCommand = { cmd ->
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onInputFieldValueChange(TextFieldValue(""))
-                        onSendMessage(cmd.command)
-                    },
-                    onDismiss = {
-                        onInputFieldValueChange(TextFieldValue(""))
                     }
-                )
+                } else Modifier
+
+                Box(modifier = popupModifier) {
+                    SlashCommandsPopupCard(
+                        commands = filtered,
+                        typedQuery = typedQuery,
+                        onSelectCommand = { cmd ->
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            onInputFieldValueChange(
+                                TextFieldValue(
+                                    text = cmd.insertText,
+                                    selection = TextRange(cmd.insertText.length)
+                                )
+                            )
+                        },
+                        onExecuteDirectCommand = { cmd ->
+                            haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                            onInputFieldValueChange(TextFieldValue(""))
+                            onSendMessage(cmd.command)
+                        },
+                        onDismiss = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onInputFieldValueChange(TextFieldValue(""))
+                        }
+                    )
+                }
             }
 
-            // 2. BARRA DI SCRITTURA LIQUID GLASS CON [+] E MIC/SEND MORPH (iOS 17 SPEC)
+            // 2. BARRA DI SCRITTURA LIQUID GLASS CON [+] E MIC/SEND MORPH
             AnimatedContent(
                 targetState = isRecordingVoice,
                 transitionSpec = {
-                    (fadeIn(tween(300, easing = FastOutSlowInEasing)) + scaleIn(
+                    (fadeIn(PeritoMotionTokens.gentleFade) + scaleIn(
                         initialScale = 0.95f,
-                        animationSpec = spring(
-                            dampingRatio = 0.82f,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
+                        animationSpec = PeritoMotionTokens.snappySpring
                     )).togetherWith(
-                        fadeOut(tween(220, easing = FastOutLinearInEasing)) + scaleOut(
+                        fadeOut(PeritoMotionTokens.gentleFade) + scaleOut(
                             targetScale = 0.97f,
-                            animationSpec = tween(220)
+                            animationSpec = PeritoMotionTokens.gentleFade
                         )
                     )
                 },
                 label = "unified_voice_bar_morph"
             ) { recordingActive ->
-                if (recordingActive) {
-                    InAppVoiceRecordingBar(
-                        onCancel = { onRecordingVoiceChange(false) },
-                        onSendVoiceNote = { transcript, durationSec, audioPath ->
-                            onRecordingVoiceChange(false)
-                            onSendVoiceNote(transcript, durationSec, audioPath)
-                        },
-                        onOpenSystemDictation = {
-                            onRecordingVoiceChange(false)
-                            onSystemVoiceClick()
-                        }
-                    )
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // [+] Pulsante Azioni & Allegati
-                        val attachInteraction = remember { MutableInteractionSource() }
-                        Surface(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onOpenAttachSheet()
+                val morphModifier = if (sharedTransitionScope != null) {
+                    with(sharedTransitionScope) {
+                        Modifier.sharedBounds(
+                            rememberSharedContentState("bottom_input_bar"),
+                            animatedVisibilityScope = this@AnimatedContent
+                        )
+                    }
+                } else Modifier
+
+                Box(modifier = morphModifier) {
+                    if (recordingActive) {
+                        InAppVoiceRecordingBar(
+                            onCancel = { onRecordingVoiceChange(false) },
+                            onSendVoiceNote = { transcript, durationSec, audioPath ->
+                                onRecordingVoiceChange(false)
+                                onSendVoiceNote(transcript, durationSec, audioPath)
                             },
-                            interactionSource = attachInteraction,
-                            shape = CircleShape,
-                            color = AppleWhite,
-                            border = BorderStroke(1.dp, DavezStoneBorder.copy(alpha = 0.60f)),
-                            shadowElevation = 1.dp,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .semantics {
-                                    contentDescription = "Azioni e allegati"
-                                    testTag = "chat_attach_button"
-                                }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Azioni e allegati",
-                                    tint = DavezBordeaux,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                            onOpenSystemDictation = {
+                                onRecordingVoiceChange(false)
+                                onSystemVoiceClick()
                             }
-                        }
-
-                        Spacer(Modifier.width(8.dp))
-
-                        // Campo di testo arrotondato Capsule Apple White
-                        Box(
+                        )
+                    } else {
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp, max = 110.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(AppleWhite)
-                                .border(
-                                    1.dp,
-                                    DavezStoneBorder.copy(alpha = 0.55f),
-                                    RoundedCornerShape(24.dp)
-                                )
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.CenterStart
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (inputFieldValue.text.isEmpty()) {
-                                Text(
-                                    text = "Messaggio o digita / per comandi...",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 15.sp,
+                            val attachInteraction = remember { MutableInteractionSource() }
+                            Surface(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                    onOpenAttachSheet()
+                                },
+                                interactionSource = attachInteraction,
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.60f)),
+                                shadowElevation = 1.dp,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .emilPressScale(attachInteraction)
+                                    .semantics {
+                                        contentDescription = "Azioni e allegati"
+                                        testTag = "chat_attach_button"
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Azioni e allegati",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(8.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp, max = 110.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                                        RoundedCornerShape(24.dp)
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (inputFieldValue.text.isEmpty()) {
+                                    Text(
+                                        text = "Messaggio o digita / per comandi...",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 15.sp,
+                                            letterSpacing = (-0.2).sp
+                                        ),
+                                        color = semanticColors.labelTertiary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                BasicTextField(
+                                    value = inputFieldValue,
+                                    onValueChange = onInputFieldValueChange,
+                                    textStyle = TextStyle(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 15.5.sp,
+                                        lineHeight = 21.sp,
                                         letterSpacing = (-0.2).sp
                                     ),
-                                    color = AppleLabelTertiary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    maxLines = 4,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(inputFocusRequester)
+                                        .semantics { contentDescription = "Campo messaggio chat" }
                                 )
                             }
-                            BasicTextField(
-                                value = inputFieldValue,
-                                onValueChange = onInputFieldValueChange,
-                                textStyle = TextStyle(
-                                    color = AppleLabelPrimary,
-                                    fontSize = 15.5.sp,
-                                    lineHeight = 21.sp,
-                                    letterSpacing = (-0.2).sp
-                                ),
-                                cursorBrush = SolidColor(DavezBordeaux),
-                                maxLines = 4,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(inputFocusRequester)
-                                    .semantics { contentDescription = "Campo messaggio chat" }
-                            )
-                        }
 
-                        Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(8.dp))
 
-                        // Pulsante Azione Dinamico: Invia (se c'è testo) / Microfono (se vuoto)
-                        val hasText = inputFieldValue.text.isNotBlank()
-                        val sendInteraction = remember { MutableInteractionSource() }
-                        Surface(
-                            onClick = {
-                                if (hasText) {
-                                    val toSend = inputFieldValue.text.trim()
-                                    if (toSend.isNotEmpty()) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onInputFieldValueChange(TextFieldValue(""))
-                                        onSendMessage(toSend)
-                                    }
-                                } else {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onRecordingVoiceChange(true)
-                                }
-                            },
-                            interactionSource = sendInteraction,
-                            shape = CircleShape,
-                            color = DavezBordeaux,
-                            shadowElevation = 2.dp,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .semantics {
-                                    contentDescription = if (hasText) "Invia messaggio" else "Detta nota vocale"
-                                    testTag = if (hasText) "chat_send_button" else "chat_mic_button"
-                                }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                AnimatedContent(
-                                    targetState = hasText,
-                                    transitionSpec = {
-                                        (scaleIn(
-                                            initialScale = 0.84f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMediumLow
-                                            )
-                                        ) + fadeIn(tween(260, easing = FastOutSlowInEasing))).togetherWith(
-                                            scaleOut(
-                                                targetScale = 0.84f,
-                                                animationSpec = tween(200, easing = FastOutLinearInEasing)
-                                            ) + fadeOut(tween(200))
-                                        )
-                                    },
-                                    label = "mic_send_morph"
-                                ) { showSend ->
-                                    if (showSend) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Send,
-                                            contentDescription = "Invia",
-                                            tint = AppleWhite,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                            val hasText = inputFieldValue.text.isNotBlank()
+                            val sendInteraction = remember { MutableInteractionSource() }
+                            Surface(
+                                onClick = {
+                                    if (hasText) {
+                                        val toSend = inputFieldValue.text.trim()
+                                        if (toSend.isNotEmpty()) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                                            onInputFieldValueChange(TextFieldValue(""))
+                                            onSendMessage(toSend)
+                                        }
                                     } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Mic,
-                                            contentDescription = "Registra Nota Vocale In-App",
-                                            tint = AppleWhite,
-                                            modifier = Modifier.size(22.dp)
-                                        )
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onRecordingVoiceChange(true)
+                                    }
+                                },
+                                interactionSource = sendInteraction,
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .emilPressScale(sendInteraction)
+                                    .semantics {
+                                        contentDescription = if (hasText) "Invia messaggio" else "Detta nota vocale"
+                                        testTag = if (hasText) "chat_send_button" else "chat_mic_button"
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    AnimatedContent(
+                                        targetState = hasText,
+                                        transitionSpec = {
+                                            (scaleIn(
+                                                initialScale = 0.84f,
+                                                animationSpec = PeritoMotionTokens.snappySpring
+                                            ) + fadeIn(PeritoMotionTokens.gentleFade)).togetherWith(
+                                                scaleOut(
+                                                    targetScale = 0.84f,
+                                                    animationSpec = PeritoMotionTokens.gentleFade
+                                                ) + fadeOut(PeritoMotionTokens.gentleFade)
+                                            )
+                                        },
+                                        label = "mic_send_morph"
+                                    ) { showSend ->
+                                        if (showSend) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                                contentDescription = "Invia",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.Mic,
+                                                contentDescription = "Registra Nota Vocale In-App",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1531,28 +1530,28 @@ fun LiquidFluidTabDock(
     SingleChoiceSegmentedButtonRow(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .heightIn(min = 44.dp)
     ) {
         SegmentedButton(
             selected = selectedTab == MainAppTab.CHAT,
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                 onSelectTab(MainAppTab.CHAT)
             },
             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
             colors = SegmentedButtonDefaults.colors(
-                activeContainerColor = AppleWhite,
-                activeContentColor = DavezBordeaux,
+                activeContainerColor = MaterialTheme.colorScheme.surface,
+                activeContentColor = MaterialTheme.colorScheme.primary,
                 inactiveContainerColor = Color.Transparent,
-                inactiveContentColor = AppleLabelSecondary,
-                activeBorderColor = DavezStoneBorder.copy(alpha = 0.50f),
-                inactiveBorderColor = DavezStoneBorder.copy(alpha = 0.35f)
+                inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                activeBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.50f),
+                inactiveBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             ),
             icon = {
                 Icon(
                     imageVector = if (selectedTab == MainAppTab.CHAT) Icons.Default.ChatBubble else Icons.Outlined.ChatBubbleOutline,
                     contentDescription = null,
-                    tint = if (selectedTab == MainAppTab.CHAT) DavezBordeaux else AppleLabelSecondary,
+                    tint = if (selectedTab == MainAppTab.CHAT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
             },
@@ -1570,23 +1569,23 @@ fun LiquidFluidTabDock(
         SegmentedButton(
             selected = selectedTab == MainAppTab.AGENDA,
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                 onSelectTab(MainAppTab.AGENDA)
             },
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
             colors = SegmentedButtonDefaults.colors(
-                activeContainerColor = AppleWhite,
-                activeContentColor = DavezBordeaux,
+                activeContainerColor = MaterialTheme.colorScheme.surface,
+                activeContentColor = MaterialTheme.colorScheme.primary,
                 inactiveContainerColor = Color.Transparent,
-                inactiveContentColor = AppleLabelSecondary,
-                activeBorderColor = DavezStoneBorder.copy(alpha = 0.50f),
-                inactiveBorderColor = DavezStoneBorder.copy(alpha = 0.35f)
+                inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                activeBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.50f),
+                inactiveBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             ),
             icon = {
                 Icon(
                     imageVector = if (selectedTab == MainAppTab.AGENDA) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
                     contentDescription = null,
-                    tint = if (selectedTab == MainAppTab.AGENDA) DavezBordeaux else AppleLabelSecondary,
+                    tint = if (selectedTab == MainAppTab.AGENDA) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
             },
@@ -1605,7 +1604,11 @@ fun LiquidFluidTabDock(
                     if (agendaCount > 0) {
                         Surface(
                             shape = CircleShape,
-                            color = if (selectedTab == MainAppTab.AGENDA) DavezBordeaux else DavezBordeaux.copy(alpha = 0.16f),
+                            color = if (selectedTab == MainAppTab.AGENDA) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                            },
                             modifier = Modifier.defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
                         ) {
                             Box(
@@ -1618,7 +1621,11 @@ fun LiquidFluidTabDock(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 10.sp
                                     ),
-                                    color = if (selectedTab == MainAppTab.AGENDA) AppleWhite else DavezBordeaux
+                                    color = if (selectedTab == MainAppTab.AGENDA) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    }
                                 )
                             }
                         }
@@ -1640,13 +1647,22 @@ fun PeritoStudioTopBar(
     isModelReady: Boolean = false,
     isModelDownloading: Boolean = false,
     studioTitle: String = "Studio Tecnico Peritale",
+    fascicoli: List<Fascicolo> = emptyList(),
+    activeFascicoloId: String? = null,
+    onSelectActiveFascicolo: (String?) -> Unit = {},
     onOpenArchive: () -> Unit,
     onOpenAiModels: () -> Unit,
     onRequestCalendarPerm: () -> Unit,
     onClearChat: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
     var showConfirmClear by remember { mutableStateOf(false) }
+    var showFascicoloMenu by remember { mutableStateOf(false) }
+
+    val activeFascicolo = remember(fascicoli, activeFascicoloId) {
+        fascicoli.find { it.id == activeFascicoloId }
+    }
 
     val modelStatus = when {
         isModelDownloading -> ModelVisualStatus.DOWNLOADING
@@ -1655,39 +1671,40 @@ fun PeritoStudioTopBar(
     }
 
     if (showConfirmClear && onClearChat != null) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showConfirmClear = false },
             title = {
                 Text(
                     text = "Cancella cronologia chat",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = DavezBordeaux
+                    color = MaterialTheme.colorScheme.primary
                 )
             },
             text = {
                 Text(
                     text = "Vuoi svuotare tutti i messaggi della conversazione corrente? I documenti archiviati e i fascicoli rimarranno intatti.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppleLabelPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
                         showConfirmClear = false
                         onClearChat()
                     }
                 ) {
-                    Text("Svuota Chat", color = AppleRed, fontWeight = FontWeight.Bold)
+                    Text("Svuota Chat", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmClear = false }) {
-                    Text("Annulla", color = AppleLabelSecondary)
+                    Text("Annulla", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            containerColor = AppleWhite,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(20.dp)
         )
     }
@@ -1695,22 +1712,20 @@ fun PeritoStudioTopBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DavezAlabaster)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(62.dp)
-                .padding(horizontal = 12.dp),
+                .heightIn(min = 62.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Brand Logo 3D PeritoAI RD con indicatore stato modello dinamico
             PeritoAiBrandEmblem(size = 42.dp, showOnlineBadge = true, modelStatus = modelStatus)
 
             Spacer(Modifier.width(10.dp))
 
-            // Nome App ("PeritoAI") + Monogramma Studio Tecnico
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1722,15 +1737,15 @@ fun PeritoStudioTopBar(
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold
                         ),
-                        color = AppleLabelPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = AppleBlueSoft,
-                        border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.22f))
+                        color = semanticColors.brandSoft,
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
@@ -1745,7 +1760,7 @@ fun PeritoStudioTopBar(
                             Text(
                                 text = studioTitle.uppercase().take(14),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = DavezBordeaux,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -1759,23 +1774,22 @@ fun PeritoStudioTopBar(
                 Text(
                     text = if (isProcessing) "✨ Elaborazione IA in corso..." else "$studioTitle • $modelStatusLabel",
                     style = MaterialTheme.typography.bodySmall,
-                    color = DavezBordeauxSoft,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            // Pulsante sincronizzazione Calendario (se non ancora concessa)
             if (!hasCalendarPermission) {
                 val calInteraction = remember { MutableInteractionSource() }
                 Surface(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         onRequestCalendarPerm()
                     },
                     interactionSource = calInteraction,
                     shape = CircleShape,
-                    color = AppleOrangeSoft,
+                    color = semanticColors.warningSoft,
                     modifier = Modifier
                         .size(44.dp)
                         .emilPressScale(calInteraction)
@@ -1784,7 +1798,7 @@ fun PeritoStudioTopBar(
                         Icon(
                             imageVector = Icons.Default.CalendarMonth,
                             contentDescription = "Collega Calendario",
-                            tint = AppleOrange,
+                            tint = semanticColors.warning,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1792,17 +1806,16 @@ fun PeritoStudioTopBar(
                 Spacer(Modifier.width(6.dp))
             }
 
-            // Pulsante Squircle Impostazioni & Modelli IA (Touch target 44x44dp Apple HIG)
             val modInteraction = remember { MutableInteractionSource() }
             Surface(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                     onOpenAiModels()
                 },
                 interactionSource = modInteraction,
                 shape = RoundedCornerShape(14.dp),
-                color = AppleBlueSoft,
-                border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.18f)),
+                color = semanticColors.brandSoft,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                 modifier = Modifier
                     .size(44.dp)
                     .emilPressScale(modInteraction)
@@ -1815,24 +1828,23 @@ fun PeritoStudioTopBar(
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = "Parametri e Modelli IA",
-                        tint = DavezBordeaux,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            // Pulsante Archivio Documentale con Badge (Feature 17 - Touch target 44x44dp Apple HIG)
             Spacer(Modifier.width(6.dp))
             val arcInteraction = remember { MutableInteractionSource() }
             Surface(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                     onOpenArchive()
                 },
                 interactionSource = arcInteraction,
                 shape = RoundedCornerShape(14.dp),
-                color = AppleBlueSoft,
-                border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.18f)),
+                color = semanticColors.brandSoft,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                 modifier = Modifier
                     .size(44.dp)
                     .emilPressScale(arcInteraction)
@@ -1845,26 +1857,29 @@ fun PeritoStudioTopBar(
                     Icon(
                         imageVector = Icons.Default.Folder,
                         contentDescription = "Archivio Documentale",
-                        tint = DavezBordeaux,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     if (archivedCount > 0) {
                         Surface(
                             shape = CircleShape,
-                            color = DavezBordeaux,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(2.dp)
-                                .size(16.dp)
+                                .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 3.dp)
+                            ) {
                                 Text(
                                     text = if (archivedCount > 99) "99+" else archivedCount.toString(),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold
                                     ),
-                                    color = AppleWhite
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
                         }
@@ -1872,19 +1887,18 @@ fun PeritoStudioTopBar(
                 }
             }
 
-            // Pulsante Svuota Chat (se fornito)
             if (onClearChat != null) {
                 Spacer(Modifier.width(6.dp))
                 val clearInteraction = remember { MutableInteractionSource() }
                 Surface(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
                         showConfirmClear = true
                     },
                     interactionSource = clearInteraction,
                     shape = RoundedCornerShape(14.dp),
-                    color = AppleBlueSoft,
-                    border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.18f)),
+                    color = semanticColors.brandSoft,
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                     modifier = Modifier
                         .size(44.dp)
                         .emilPressScale(clearInteraction)
@@ -1896,7 +1910,7 @@ fun PeritoStudioTopBar(
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = "Svuota Chat",
-                            tint = DavezBordeaux,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1904,8 +1918,133 @@ fun PeritoStudioTopBar(
             }
         }
 
-        // Hairline Divider iOS (0.5.dp) in tonalità pietra davez
-        HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
+        // Active Fascicolo Selector Chip (1-tap commessa switcher)
+        if (fascicoli.isNotEmpty() || activeFascicolo != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
+            ) {
+                val chipInteraction = remember { MutableInteractionSource() }
+                Surface(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        showFascicoloMenu = true
+                    },
+                    interactionSource = chipInteraction,
+                    shape = RoundedCornerShape(50),
+                    color = if (activeFascicolo != null) semanticColors.brandSoft else MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(
+                        0.8.dp,
+                        if (activeFascicolo != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline
+                    ),
+                    modifier = Modifier
+                        .heightIn(min = 44.dp)
+                        .emilPressScale(chipInteraction)
+                        .semantics { testTag = "top_bar_active_fascicolo_chip" }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = if (activeFascicolo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = if (activeFascicolo != null) {
+                                "Commessa attiva: ${activeFascicolo.codice} • ${activeFascicolo.titolo}"
+                            } else {
+                                "Seleziona commessa / fascicolo attivo"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (activeFascicolo != null) FontWeight.Bold else FontWeight.Medium,
+                            color = if (activeFascicolo != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Cambia commessa attiva",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showFascicoloMenu,
+                    onDismissRequest = { showFascicoloMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = "Nessuna commessa (Generale)",
+                                fontWeight = if (activeFascicoloId == null) FontWeight.Bold else FontWeight.Normal,
+                                color = if (activeFascicoloId == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        leadingIcon = {
+                            if (activeFascicoloId == null) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            showFascicoloMenu = false
+                            onSelectActiveFascicolo(null)
+                        }
+                    )
+                    fascicoli.forEach { fascicolo ->
+                        val isSelected = fascicolo.id == activeFascicoloId
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = "${fascicolo.codice} • ${fascicolo.titolo}",
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = fascicolo.cliente,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            },
+                            leadingIcon = {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                showFascicoloMenu = false
+                                onSelectActiveFascicolo(fascicolo.id)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
     }
 }
 
@@ -1921,16 +2060,18 @@ fun PeritoInteractiveHeroHeader(
     onPrefillSearch: () -> Unit,
     onPrefillDelete: () -> Unit
 ) {
+    val semanticColors = LocalPeritoSemanticColors.current
+
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = AppleWhite,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp,
         border = BorderStroke(
             width = 1.dp,
             brush = Brush.linearGradient(
                 colors = listOf(
-                    DavezBordeaux.copy(alpha = 0.28f),
-                    DavezStoneBorder.copy(alpha = 0.55f)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
                 )
             )
         ),
@@ -1946,7 +2087,6 @@ fun PeritoInteractiveHeroHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Nucleo 3D Interattivo in Bordeaux Imperiale & Oro Champagne (Trascinabile!)
                 Perito3DThinkingOrb(
                     isThinking = isProcessing,
                     size = 54.dp
@@ -1962,19 +2102,19 @@ fun PeritoInteractiveHeroHeader(
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = AppleLabelPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = if (isReasoningReady) AppleGreenSoft else AppleOrangeSoft
+                            color = if (isReasoningReady) semanticColors.successSoft else semanticColors.warningSoft
                         ) {
                             Text(
                                 text = if (isReasoningReady) "Qwen 3.5 Attivo" else "Modello Richiesto",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isReasoningReady) AppleGreen else AppleOrange,
+                                color = if (isReasoningReady) semanticColors.success else semanticColors.warning,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
@@ -1984,12 +2124,11 @@ fun PeritoInteractiveHeroHeader(
                     Text(
                         text = "Il rigore delle misure e l'IA locale: registra note vocali, scansiona atti o smista nelle 6 cartelle.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // 3 Quick Action Bento Cards (/design-taste-frontend-v1 & /agency-ui-designer)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2028,30 +2167,28 @@ private fun HeroActionBentoCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val haptic = LocalHapticFeedback.current
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
 
-    // Cartoonish icon bounce when pressed
     val iconBounce by animateFloatAsState(
         targetValue = if (isPressed) 0.84f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "bento_icon_bounce"
     )
 
     Surface(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
             onClick()
         },
         interactionSource = interactionSource,
         shape = RoundedCornerShape(14.dp),
-        color = DavezAlabaster,
-        border = BorderStroke(0.6.dp, DavezStoneBorder),
-        modifier = modifier.cartoonPressSquash(interactionSource, pressedScaleY = 0.92f, squashScaleX = 1.05f)
+        color = MaterialTheme.colorScheme.background,
+        border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline),
+        modifier = modifier.emilPressScale(interactionSource, pressedScale = 0.95f)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
@@ -2061,8 +2198,8 @@ private fun HeroActionBentoCard(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(AppleWhite)
-                    .border(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                     .graphicsLayer {
                         scaleX = iconBounce
                         scaleY = iconBounce
@@ -2072,7 +2209,7 @@ private fun HeroActionBentoCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = DavezBordeaux,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(15.dp)
                 )
             }
@@ -2081,14 +2218,14 @@ private fun HeroActionBentoCard(
                 text = title,
                 style = MaterialTheme.typography.labelMedium.copy(letterSpacing = (-0.2).sp),
                 fontWeight = FontWeight.Bold,
-                color = DavezBordeaux,
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                color = AppleLabelSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2099,8 +2236,15 @@ private fun HeroActionBentoCard(
 // =============================================================================
 // BOLLA SEMANTICA DI RAGIONAMENTO IA IN CORSO (/agentic-craft-ui Pillar 1 & 4)
 // =============================================================================
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun AgenticThinkingBubble(label: String) {
+fun AgenticThinkingBubble(
+    label: String,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
+) {
+    val context = LocalContext.current
+    val semanticColors = LocalPeritoSemanticColors.current
     val infiniteTransition = rememberInfiniteTransition(label = "thinking_orb_breathe")
     val breathePhase = infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -2119,12 +2263,13 @@ fun AgenticThinkingBubble(label: String) {
             bottomStart = 6.dp,
             bottomEnd = 22.dp
         ),
-        color = AppleBlueSoft,
-        border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.25f)),
+        color = semanticColors.brandSoft,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
         modifier = Modifier
             .widthIn(min = 180.dp, max = 330.dp)
             .graphicsLayer {
-                val phase = breathePhase.value
+                val animationsEnabled = PeritoMotionTokens.areAnimationsEnabled(context)
+                val phase = if (animationsEnabled) breathePhase.value else 0f
                 scaleX = 1f + sin(phase) * 0.025f
                 scaleY = 1f - sin(phase) * 0.025f
             }
@@ -2135,11 +2280,19 @@ fun AgenticThinkingBubble(label: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Perito3DThinkingOrb(isThinking = true, size = 32.dp)
+            val orbModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                with(sharedTransitionScope) {
+                    Modifier.sharedBounds(
+                        rememberSharedContentState("agentic_thinking_orb"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+                }
+            } else Modifier
+            Perito3DThinkingOrb(isThinking = true, size = 32.dp, modifier = orbModifier)
             Text(
                 text = label.ifBlank { "🧠 Qwen 3.5 2B (Q4_K_M) • Analisi in corso..." },
                 style = MaterialTheme.typography.labelMedium,
-                color = DavezBordeaux,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -2147,18 +2300,16 @@ fun AgenticThinkingBubble(label: String) {
 }
 
 // =============================================================================
-// SCHERMATA UNICA TIMELINE CON REGISTRATORE VOCALE IN-APP (STUDIO PERITALE),
-// FOTOCAMERA SCANNER 3D E TRAY ALLEGATI MODERNO SQUIRCLE
+// SCHERMATA ASSISTENTE CHAT PERITALE
 // =============================================================================
-// =============================================================================
-// SCHERMATA ASSISTENTE CHAT PERITALE (SFONDO CONTINUO DAVEZ ALABASTER)
-// =============================================================================
+@OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun PeritoStudioChatScreen(
     uiState: PeritoUiState,
     viewModel: PeritoViewModel,
     onPrefillCommand: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -2171,7 +2322,6 @@ fun PeritoStudioChatScreen(
         derivedStateOf { listState.canScrollForward }
     }
 
-    // Scroll fluido solo su arrivo di nuovi messaggi o inizio elaborazione
     LaunchedEffect(uiState.messages.size, uiState.isProcessing) {
         val totalItems = uiState.messages.size + 1 + (if (uiState.isProcessing) 1 else 0)
         if (uiState.messages.size > 1 || uiState.isProcessing) {
@@ -2179,7 +2329,6 @@ fun PeritoStudioChatScreen(
         }
     }
 
-    // Scroll istantaneo su apertura tastiera (IME): niente ritardi, delay o doppie animazioni concorrenti
     LaunchedEffect(imeBottomPx > 0) {
         if (imeBottomPx > 0) {
             val totalItems = uiState.messages.size + 1 + (if (uiState.isProcessing) 1 else 0)
@@ -2192,17 +2341,17 @@ fun PeritoStudioChatScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DavezAlabaster)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .background(DavezAlabaster),
+                .background(MaterialTheme.colorScheme.background)
+                .imeNestedScroll(),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header Interattivo con Nucleo 3D e i 3 comandi slash (/oggi, /cerca, /elimina)
             item(key = "hero_header_3d") {
                 PeritoInteractiveHeroHeader(
                     isProcessing = uiState.isProcessing,
@@ -2211,6 +2360,19 @@ fun PeritoStudioChatScreen(
                     onPrefillSearch = { onPrefillCommand("/cerca ") },
                     onPrefillDelete = { onPrefillCommand("/elimina ") }
                 )
+            }
+
+            if (uiState.messages.isEmpty() && !uiState.isProcessing) {
+                item(key = "chat_empty_state") {
+                    PeritoEmptyErrorState(
+                        icon = Icons.Outlined.ChatBubbleOutline,
+                        title = "Nessun messaggio in cronologia",
+                        subtitle = "Scrivi una richiesta, usa /oggi o allega un documento per iniziare.",
+                        actionLabel = "Briefing di oggi",
+                        onAction = { viewModel.sendUserMessage("/oggi") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             items(uiState.messages, key = { it.id }) { msg ->
@@ -2255,45 +2417,60 @@ fun PeritoStudioChatScreen(
                 }
             }
 
-            // Bolla Semantica Thinking Orb durante l'analisi IA (/agentic-craft-ui)
-            if (uiState.isProcessing) {
-                item(key = "thinking_orb_bubble") {
-                    AgenticThinkingBubble(label = uiState.processingLabel)
+            item(key = "thinking_orb_bubble") {
+                AnimatedVisibility(
+                    visible = uiState.isProcessing,
+                    enter = fadeIn(PeritoMotionTokens.gentleFade) + scaleIn(
+                        initialScale = 0.92f,
+                        animationSpec = PeritoMotionTokens.snappySpring
+                    ),
+                    exit = fadeOut(PeritoMotionTokens.gentleFade) + scaleOut(
+                        targetScale = 0.92f,
+                        animationSpec = PeritoMotionTokens.gentleFade
+                    )
+                ) {
+                    AgenticThinkingBubble(
+                        label = uiState.processingLabel,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = this@AnimatedVisibility
+                    )
                 }
             }
         }
 
-        // Floating Pill "Ultimi messaggi" quando si scorre verso l'alto
-        androidx.compose.animation.AnimatedVisibility(
+        AnimatedVisibility(
             visible = showScrollToBottom,
-            enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) + scaleIn(
+            enter = fadeIn(PeritoMotionTokens.gentleFade) + scaleIn(
                 initialScale = 0.86f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+                animationSpec = PeritoMotionTokens.snappySpring
             ),
-            exit = fadeOut(tween(220, easing = FastOutLinearInEasing)) + scaleOut(targetScale = 0.86f, animationSpec = tween(220)),
+            exit = fadeOut(PeritoMotionTokens.gentleFade) + scaleOut(
+                targetScale = 0.86f,
+                animationSpec = PeritoMotionTokens.gentleFade
+            ),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 12.dp)
         ) {
             Surface(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                     coroutineScope.launch {
                         val totalItems = uiState.messages.size + 1
                         listState.animateScrollToItem(totalItems - 1, scrollOffset = 10_000)
                     }
                 },
                 shape = CircleShape,
-                color = AppleWhite,
+                color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 4.dp,
-                border = BorderStroke(0.8.dp, DavezStoneBorder),
-                modifier = Modifier.size(42.dp)
+                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.size(44.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = "Scorri in fondo",
-                        tint = DavezBordeaux
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -2305,46 +2482,195 @@ fun PeritoStudioChatScreen(
 // REGISTRATORE VOCALE IN-APP STILE WHATSAPP / IMESSAGE CON ONDA SONORA 60FPS,
 // REGISTRAZIONE VOCE REALE UTENTE (.WAV) E GOOGLE SPEECHRECOGNIZER HEADLESS
 // =============================================================================
-private fun savePcmAsWavFile(
-    context: android.content.Context,
-    pcmBytes: ByteArray,
-    sampleRate: Int = 16000
-): String? {
-    if (pcmBytes.isEmpty()) return null
-    return try {
-        val dir = File(context.filesDir, "voice_notes").apply { mkdirs() }
-        val wavFile = File(dir, "voice_${System.currentTimeMillis()}.wav")
-        val channels = 1
-        val bitsPerSample = 16
-        val byteRate = sampleRate * channels * (bitsPerSample / 8)
-        val blockAlign = channels * (bitsPerSample / 8)
-        val dataSize = pcmBytes.size
-        val chunkSize = 36 + dataSize
+@Composable
+fun SlashCommandsPopupCard(
+    commands: List<PeritoSlashCommand>,
+    typedQuery: String,
+    onSelectCommand: (PeritoSlashCommand) -> Unit,
+    onExecuteDirectCommand: (PeritoSlashCommand) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val semanticColors = LocalPeritoSemanticColors.current
 
-        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
-            put("RIFF".toByteArray(Charsets.US_ASCII))
-            putInt(chunkSize)
-            put("WAVE".toByteArray(Charsets.US_ASCII))
-            put("fmt ".toByteArray(Charsets.US_ASCII))
-            putInt(16) // Subchunk1Size (PCM)
-            putShort(1.toShort()) // AudioFormat (1 = PCM)
-            putShort(channels.toShort())
-            putInt(sampleRate)
-            putInt(byteRate)
-            putShort(blockAlign.toShort())
-            putShort(bitsPerSample.toShort())
-            put("data".toByteArray(Charsets.US_ASCII))
-            putInt(dataSize)
-        }.array()
+    Surface(
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 6.dp,
+        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 280.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text("⚡", fontSize = 14.sp)
+                    Text(
+                        text = "COMANDI RAPIDI & IMPOSTAZIONI",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 0.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (typedQuery.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                        ) {
+                            Text(
+                                text = "/$typedQuery",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Chiudi suggerimenti",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
 
-        FileOutputStream(wavFile).use { fos ->
-            fos.write(header)
-            fos.write(pcmBytes)
-            fos.flush()
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+
+            if (commands.isEmpty()) {
+                PeritoEmptyErrorState(
+                    icon = Icons.Default.Search,
+                    title = "Nessun comando trovato",
+                    subtitle = "Nessun comando per \"/$typedQuery\". Prova /orario, /sposta, /oggi, /fissa o /cerca.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(commands, key = { it.command }) { cmd ->
+                        Surface(
+                            onClick = { onSelectCommand(cmd) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                            .border(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), RoundedCornerShape(9.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(cmd.iconEmoji, fontSize = 17.sp)
+                                    }
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = cmd.title,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = semanticColors.brandSoft
+                                            ) {
+                                                Text(
+                                                    text = cmd.syntax,
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontSize = 10.sp
+                                                    ),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(Modifier.height(1.dp))
+                                        Text(
+                                            text = cmd.description,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                if (cmd.isDirectAction) {
+                                    Surface(
+                                        onClick = { onExecuteDirectCommand(cmd) },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Esegui ⚡",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        text = "Usa ↗",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(start = 6.dp, end = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-        wavFile.absolutePath
-    } catch (_: Throwable) {
-        null
     }
 }
 
@@ -2458,781 +2784,10 @@ val PeritoSlashCommandsList = listOf(
     )
 )
 
-@Composable
-fun SlashCommandsPopupCard(
-    commands: List<PeritoSlashCommand>,
-    typedQuery: String,
-    onSelectCommand: (PeritoSlashCommand) -> Unit,
-    onExecuteDirectCommand: (PeritoSlashCommand) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = AppleWhite,
-        shadowElevation = 6.dp,
-        border = BorderStroke(0.8.dp, DavezStoneBorder),
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 280.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Header con titolo, query filtrata e pulsante chiudi
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f, fill = false)
-                ) {
-                    Text("⚡", fontSize = 14.sp)
-                    Text(
-                        text = "COMANDI RAPIDI & IMPOSTAZIONI",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = DavezBordeaux,
-                        letterSpacing = 0.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (typedQuery.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = DavezBordeaux.copy(alpha = 0.10f)
-                        ) {
-                            Text(
-                                text = "/$typedQuery",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = DavezBordeaux,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Chiudi suggerimenti",
-                        tint = AppleLabelSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder.copy(alpha = 0.6f))
-
-            if (commands.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Nessun comando trovato per \"/$typedQuery\".\nProva /orario, /sposta, /oggi, /fissa, /cerca...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppleLabelSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(commands, key = { it.command }) { cmd ->
-                        Surface(
-                            onClick = { onSelectCommand(cmd) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = AppleWhite,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    // Badge icona
-                                    Box(
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(RoundedCornerShape(9.dp))
-                                            .background(DavezBordeaux.copy(alpha = 0.08f))
-                                            .border(0.5.dp, DavezBordeaux.copy(alpha = 0.18f), RoundedCornerShape(9.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(cmd.iconEmoji, fontSize = 17.sp)
-                                    }
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = cmd.title,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = AppleLabelPrimary,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false)
-                                            )
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = AppleBlueSoft
-                                            ) {
-                                                Text(
-                                                    text = cmd.syntax,
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontSize = 10.sp
-                                                    ),
-                                                    color = DavezBordeaux,
-                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(Modifier.height(1.dp))
-                                        Text(
-                                            text = cmd.description,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppleLabelSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-
-                                if (cmd.isDirectAction) {
-                                    Surface(
-                                        onClick = { onExecuteDirectCommand(cmd) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = DavezBordeaux,
-                                        modifier = Modifier.padding(start = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = "Esegui ⚡",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppleWhite,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                } else {
-                                    Text(
-                                        text = "Usa ↗",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = DavezBordeaux,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(start = 6.dp, end = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun InAppVoiceRecordingBar(
-    onCancel: () -> Unit,
-    onSendVoiceNote: (String, Int, String?) -> Unit,
-    @Suppress("UNUSED_PARAMETER") onOpenSystemDictation: () -> Unit = {}
-) {
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    val coroutineScope = rememberCoroutineScope()
-    var elapsedSeconds by remember { mutableIntStateOf(1) }
-    var liveTranscript by remember { mutableStateOf("") }
-    var partialSegment by remember { mutableStateOf("") }
-    var statusHint by remember { mutableStateOf<String?>(null) }
-    var isFlushingSend by remember { mutableStateOf(false) }
-    var recognizerInstance by remember { mutableStateOf<SpeechRecognizer?>(null) }
-    val mainHandler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
-    var rmsDb by remember { mutableFloatStateOf(4.5f) }
-    val pcmBuffer = remember { ByteArrayOutputStream(16000 * 2 * 15) }
-    var stopAudioRecordFn by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var hasAudioPerm by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    // Timer in tempo reale (0:01, 0:02...)
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000L)
-            elapsedSeconds += 1
-        }
-    }
-
-    // Richiesta reattiva permesso RECORD_AUDIO
-    val audioPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasAudioPerm = granted
-    }
-
-    LaunchedEffect(Unit) {
-        if (!hasAudioPerm) {
-            try {
-                audioPermLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            } catch (_: Throwable) {}
-        }
-    }
-
-    DisposableEffect(hasAudioPerm) {
-        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-        var isDisposed = false
-        var isRecordingAudio = true
-        var usePipeAudioSource = android.os.Build.VERSION.SDK_INT >= 33
-        var currentPipeSink: ParcelFileDescriptor.AutoCloseOutputStream? = null
-        var currentPipeReadFd: ParcelFileDescriptor? = null
-        var audioRecord: AudioRecord? = null
-        var recordThread: Thread? = null
-
-        fun closeCurrentPipe() {
-            try { currentPipeSink?.close() } catch (_: Throwable) {}
-            try { currentPipeReadFd?.close() } catch (_: Throwable) {}
-            currentPipeSink = null
-            currentPipeReadFd = null
-        }
-
-        // 1. Avvia AudioRecord per registrare la VERA voce dell'utente in PCM 16kHz 16-bit Mono (.wav)
-        if (hasAudioPerm) {
-            try {
-                val sampleRate = 16000
-                val minBuf = AudioRecord.getMinBufferSize(
-                    sampleRate,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT
-                ).coerceAtLeast(3200)
-                @Suppress("MissingPermission")
-                val ar = AudioRecord(
-                    MediaRecorder.AudioSource.MIC,
-                    sampleRate,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    minBuf * 2
-                )
-                if (ar.state == AudioRecord.STATE_INITIALIZED) {
-                    audioRecord = ar
-                    ar.startRecording()
-                    recordThread = Thread {
-                        val readBuf = ByteArray(1600) // 50ms a 16kHz 16-bit mono
-                        var lastDbUpdateMs = 0L
-                        while (isRecordingAudio && !isDisposed) {
-                            val readBytes = try {
-                                ar.read(readBuf, 0, readBuf.size)
-                            } catch (_: Throwable) {
-                                -1
-                            }
-                            if (readBytes > 0) {
-                                synchronized(pcmBuffer) {
-                                    pcmBuffer.write(readBuf, 0, readBytes)
-                                }
-                                // Invia i campioni anche alla pipe di SpeechRecognizer (se attiva su Android 13+)
-                                val sink = currentPipeSink
-                                if (sink != null) {
-                                    try {
-                                        sink.write(readBuf, 0, readBytes)
-                                        sink.flush()
-                                    } catch (_: Throwable) {
-                                        // SpeechRecognizer ha chiuso il lato lettura a fine frase
-                                    }
-                                }
-                                // Calcola il volume reale RMS della voce per l'onda sonora con throttling a 60ms e dispatch su MainThread
-                                var sumSq = 0.0
-                                val samples = readBytes / 2
-                                if (samples > 0) {
-                                    var idx = 0
-                                    while (idx + 1 < readBytes) {
-                                        val lo = readBuf[idx].toInt() and 0xFF
-                                        val hi = readBuf[idx + 1].toInt()
-                                        val sample = ((hi shl 8) or lo).toShort().toDouble()
-                                        sumSq += sample * sample
-                                        idx += 2
-                                    }
-                                    val now = System.currentTimeMillis()
-                                    if (now - lastDbUpdateMs >= 60L) {
-                                        lastDbUpdateMs = now
-                                        val rms = sqrt(sumSq / samples)
-                                        val mappedDb = ((rms / 1800.0) * 10.0 + 2.0).toFloat().coerceIn(1.5f, 12f)
-                                        mainHandler.post { rmsDb = mappedDb }
-                                    }
-                                }
-                            } else {
-                                try { Thread.sleep(15L) } catch (_: Throwable) {}
-                            }
-                        }
-                    }.apply {
-                        name = "PeritoRealVoiceRecorder"
-                        isDaemon = true
-                        start()
-                    }
-                } else {
-                    ar.release()
-                    usePipeAudioSource = false
-                }
-            } catch (_: Throwable) {
-                usePipeAudioSource = false
-            }
-        }
-
-        stopAudioRecordFn = {
-            isRecordingAudio = false
-            closeCurrentPipe()
-            try {
-                audioRecord?.stop()
-            } catch (_: Throwable) {}
-            try {
-                recordThread?.join(250L)
-            } catch (_: Throwable) {}
-        }
-
-        fun buildSpeechIntent(): Intent {
-            closeCurrentPipe()
-            return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "it-IT")
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "it-IT")
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
-                if (usePipeAudioSource && android.os.Build.VERSION.SDK_INT >= 33 && audioRecord != null) {
-                    try {
-                        val pipe = ParcelFileDescriptor.createPipe()
-                        currentPipeReadFd = pipe[0]
-                        currentPipeSink = ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
-                        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pipe[0])
-                        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
-                        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-                        putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, 16000)
-                    } catch (_: Throwable) {
-                        usePipeAudioSource = false
-                    }
-                }
-            }
-        }
-
-        val recognizer = try {
-            if (hasAudioPerm) {
-                val sr = try {
-                    SpeechRecognizer.createSpeechRecognizer(context)
-                } catch (_: Throwable) {
-                    if (android.os.Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-                        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-                    } else null
-                }
-                sr?.apply {
-                    setRecognitionListener(object : RecognitionListener {
-                        override fun onReadyForSpeech(params: Bundle?) {
-                            statusHint = null
-                        }
-
-                        override fun onBeginningOfSpeech() {
-                            statusHint = null
-                        }
-
-                        override fun onRmsChanged(rmsdB: Float) {
-                            if (audioRecord == null) {
-                                rmsDb = rmsdB.coerceIn(1f, 12f)
-                            }
-                        }
-
-                        override fun onBufferReceived(buffer: ByteArray?) {}
-
-                        override fun onEndOfSpeech() {}
-
-                        override fun onError(error: Int) {
-                            if (isDisposed) return
-                            closeCurrentPipe()
-                            // Se l'OEM non supporta EXTRA_AUDIO_SOURCE, passa automaticamente al mic condiviso
-                            if (usePipeAudioSource && (error == SpeechRecognizer.ERROR_AUDIO || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
-                                usePipeAudioSource = false
-                            }
-                            if (partialSegment.isNotBlank()) {
-                                val seg = partialSegment.trim()
-                                liveTranscript = if (liveTranscript.isBlank()) seg else "$liveTranscript $seg"
-                                partialSegment = ""
-                            }
-                            if (!isFlushingSend) {
-                                mainHandler.postDelayed({
-                                    if (!isDisposed && !isFlushingSend) {
-                                        try {
-                                            startListening(buildSpeechIntent())
-                                        } catch (_: Throwable) {}
-                                    }
-                                }, 180L)
-                            }
-                        }
-
-                        override fun onResults(results: Bundle?) {
-                            if (isDisposed) return
-                            closeCurrentPipe()
-                            val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            val phrase = list?.firstOrNull()?.trim().orEmpty()
-                            if (phrase.isNotEmpty()) {
-                                liveTranscript = if (liveTranscript.isBlank()) phrase else "$liveTranscript $phrase"
-                            } else if (partialSegment.isNotBlank()) {
-                                val seg = partialSegment.trim()
-                                liveTranscript = if (liveTranscript.isBlank()) seg else "$liveTranscript $seg"
-                            }
-                            partialSegment = ""
-                            if (!isFlushingSend) {
-                                mainHandler.postDelayed({
-                                    if (!isDisposed && !isFlushingSend) {
-                                        try {
-                                            startListening(buildSpeechIntent())
-                                        } catch (_: Throwable) {}
-                                    }
-                                }, 140L)
-                            }
-                        }
-
-                        override fun onPartialResults(partialResults: Bundle?) {
-                            if (isDisposed) return
-                            val stableList = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            val unstableList = partialResults?.getStringArrayList("android.speech.extra.UNSTABLE_TEXT")
-                            val stablePart = stableList?.firstOrNull()?.trim().orEmpty()
-                            val unstablePart = unstableList?.firstOrNull()?.trim().orEmpty()
-                            val combinedPart = when {
-                                stablePart.isNotEmpty() && unstablePart.isNotEmpty() -> "$stablePart $unstablePart"
-                                stablePart.isNotEmpty() -> stablePart
-                                else -> unstablePart
-                            }.trim()
-                            if (combinedPart.isNotEmpty()) {
-                                partialSegment = combinedPart
-                                statusHint = null
-                            }
-                        }
-
-                        override fun onEvent(eventType: Int, params: Bundle?) {}
-                    })
-                    startListening(buildSpeechIntent())
-                }
-            } else null
-        } catch (_: Throwable) {
-            null
-        }
-        recognizerInstance = recognizer
-
-        onDispose {
-            isDisposed = true
-            isRecordingAudio = false
-            mainHandler.removeCallbacksAndMessages(null)
-            recognizerInstance = null
-            stopAudioRecordFn = null
-            closeCurrentPipe()
-            try {
-                audioRecord?.stop()
-            } catch (_: Throwable) {}
-            try {
-                audioRecord?.release()
-            } catch (_: Throwable) {}
-            try {
-                recognizer?.stopListening()
-                recognizer?.cancel()
-                recognizer?.destroy()
-            } catch (_: Throwable) {}
-        }
-    }
-
-    val combinedTranscript = remember(liveTranscript, partialSegment) {
-        when {
-            liveTranscript.isNotBlank() && partialSegment.isNotBlank() -> "$liveTranscript $partialSegment"
-            partialSegment.isNotBlank() -> partialSegment
-            else -> liveTranscript
-        }.trim()
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "voice_wave_transition")
-    val wavePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2.0 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "voice_wave_phase"
-    )
-    val redDotAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 550),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "red_dot_pulse"
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AppleWhite)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .semantics { testTag = "in_app_voice_recording_bar" },
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Trascrizione Live Google SpeechRecognizer Headless In-App + Registrazione Voce Reale Utente
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = AppleRedSoft
-            ) {
-                Text(
-                    text = "🎙️ Registrazione Vocale • Trascrizione in Diretta",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppleRed,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
-            if (combinedTranscript.isNotBlank()) {
-                Surface(
-                    onClick = {
-                        liveTranscript = ""
-                        partialSegment = ""
-                    },
-                    shape = RoundedCornerShape(50),
-                    color = DavezAlabaster,
-                    border = BorderStroke(0.5.dp, DavezStoneBorder)
-                ) {
-                    Text(
-                        text = "↺ Pulisci testo",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-
-        // Anteprima testo trascritto in tempo reale direttamente nella schermata attuale
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = DavezAlabaster,
-            border = BorderStroke(0.5.dp, DavezStoneBorder),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = when {
-                    combinedTranscript.isNotBlank() -> "“$combinedTranscript”"
-                    statusHint != null -> statusHint!!
-                    hasAudioPerm -> "🎙️ Parla ora... registriamo la tua voce reale e trascriviamo in diretta"
-                    else -> "🎙️ Consenti il permesso microfono per registrare e trascrivere in-app"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = when {
-                    combinedTranscript.isNotBlank() -> AppleLabelPrimary
-                    statusHint != null -> AppleRed
-                    else -> AppleLabelSecondary
-                },
-                fontWeight = if (combinedTranscript.isNotBlank()) FontWeight.Medium else FontWeight.Normal,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-        }
-
-        // Barra Principale stile WhatsApp: [🗑️ Annulla] + [🔴 0:03 + Onda Sonora 24 Barre] + [⬆️ Invia Vocale]
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val cancelInteraction = remember { MutableInteractionSource() }
-            Surface(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    stopAudioRecordFn?.invoke()
-                    onCancel()
-                },
-                interactionSource = cancelInteraction,
-                shape = CircleShape,
-                color = AppleRedSoft,
-                modifier = Modifier
-                    .size(44.dp)
-                    .emilPressScale(cancelInteraction)
-                    .semantics {
-                        contentDescription = "Annulla registrazione vocale"
-                        testTag = "cancel_voice_note_button"
-                    }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteOutline,
-                        contentDescription = "Annulla",
-                        tint = AppleRed,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-
-            // Pillola Centrale con Pallino Rosso Pulsante + Timer + Onda Sonora 60fps
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = AppleBlueSoft,
-                border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.25f)),
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(AppleRed.copy(alpha = redDotAlpha))
-                    )
-                    val mins = elapsedSeconds / 60
-                    val secs = elapsedSeconds % 60
-                    Text(
-                        text = String.format(Locale.ITALIAN, "%d:%02d", mins, secs),
-                        style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace),
-                        color = DavezBordeaux,
-                        fontWeight = FontWeight.Bold
-                    )
-                    // Onda Sonora 24 Barre Dinamica
-                    Canvas(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(26.dp)
-                    ) {
-                        val barCount = 24
-                        val spacing = size.width / barCount
-                        val barWidth = (spacing * 0.56f).coerceAtLeast(3f)
-                        for (i in 0 until barCount) {
-                            val norm = sin(wavePhase + i * 0.45f) * 0.5f + 0.5f
-                            val boost = (rmsDb / 8f).coerceIn(0.4f, 1.3f)
-                            val barH = (size.height * (0.22f + 0.72f * norm * boost)).coerceIn(4.dp.toPx(), size.height)
-                            val x = i * spacing + (spacing - barWidth) / 2f
-                            val y = (size.height - barH) / 2f
-                            drawRoundRect(
-                                color = if (i % 3 == 0) DavezBordeaux else DavezBordeauxSoft,
-                                topLeft = Offset(x, y),
-                                size = Size(barWidth, barH),
-                                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Pulsante Invia Nota Vocale (⬆️) — Salva il .WAV della vera voce dell'utente e invia!
-            val sendInteraction = remember { MutableInteractionSource() }
-            Surface(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    val immediateText = combinedTranscript.trim()
-                    if (immediateText.isNotBlank()) {
-                        isFlushingSend = true
-                        stopAudioRecordFn?.invoke()
-                        try {
-                            recognizerInstance?.stopListening()
-                        } catch (_: Throwable) {}
-                        val wavBytes = synchronized(pcmBuffer) { pcmBuffer.toByteArray() }
-                        val savedWavPath = savePcmAsWavFile(context, wavBytes, 16000)
-                        onSendVoiceNote(immediateText, elapsedSeconds, savedWavPath)
-                    } else if (!isFlushingSend) {
-                        // Forza il flush finale del motore Google SpeechRecognizer senza aprire pop-up
-                        isFlushingSend = true
-                        statusHint = "⏳ Elaborazione ultime parole..."
-                        stopAudioRecordFn?.invoke()
-                        try {
-                            recognizerInstance?.stopListening()
-                        } catch (_: Throwable) {}
-                        coroutineScope.launch {
-                            var waited = 0
-                            while (waited < 650 && liveTranscript.isBlank() && partialSegment.isBlank()) {
-                                delay(65L)
-                                waited += 65
-                            }
-                            val flushed = when {
-                                liveTranscript.isNotBlank() && partialSegment.isNotBlank() -> "$liveTranscript $partialSegment"
-                                partialSegment.isNotBlank() -> partialSegment
-                                else -> liveTranscript
-                            }.trim()
-                            if (flushed.isNotBlank()) {
-                                val wavBytes = synchronized(pcmBuffer) { pcmBuffer.toByteArray() }
-                                val savedWavPath = savePcmAsWavFile(context, wavBytes, 16000)
-                                onSendVoiceNote(flushed, elapsedSeconds, savedWavPath)
-                            } else {
-                                isFlushingSend = false
-                                statusHint = "🎙️ Nessuna voce rilevata: parla nel microfono e premi Invia"
-                            }
-                        }
-                    }
-                },
-                interactionSource = sendInteraction,
-                shape = CircleShape,
-                color = DavezBordeaux,
-                shadowElevation = 3.dp,
-                modifier = Modifier
-                    .size(44.dp)
-                    .emilPressScale(sendInteraction)
-                    .semantics {
-                        contentDescription = "Invia nota vocale"
-                        testTag = "send_voice_note_button"
-                    }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Invia Nota Vocale",
-                        tint = AppleWhite,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
-}
+// (SlashCommandsPopupCard moved above; InAppVoiceRecordingBar extracted to PeritoVoiceRecordingBar.kt)
 
 // =============================================================================
 // FOGLIO MODALE ALLEGATI SQUIRCLE STILE WHATSAPP / IOS (APPLE HIG & RESPONSIVE)
-// Risolve il problema del pulsante Chiudi che va a capo e garantisce perfetta responsività
-// su schermi compatti, standard, foldable e tablet senza menu quadrati!
 // =============================================================================
 @Composable
 fun ModernAttachmentSheet(
@@ -3243,23 +2798,24 @@ fun ModernAttachmentSheet(
     onClose: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            .imePadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 520.dp)
-                .background(DavezAlabaster)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 20.dp, vertical = 10.dp)
                 .semantics { testTag = "modern_attachment_sheet" },
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header con titolo e pulsante circolare Chiudi stile Apple HIG (non va MAI a capo!)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -3276,7 +2832,7 @@ fun ModernAttachmentSheet(
                             fontSize = 18.sp,
                             letterSpacing = (-0.3).sp
                         ),
-                        color = AppleLabelPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -3287,24 +2843,23 @@ fun ModernAttachmentSheet(
                             fontSize = 12.sp,
                             letterSpacing = (-0.1).sp
                         ),
-                        color = AppleLabelSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // Pulsante Chiudi Circolare Stile Apple HIG: NON va MAI a capo!
                 val closeInteraction = remember { MutableInteractionSource() }
                 Surface(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         onClose()
                     },
                     interactionSource = closeInteraction,
                     shape = CircleShape,
-                    color = Color(0x14000000),
+                    color = semanticColors.secondaryGroupedBg,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .emilPressScale(closeInteraction, pressedScale = 0.90f)
                         .semantics { contentDescription = "Chiudi finestra allegati" }
                 ) {
@@ -3312,14 +2867,13 @@ fun ModernAttachmentSheet(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Chiudi",
-                            tint = AppleLabelPrimary,
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            // Griglia 2x2 Bento Squircle Responsive stile Apple HIG & Studio Peritale
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val isCompact = maxWidth < 340.dp
                 val tileSpacing = if (isCompact) 8.dp else 12.dp
@@ -3336,8 +2890,8 @@ fun ModernAttachmentSheet(
                             emoji = "📸",
                             title = "Scanner 3D",
                             subtitle = "Foto & OCR Live",
-                            tintColor = DavezBordeaux,
-                            bgColor = AppleBlueSoft,
+                            tintColor = MaterialTheme.colorScheme.primary,
+                            bgColor = semanticColors.brandSoft,
                             modifier = Modifier.weight(1f),
                             onClick = onOpenScanner
                         )
@@ -3345,8 +2899,8 @@ fun ModernAttachmentSheet(
                             emoji = "📄",
                             title = "File & .p7m",
                             subtitle = "Importa da Telefono",
-                            tintColor = DavezFotografiaSlate,
-                            bgColor = Color(0xFFEDF2F5),
+                            tintColor = MaterialTheme.colorScheme.tertiary,
+                            bgColor = MaterialTheme.colorScheme.tertiaryContainer,
                             modifier = Modifier.weight(1f),
                             onClick = onPickSystemFile
                         )
@@ -3359,8 +2913,8 @@ fun ModernAttachmentSheet(
                             emoji = "🎙️",
                             title = "Nota Vocale",
                             subtitle = "Voce & Trascrizione",
-                            tintColor = AppleGreen,
-                            bgColor = AppleGreenSoft,
+                            tintColor = semanticColors.success,
+                            bgColor = semanticColors.successSoft,
                             modifier = Modifier.weight(1f),
                             onClick = onStartVoiceNote
                         )
@@ -3368,8 +2922,8 @@ fun ModernAttachmentSheet(
                             emoji = "📂",
                             title = "6 Cartelle",
                             subtitle = "Archivio & Perizie",
-                            tintColor = AppleOrange,
-                            bgColor = AppleOrangeSoft,
+                            tintColor = semanticColors.warning,
+                            bgColor = semanticColors.warningSoft,
                             modifier = Modifier.weight(1f),
                             onClick = onOpenFolders
                         )
@@ -3397,13 +2951,13 @@ private fun SquircleAttachmentTile(
 
     Surface(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
             onClick()
         },
         interactionSource = interaction,
         shape = RoundedCornerShape(18.dp),
         color = bgColor,
-        border = BorderStroke(0.8.dp, tintColor.copy(alpha = 0.20f)),
+        border = BorderStroke(0.8.dp, tintColor.copy(alpha = 0.22f)),
         shadowElevation = 0.5.dp,
         modifier = modifier.emilPressScale(interaction, pressedScale = 0.95f)
     ) {
@@ -3418,8 +2972,8 @@ private fun SquircleAttachmentTile(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AppleWhite)
-                    .border(0.5.dp, Color.Black.copy(alpha = 0.04f), RoundedCornerShape(12.dp)),
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(text = emoji, fontSize = 20.sp)
@@ -3446,558 +3000,11 @@ private fun SquircleAttachmentTile(
                         fontSize = 11.sp,
                         letterSpacing = (-0.1).sp
                     ),
-                    color = AppleLabelSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-    }
-}
-
-// =============================================================================
-// FOTOCAMERA & SCANNER DOCUMENTALE & RILIEVI INTEGRATO IN-APP (LIVE CAMERAX + /apple-design)
-// =============================================================================
-@Composable
-fun InAppCameraScannerSheet(
-    onCaptureRealBitmap: (Bitmap, Int) -> Unit,
-    onCaptureBurstFiles: ((List<File>) -> Unit)? = null,
-    onOpenSystemCamera: () -> Unit,
-    onPickFromGallery: () -> Unit,
-    onClose: () -> Unit
-) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val haptic = LocalHapticFeedback.current
-    var selectedScanMode by rememberSaveable { mutableIntStateOf(1) }
-    var isBurstMode by rememberSaveable { mutableStateOf(false) }
-    val burstFileList = remember { mutableStateListOf<File>() }
-    var flashEnabled by rememberSaveable { mutableStateOf(true) }
-    var shutterFlashAlpha by remember { mutableFloatStateOf(0f) }
-    var isCapturing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    DisposableEffect(Unit) {
-        onDispose {
-            burstFileList.forEach { runCatching { it.delete() } }
-            burstFileList.clear()
-        }
-    }
-
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val camPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasCameraPermission = granted
-    }
-
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            try {
-                camPermLauncher.launch(Manifest.permission.CAMERA)
-            } catch (_: Throwable) {}
-        }
-    }
-
-    val imageCapture = remember {
-        ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-            .build()
-    }
-
-    LaunchedEffect(flashEnabled) {
-        imageCapture.flashMode = if (flashEnabled) {
-            ImageCapture.FLASH_MODE_AUTO
-        } else {
-            ImageCapture.FLASH_MODE_OFF
-        }
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "scanner_laser_anim")
-    val laserProgress by infiniteTransition.animateFloat(
-        initialValue = 0.12f,
-        targetValue = 0.88f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2100, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "laser_y"
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .semantics { testTag = "in_app_camera_scanner_sheet" },
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Top Bar dello Scanner In-App (con weight(1f) per non tagliare mai la X di chiusura!)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = DavezBordeaux
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        tint = AppleWhite,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .size(18.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Scanner Peritale & OCR",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AppleWhite,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Fotocamera Live • ML Kit OCR On-Device",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DavezTravertine,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    onClick = { flashEnabled = !flashEnabled },
-                    shape = RoundedCornerShape(50),
-                    color = if (flashEnabled) Color(0xFFF5D0A9) else Color(0xFF2B2625)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FlashOn,
-                            contentDescription = "Flash",
-                            tint = if (flashEnabled) Color(0xFF191716) else AppleWhite,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Text(
-                            text = if (flashEnabled) "Auto" else "Off",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (flashEnabled) Color(0xFF191716) else AppleWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                Surface(
-                    onClick = onClose,
-                    shape = CircleShape,
-                    color = Color(0xFF2B2625),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Chiudi",
-                            tint = AppleWhite,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Mirino Live CameraX Reale + Guida Ottica CAD Leggera
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(Color(0xFF121010))
-                .border(1.dp, DavezBordeauxSoft.copy(alpha = 0.6f), RoundedCornerShape(26.dp))
-        ) {
-            if (hasCameraPermission) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        val previewView = PreviewView(ctx).apply {
-                            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                            scaleType = PreviewView.ScaleType.FILL_CENTER
-                        }
-                        val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                        cameraProviderFuture.addListener({
-                            try {
-                                val cameraProvider = cameraProviderFuture.get()
-                                val preview = Preview.Builder().build().also {
-                                    it.surfaceProvider = previewView.surfaceProvider
-                                }
-                                cameraProvider.unbindAll()
-                                try {
-                                    cameraProvider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        CameraSelector.DEFAULT_BACK_CAMERA,
-                                        preview,
-                                        imageCapture
-                                    )
-                                } catch (_: Throwable) {
-                                    cameraProvider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        CameraSelector.DEFAULT_FRONT_CAMERA,
-                                        preview,
-                                        imageCapture
-                                    )
-                                }
-                            } catch (_: Throwable) {}
-                        }, ContextCompat.getMainExecutor(ctx))
-                        previewView
-                    }
-                )
-            } else {
-                // Stato in cui l'utente non ha ancora concesso il permesso fotocamera
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        tint = Color(0xFFF5D0A9),
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = "Consenti l'accesso alla Fotocamera per inquadrare documenti e rilievi peritali dal vivo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppleWhite,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = { camPermLauncher.launch(Manifest.permission.CAMERA) },
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeauxHover),
-                        shape = RoundedCornerShape(50)
-                    ) {
-                        Text("Attiva Fotocamera Live", color = AppleWhite)
-                    }
-                }
-            }
-
-            // Mirino Ottico Leggero: Angoli CAD di inquadratura + Raggio Laser (senza finto testo!)
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
-                val padX = w * 0.10f
-                val padY = h * 0.14f
-                val cornerLen = 28.dp.toPx()
-                val strokeW = 3.dp.toPx()
-                val bracketColor = Color(0xFFF5D0A9)
-
-                // Angolo Alto-Sinistra
-                drawLine(bracketColor, Offset(padX, padY), Offset(padX + cornerLen, padY), strokeW, StrokeCap.Round)
-                drawLine(bracketColor, Offset(padX, padY), Offset(padX, padY + cornerLen), strokeW, StrokeCap.Round)
-                // Angolo Alto-Destra
-                drawLine(bracketColor, Offset(w - padX, padY), Offset(w - padX - cornerLen, padY), strokeW, StrokeCap.Round)
-                drawLine(bracketColor, Offset(w - padX, padY), Offset(w - padX, padY + cornerLen), strokeW, StrokeCap.Round)
-                // Angolo Basso-Sinistra
-                drawLine(bracketColor, Offset(padX, h - padY), Offset(padX + cornerLen, h - padY), strokeW, StrokeCap.Round)
-                drawLine(bracketColor, Offset(padX, h - padY), Offset(padX, h - padY - cornerLen), strokeW, StrokeCap.Round)
-                // Angolo Basso-Destra
-                drawLine(bracketColor, Offset(w - padX, h - padY), Offset(w - padX - cornerLen, h - padY), strokeW, StrokeCap.Round)
-                drawLine(bracketColor, Offset(w - padX, h - padY), Offset(w - padX, h - padY - cornerLen), strokeW, StrokeCap.Round)
-
-                // Raggio Laser di Scansione Orizzontale
-                val laserY = h * laserProgress
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0xFF34C759).copy(alpha = 0.85f),
-                            Color(0xFFF5D0A9),
-                            Color(0xFF34C759).copy(alpha = 0.85f),
-                            Color.Transparent
-                        )
-                    ),
-                    start = Offset(padX, laserY),
-                    end = Offset(w - padX, laserY),
-                    strokeWidth = 2.2.dp.toPx()
-                )
-            }
-
-            // Badge Superiore: Modalità Attiva
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = Color(0xCC191716),
-                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f)),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 12.dp)
-            ) {
-                Text(
-                    text = if (isBurstMode) {
-                        "⚡ Raffica Rilievi: scatta a ripetizione, poi premi 'Salva Raffica'"
-                    } else when (selectedScanMode) {
-                        1 -> "📐 Inquadra Atto / Verbale CTU (OCR Automatico)"
-                        2 -> "🔍 Inquadra Danno / Infiltrazione / Rilievo"
-                        else -> "📐 Inquadra Planimetria / Computo Metrico"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFF5D0A9),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                )
-            }
-
-            // Flash Bianco allo scatto
-            if (shutterFlashAlpha > 0f) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.White.copy(alpha = shutterFlashAlpha))
-                )
-            }
-        }
-
-        // Selettore Pillole Modalità Scanner + Raffica Sopralluogo Peritale
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            ScannerModePill(
-                label = "⚖️ Verbale",
-                selected = !isBurstMode && selectedScanMode == 1,
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    isBurstMode = false
-                    selectedScanMode = 1
-                }
-            )
-            ScannerModePill(
-                label = "🧱 Danni",
-                selected = !isBurstMode && selectedScanMode == 2,
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    isBurstMode = false
-                    selectedScanMode = 2
-                }
-            )
-            ScannerModePill(
-                label = "📐 Misure",
-                selected = !isBurstMode && selectedScanMode == 3,
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    isBurstMode = false
-                    selectedScanMode = 3
-                }
-            )
-            ScannerModePill(
-                label = if (burstFileList.isEmpty()) "⚡ Raffica" else "⚡ (${burstFileList.size})",
-                selected = isBurstMode,
-                modifier = Modifier.weight(1.15f),
-                onClick = {
-                    isBurstMode = !isBurstMode
-                }
-            )
-        }
-
-        // Barra Inferiore Otturatore Stile iOS Camera: [🖼️ Galleria] + [🔘 Scatta Foto Reale] + [📷 App Foto]
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedButton(
-                onClick = onPickFromGallery,
-                shape = RoundedCornerShape(50),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
-            ) {
-                Text("🖼️ Galleria", color = AppleWhite, fontSize = 12.sp)
-            }
-
-            // Pulsante Otturatore Tattile a Doppio Anello iOS (Scatta FOTO VERA con CameraX!)
-            val shutterInteraction = remember { MutableInteractionSource() }
-            Surface(
-                onClick = {
-                    if (isCapturing) return@Surface
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    scope.launch {
-                        shutterFlashAlpha = 0.85f
-                        delay(110L)
-                        shutterFlashAlpha = 0f
-                    }
-                    if (hasCameraPermission) {
-                        isCapturing = true
-                        imageCapture.takePicture(
-                            ContextCompat.getMainExecutor(context),
-                            object : ImageCapture.OnImageCapturedCallback() {
-                                override fun onCaptureSuccess(image: ImageProxy) {
-                                    isCapturing = false
-                                    try {
-                                        val rawBitmap = image.toBitmap()
-                                        val rotation = image.imageInfo.rotationDegrees
-                                        val finalBitmap = if (rotation != 0) {
-                                            val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-                                            val rotated = Bitmap.createBitmap(
-                                                rawBitmap,
-                                                0,
-                                                0,
-                                                rawBitmap.width,
-                                                rawBitmap.height,
-                                                matrix,
-                                                true
-                                            )
-                                            rawBitmap.recycle()
-                                            rotated
-                                        } else {
-                                            rawBitmap
-                                        }
-                                        image.close()
-                                        if (isBurstMode) {
-                                            scope.launch(Dispatchers.IO) {
-                                                try {
-                                                    val burstDir = File(context.cacheDir, "camera_burst").apply { mkdirs() }
-                                                    val burstFile = File(burstDir, "burst_${System.currentTimeMillis()}_${burstFileList.size + 1}.jpg")
-                                                    burstFile.outputStream().use { out ->
-                                                        finalBitmap.compress(Bitmap.CompressFormat.JPEG, 88, out)
-                                                    }
-                                                    finalBitmap.recycle()
-                                                    withContext(Dispatchers.Main) {
-                                                        burstFileList.add(burstFile)
-                                                        Toast.makeText(context, "📸 Foto #${burstFileList.size} acquisita!", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                } catch (_: Throwable) {
-                                                    runCatching { finalBitmap.recycle() }
-                                                    withContext(Dispatchers.Main) {
-                                                        Toast.makeText(context, "Errore salvataggio foto raffica", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            onCaptureRealBitmap(finalBitmap, selectedScanMode)
-                                        }
-                                    } catch (_: Throwable) {
-                                        try { image.close() } catch (_: Throwable) {}
-                                        Toast.makeText(context, "Errore scatto fotocamera", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-
-                                override fun onError(exception: ImageCaptureException) {
-                                    isCapturing = false
-                                    Toast.makeText(context, "Impossibile acquisire la foto", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
-                    } else {
-                        camPermLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
-                interactionSource = shutterInteraction,
-                shape = CircleShape,
-                color = Color.Transparent,
-                border = BorderStroke(4.dp, AppleWhite),
-                modifier = Modifier
-                    .size(74.dp)
-                    .emilPressScale(shutterInteraction, pressedScale = 0.90f)
-                    .semantics {
-                        contentDescription = "Scatta scansione rilievo o documento"
-                        testTag = "in_app_camera_shutter_button"
-                    }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(6.dp)
-                        .clip(CircleShape)
-                        .background(DavezBordeauxHover),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        tint = AppleWhite,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
-
-            OutlinedButton(
-                onClick = onOpenSystemCamera,
-                shape = RoundedCornerShape(50),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
-            ) {
-                Text("📷 Sistema", color = AppleWhite, fontSize = 12.sp)
-            }
-        }
-
-        // Se in modalità raffica con foto già scattate, mostra il pulsante di conferma e salvataggio batch
-        if (isBurstMode && burstFileList.isNotEmpty()) {
-            Button(
-                onClick = {
-                    val batch = burstFileList.toList()
-                    burstFileList.clear()
-                    onCaptureBurstFiles?.invoke(batch)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Text(
-                    text = "📁 Salva Raffica (${burstFileList.size} foto) nel Fascicolo",
-                    fontWeight = FontWeight.Bold,
-                    color = AppleWhite,
-                    fontSize = 13.5.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScannerModePill(
-    label: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = if (selected) DavezBordeauxHover else Color(0xFF2B2423),
-        border = BorderStroke(1.dp, if (selected) Color(0xFFF5D0A9) else Color.White.copy(alpha = 0.12f)),
-        modifier = modifier.height(36.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (selected) AppleWhite else DavezTravertine,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
@@ -4009,27 +3016,29 @@ fun PeritoQuickPill(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
+
     Surface(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
             onClick()
         },
         interactionSource = interactionSource,
         shape = RoundedCornerShape(50),
-        color = AppleBlueSoft,
-        border = BorderStroke(0.8.dp, DavezBordeaux.copy(alpha = 0.22f)),
+        color = semanticColors.brandSoft,
+        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
         modifier = Modifier
-            .height(36.dp)
+            .heightIn(min = 44.dp)
             .emilPressScale(interactionSource, pressedScale = 0.95f)
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 14.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = DavezBordeaux,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -4049,11 +3058,12 @@ fun PeritoStudioMessageBubble(
     onShareDocument: (ArchivedDocument) -> Unit,
     onOpenMaps: (String) -> Unit
 ) {
+    val semanticColors = LocalPeritoSemanticColors.current
     val isUser = message.isUser
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val bubbleBg = if (isUser) DavezBordeaux else AppleWhite
-    val textColor = if (isUser) AppleWhite else AppleLabelPrimary
-    val timeColor = if (isUser) AppleWhite.copy(alpha = 0.78f) else AppleLabelTertiary
+    val bubbleBg = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val textColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val timeColor = if (isUser) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f) else semanticColors.labelTertiary
 
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -4063,22 +3073,21 @@ fun PeritoStudioMessageBubble(
     var showRescheduleDialog by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val textSelectionColors = remember(isUser) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+    val textSelectionColors = remember(isUser, primaryColor, onPrimaryColor) {
         TextSelectionColors(
-            handleColor = if (isUser) AppleWhite else DavezBordeaux,
-            backgroundColor = if (isUser) AppleWhite.copy(alpha = 0.35f) else DavezBordeaux.copy(alpha = 0.22f)
+            handleColor = if (isUser) onPrimaryColor else primaryColor,
+            backgroundColor = if (isUser) onPrimaryColor.copy(alpha = 0.35f) else primaryColor.copy(alpha = 0.22f)
         )
     }
 
-    // Cartoonish Dissolve / Vaporize transition on Clear Chat History
     val dissolveProgress by animateFloatAsState(
         targetValue = if (isClearingHistory) 1f else 0f,
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
         label = "dissolve_vaporize"
     )
 
-    // Emil Kowalski Animation Philosophy:
-    // Only freshly posted messages trigger the spring entrance bounce; historical scrolled messages render stably at 1f.
     val isFreshMessage = remember(message.id) {
         (System.currentTimeMillis() - message.timestampMillis) < 2500L
     }
@@ -4086,7 +3095,7 @@ fun PeritoStudioMessageBubble(
         Animatable(if (isFreshMessage) 0.85f else 1f)
     }
     LaunchedEffect(message.id) {
-        if (isFreshMessage && ValueAnimator.areAnimatorsEnabled()) {
+        if (isFreshMessage && PeritoMotionTokens.areAnimationsEnabled(context)) {
             entranceProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = spring(
@@ -4099,32 +3108,9 @@ fun PeritoStudioMessageBubble(
         }
     }
 
-    val isRecentAssistantMsg = remember(message.id) {
-        !isUser && (System.currentTimeMillis() - message.timestampMillis) < 2500L
-    }
-    val formattedFullText = remember(message.text, isUser) {
-        formatPeritoMessageText(message.text, isUser)
-    }
-    var visibleChars by remember(message.id) {
-        mutableIntStateOf(if (isRecentAssistantMsg) 24.coerceAtMost(formattedFullText.length) else formattedFullText.length)
-    }
-    LaunchedEffect(message.id, formattedFullText.length) {
-        if (isRecentAssistantMsg && ValueAnimator.areAnimatorsEnabled()) {
-            val total = formattedFullText.length
-            val step = (total / 10).coerceAtLeast(18)
-            while (visibleChars < total) {
-                delay(22L)
-                visibleChars = (visibleChars + step).coerceAtMost(total)
-            }
-        } else {
-            visibleChars = formattedFullText.length
-        }
-    }
-
-    val displayedText = if (visibleChars >= formattedFullText.length) {
-        formattedFullText
-    } else {
-        formattedFullText.subSequence(0, visibleChars)
+    val codeColor = if (isUser) Color(0xFFF5D0A9) else primaryColor
+    val formattedFullText = remember(message.text, isUser, codeColor) {
+        formatPeritoMessageText(message.text, isUser, codeColor)
     }
 
     val timeFormatted = remember(message.timestampMillis) {
@@ -4143,7 +3129,6 @@ fun PeritoStudioMessageBubble(
             .graphicsLayer {
                 if (dissolveProgress > 0f) {
                     val p = dissolveProgress
-                    // Cartoon Vaporize: Puff up slightly, float upward, tilt and fade out
                     val puffScale = if (p < 0.25f) {
                         1f + (p / 0.25f) * 0.08f
                     } else {
@@ -4163,21 +3148,26 @@ fun PeritoStudioMessageBubble(
             },
         horizontalAlignment = alignment
     ) {
-        // Bolla principale del messaggio con angoli Squircle morbidi (22.dp)
         Surface(
             color = bubbleBg,
             shadowElevation = if (isUser) 2.dp else 1.dp,
-            border = if (isUser) null else BorderStroke(0.8.dp, DavezStoneBorder),
+            border = if (isUser) null else BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
             shape = RoundedCornerShape(
                 topStart = 22.dp,
                 topEnd = 22.dp,
                 bottomStart = if (isUser) 22.dp else 6.dp,
                 bottomEnd = if (isUser) 6.dp else 22.dp
             ),
-            modifier = Modifier.widthIn(min = 90.dp, max = maxBubbleWidth)
+            modifier = Modifier
+                .widthIn(min = 90.dp, max = maxBubbleWidth)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = 0.86f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                // 1. Se è una Nota Vocale registrata in-app -> Player Onda Sonora stile WhatsApp con Voce Reale Utente!
                 if (message.voiceDurationSeconds != null || message.attachmentType == "VOICE") {
                     WhatsAppVoiceNoteCard(
                         durationSeconds = message.voiceDurationSeconds ?: 4,
@@ -4187,7 +3177,6 @@ fun PeritoStudioMessageBubble(
                     )
                     Spacer(Modifier.height(6.dp))
                 } else if (message.attachmentName != null) {
-                    // 2. Se è un Allegato (PDF, .p7m, Scansione Peritale) -> Card Allegato Squircle Moderna!
                     ModernAttachmentBubbleCard(
                         fileName = message.attachmentName,
                         attachmentType = message.attachmentType ?: "PDF",
@@ -4196,12 +3185,11 @@ fun PeritoStudioMessageBubble(
                     Spacer(Modifier.height(6.dp))
                 }
 
-                // Testo del messaggio (o trascrizione vocale) con Selezione Testo stile WhatsApp (SelectionContainer)
                 if (message.attachmentName == null || message.voiceDurationSeconds != null) {
                     CompositionLocalProvider(LocalTextSelectionColors provides textSelectionColors) {
                         SelectionContainer {
                             Text(
-                                text = displayedText,
+                                text = formattedFullText,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = textColor,
                                 lineHeight = 21.sp,
@@ -4213,7 +3201,6 @@ fun PeritoStudioMessageBubble(
                     }
                 }
 
-                // Badge Visivo di Verifica Appuntamento (/agentic-craft-ui Pillar 3)
                 message.createdEvent?.let { ev ->
                     Spacer(Modifier.height(8.dp))
                     AppointmentVerificationSubCard(event = ev)
@@ -4225,21 +3212,19 @@ fun PeritoStudioMessageBubble(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Azioni rapide stile WhatsApp / Claude: Copia intero testo & Condividi risultati agente
                     if (message.text.isNotBlank()) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 1. Tasto Rapido Copia Tutto
                             Surface(
                                 shape = RoundedCornerShape(7.dp),
-                                color = if (isUser) AppleWhite.copy(alpha = 0.16f) else DavezAlabaster,
+                                color = if (isUser) onPrimaryColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.background,
                                 modifier = Modifier.clickable {
                                     coroutineScope.launch {
                                         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("PeritoAI", message.text)))
                                     }
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                                     isCopied = true
                                     Toast.makeText(context, "Messaggio copiato", Toast.LENGTH_SHORT).show()
                                     coroutineScope.launch {
@@ -4256,23 +3241,22 @@ fun PeritoStudioMessageBubble(
                                     Icon(
                                         imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
                                         contentDescription = "Copia messaggio",
-                                        tint = if (isCopied) AppleGreen else timeColor,
+                                        tint = if (isCopied) semanticColors.success else timeColor,
                                         modifier = Modifier.size(11.dp)
                                     )
                                     Text(
                                         text = if (isCopied) "Copiato" else "Copia",
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                        color = if (isCopied) AppleGreen else timeColor
+                                        color = if (isCopied) semanticColors.success else timeColor
                                     )
                                 }
                             }
 
-                            // 2. Tasto Rapido Condividi Risultati Agente / Messaggio
                             Surface(
                                 shape = RoundedCornerShape(7.dp),
-                                color = if (isUser) AppleWhite.copy(alpha = 0.16f) else DavezAlabaster,
+                                color = if (isUser) onPrimaryColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.background,
                                 modifier = Modifier.clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                                     val sendIntent = Intent().apply {
                                         action = Intent.ACTION_SEND
                                         putExtra(Intent.EXTRA_TEXT, message.text)
@@ -4317,10 +3301,6 @@ fun PeritoStudioMessageBubble(
             }
         }
 
-        // =====================================================================
-        // TASTIERA INLINE SQUIRCLE MODERNA (SOTTO LA BOLLA)
-        // =====================================================================
-
         // 1. TASTIERA INLINE CONFLITTO D'AGENDA (±15 MIN)
         message.pendingConflict?.let { conflict ->
             Spacer(Modifier.height(8.dp))
@@ -4331,30 +3311,30 @@ fun PeritoStudioMessageBubble(
                 PeritoStudioInlineButton(
                     text = "Sostituisci precedente",
                     leadingIcon = Icons.Default.Sync,
-                    containerColor = DavezBordeaux,
-                    contentColor = AppleWhite,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     onClick = { viewModel.resolveConflictReplace(message.id, conflict) }
                 )
                 PeritoStudioInlineButton(
                     text = "Inserisci comunque",
                     leadingIcon = Icons.Default.Warning,
-                    containerColor = AppleOrangeSoft,
-                    contentColor = AppleOrange,
-                    borderColor = AppleOrange.copy(alpha = 0.45f),
+                    containerColor = semanticColors.warningSoft,
+                    contentColor = semanticColors.warning,
+                    borderColor = semanticColors.warning.copy(alpha = 0.45f),
                     onClick = { viewModel.resolveConflictForce(message.id, conflict) }
                 )
                 PeritoStudioInlineButton(
                     text = "Annulla",
                     leadingIcon = Icons.Default.Close,
-                    containerColor = AppleRedSoft,
-                    contentColor = AppleRed,
-                    borderColor = AppleRed.copy(alpha = 0.35f),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.error,
+                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
                     onClick = { viewModel.resolveConflictCancel(message.id) }
                 )
             }
         }
 
-        // 2. TASTIERA INLINE APPUNTAMENTO CONFERMATO -> APRI GOOGLE MAPS + CONDIVIDI + ELIMINA
+        // 2. TASTIERA INLINE APPUNTAMENTO CONFERMATO
         message.createdEvent?.let { ev ->
             Spacer(Modifier.height(8.dp))
             Column(
@@ -4365,26 +3345,26 @@ fun PeritoStudioMessageBubble(
                     PeritoStudioInlineButton(
                         text = "Apri Google Maps (${ev.luogo})",
                         leadingIcon = Icons.Default.Place,
-                        containerColor = AppleWhite,
-                        contentColor = DavezBordeaux,
-                        borderColor = DavezBordeaux.copy(alpha = 0.32f),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
                         onClick = { onOpenMaps(ev.luogo) }
                     )
                 }
                 PeritoStudioInlineButton(
                     text = "Modifica Orario",
                     leadingIcon = Icons.Default.Edit,
-                    containerColor = AppleWhite,
-                    contentColor = DavezBordeaux,
-                    borderColor = DavezBordeaux.copy(alpha = 0.32f),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
                     onClick = { showRescheduleDialog = true }
                 )
                 PeritoStudioInlineButton(
                     text = "Condividi Appuntamento (WhatsApp / SMS)",
                     leadingIcon = Icons.Default.Share,
-                    containerColor = AppleWhite,
-                    contentColor = DavezBordeaux,
-                    borderColor = DavezBordeaux.copy(alpha = 0.32f),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
                     onClick = {
                         val shareText = buildString {
                             append("📅 Appuntamento: ${ev.titolo}\n")
@@ -4404,9 +3384,9 @@ fun PeritoStudioMessageBubble(
                 PeritoStudioInlineButton(
                     text = "Elimina Appuntamento",
                     leadingIcon = Icons.Default.DeleteOutline,
-                    containerColor = AppleRedSoft,
-                    contentColor = AppleRed,
-                    borderColor = AppleRed.copy(alpha = 0.30f),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.error,
+                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.30f),
                     onClick = { viewModel.deleteCalendarEvent(ev, notifyInChat = true) }
                 )
             }
@@ -4432,7 +3412,7 @@ fun PeritoStudioMessageBubble(
             }
         }
 
-        // 3. TASTIERA INLINE BRIEFING /OGGI -> BOTTONI MAPS PER OGNI SOPRALLUOGO
+        // 3. TASTIERA INLINE BRIEFING /OGGI
         if (message.briefingEvents.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Column(
@@ -4444,16 +3424,16 @@ fun PeritoStudioMessageBubble(
                     PeritoStudioInlineButton(
                         text = "$startH • ${ev.luogo}",
                         leadingIcon = Icons.Default.Place,
-                        containerColor = AppleWhite,
-                        contentColor = DavezBordeaux,
-                        borderColor = DavezBordeaux.copy(alpha = 0.32f),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
                         onClick = { onOpenMaps(ev.luogo) }
                     )
                 }
             }
         }
 
-        // 4. TASTIERA INLINE DOCUMENTO ARCHIVIATO -> APRI / CONDIVIDI / ELIMINA + LE 6 CARTELLE SQUIRCLE
+        // 4. TASTIERA INLINE DOCUMENTO ARCHIVIATO
         message.archivedDocument?.let { doc ->
             Spacer(Modifier.height(8.dp))
             Column(
@@ -4467,26 +3447,26 @@ fun PeritoStudioMessageBubble(
                     PeritoStudioInlineButton(
                         text = "Apri",
                         leadingIcon = Icons.Default.Description,
-                        containerColor = DavezBordeaux,
-                        contentColor = AppleWhite,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpenDocument(doc) }
                     )
                     PeritoStudioInlineButton(
                         text = "Invia",
                         leadingIcon = Icons.Default.Share,
-                        containerColor = AppleWhite,
-                        contentColor = DavezBordeaux,
-                        borderColor = DavezBordeaux.copy(alpha = 0.30f),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f),
                         modifier = Modifier.weight(1f),
                         onClick = { onShareDocument(doc) }
                     )
                     PeritoStudioInlineButton(
                         text = "Elimina",
                         leadingIcon = Icons.Default.DeleteOutline,
-                        containerColor = AppleRedSoft,
-                        contentColor = AppleRed,
-                        borderColor = AppleRed.copy(alpha = 0.35f),
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.error,
+                        borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
                         modifier = Modifier.weight(1f),
                         onClick = { viewModel.deleteArchivedDocument(doc.id, notifyInChat = true) }
                     )
@@ -4506,9 +3486,9 @@ fun PeritoStudioMessageBubble(
                                 PeritoStudioInlineButton(
                                     text = cat.displayTitle,
                                     leadingIcon = if (isSelected) Icons.Default.Check else Icons.Default.Folder,
-                                    containerColor = if (isSelected) AppleGreenSoft else AppleWhite,
-                                    contentColor = if (isSelected) AppleLabelPrimary else DavezBordeaux,
-                                    borderColor = if (isSelected) AppleGreen else DavezStoneBorder,
+                                    containerColor = if (isSelected) semanticColors.successSoft else MaterialTheme.colorScheme.surface,
+                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                                    borderColor = if (isSelected) semanticColors.success else MaterialTheme.colorScheme.outline,
                                     modifier = Modifier.weight(1f),
                                     onClick = {
                                         if (!isSelected) {
@@ -4523,7 +3503,7 @@ fun PeritoStudioMessageBubble(
             }
         }
 
-        // 5. CARD SQUIRCLE FILE TROVATI IN ARCHIVIO (/cerca o Fascicolo Cliente) CON TASTO ELIMINA
+        // 5. CARD SQUIRCLE FILE TROVATI IN ARCHIVIO
         if (message.matchedDocuments.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Column(
@@ -4533,28 +3513,28 @@ fun PeritoStudioMessageBubble(
                 message.matchedDocuments.forEach { doc ->
                     Surface(
                         shape = RoundedCornerShape(18.dp),
-                        color = AppleWhite,
+                        color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 1.dp,
-                        border = BorderStroke(0.8.dp, DavezStoneBorder),
+                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(AppleBlueSoft),
+                                    .background(semanticColors.brandSoft),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.Description,
                                     contentDescription = null,
-                                    tint = DavezBordeaux,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -4564,46 +3544,55 @@ fun PeritoStudioMessageBubble(
                                     text = doc.fileName,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = AppleLabelPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "📂 ${doc.category.displayTitle} • ${doc.cliente.replace('_', ' ')}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = AppleLabelSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             IconButton(
-                                onClick = { onOpenDocument(doc) },
-                                modifier = Modifier.size(36.dp)
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                    onOpenDocument(doc)
+                                },
+                                modifier = Modifier.size(44.dp)
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.OpenInNew,
                                     contentDescription = "Apri",
-                                    tint = DavezBordeaux,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
                             IconButton(
-                                onClick = { onShareDocument(doc) },
-                                modifier = Modifier.size(36.dp)
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                                    onShareDocument(doc)
+                                },
+                                modifier = Modifier.size(44.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Share,
                                     contentDescription = "Condividi",
-                                    tint = DavezBordeaux,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
                             IconButton(
-                                onClick = { viewModel.deleteArchivedDocument(doc.id, notifyInChat = true) },
-                                modifier = Modifier.size(36.dp)
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                                    viewModel.deleteArchivedDocument(doc.id, notifyInChat = true)
+                                },
+                                modifier = Modifier.size(44.dp)
                             ) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
                                     contentDescription = "Elimina file",
-                                    tint = AppleRed,
+                                    tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -4632,12 +3621,8 @@ fun WhatsAppVoiceNoteCard(
 
     DisposableEffect(voiceAudioPath) {
         onDispose {
-            try {
-                mediaPlayerRef?.stop()
-            } catch (_: Throwable) {}
-            try {
-                mediaPlayerRef?.release()
-            } catch (_: Throwable) {}
+            try { mediaPlayerRef?.stop() } catch (_: Throwable) {}
+            try { mediaPlayerRef?.release() } catch (_: Throwable) {}
             mediaPlayerRef = null
         }
     }
@@ -4645,33 +3630,40 @@ fun WhatsAppVoiceNoteCard(
     LaunchedEffect(isPlaying, voiceAudioPath) {
         if (isPlaying) {
             val wavFile = voiceAudioPath?.takeIf { it.isNotBlank() }?.let { File(it) }
-            if (wavFile != null && wavFile.exists() && wavFile.length() > 44L) {
+            val hasValidAudio = withContext(Dispatchers.IO) {
+                wavFile != null && wavFile.exists() && wavFile.length() > 44L
+            }
+            if (hasValidAudio && wavFile != null) {
                 var mp: MediaPlayer? = null
                 try {
-                    mp = MediaPlayer().apply {
-                        setDataSource(wavFile.absolutePath)
-                        prepare()
-                        setOnCompletionListener {
-                            isPlaying = false
-                            progress = 0f
+                    mp = withContext(Dispatchers.IO) {
+                        val player = MediaPlayer()
+                        try {
+                            player.setDataSource(wavFile.absolutePath)
+                            player.prepare()
+                            player
+                        } catch (t: Throwable) {
+                            runCatching { player.release() }
+                            throw t
                         }
-                        start()
                     }
+                    mp.setOnCompletionListener {
+                        isPlaying = false
+                        progress = 0f
+                    }
+                    mp.start()
                     mediaPlayerRef = mp
                     val totalMs = mp.duration.coerceAtLeast(durationSeconds * 1000).coerceAtLeast(500)
                     while (isPlaying && mp.isPlaying) {
                         progress = (mp.currentPosition.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
                         delay(40L)
                     }
-                } catch (_: Throwable) {
+                } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
                     Toast.makeText(context, "Impossibile riprodurre il file vocale", Toast.LENGTH_SHORT).show()
                 } finally {
-                    try {
-                        mp?.stop()
-                    } catch (_: Throwable) {}
-                    try {
-                        mp?.release()
-                    } catch (_: Throwable) {}
+                    try { mp?.stop() } catch (_: Throwable) {}
+                    try { mp?.release() } catch (_: Throwable) {}
                     if (mediaPlayerRef === mp) {
                         mediaPlayerRef = null
                     }
@@ -4688,20 +3680,18 @@ fun WhatsAppVoiceNoteCard(
                 progress = 0f
             }
         } else {
-            try {
-                mediaPlayerRef?.stop()
-            } catch (_: Throwable) {}
-            try {
-                mediaPlayerRef?.release()
-            } catch (_: Throwable) {}
+            try { mediaPlayerRef?.stop() } catch (_: Throwable) {}
+            try { mediaPlayerRef?.release() } catch (_: Throwable) {}
             mediaPlayerRef = null
             progress = 0f
         }
     }
 
-    val cardBg = if (isUser) Color.White.copy(alpha = 0.14f) else DavezAlabaster
-    val accent = if (isUser) Color(0xFFF5D0A9) else DavezBordeaux
-    val unplayed = if (isUser) Color.White.copy(alpha = 0.35f) else DavezStoneBorder
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val primary = MaterialTheme.colorScheme.primary
+    val cardBg = if (isUser) onPrimary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.background
+    val accent = if (isUser) Color(0xFFF5D0A9) else primary
+    val unplayed = if (isUser) onPrimary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -4729,7 +3719,7 @@ fun WhatsAppVoiceNoteCard(
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pausa vocale" else "Riproduci la tua voce reale",
-                        tint = if (isUser) DavezBordeaux else AppleWhite,
+                        tint = if (isUser) primary else onPrimary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -4768,13 +3758,13 @@ fun WhatsAppVoiceNoteCard(
                     Text(
                         text = String.format(Locale.ITALIAN, "🎙️ %d:%02d", mins, secs),
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = if (isUser) AppleWhite.copy(alpha = 0.9f) else DavezBordeaux,
+                        color = if (isUser) onPrimary.copy(alpha = 0.9f) else primary,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Voce Originale • Trascrizione Live",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isUser) Color(0xFFF5D0A9) else AppleLabelSecondary,
+                        color = if (isUser) Color(0xFFF5D0A9) else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
                     )
                 }
@@ -4792,6 +3782,8 @@ fun ModernAttachmentBubbleCard(
     attachmentType: String,
     isUser: Boolean
 ) {
+    val semanticColors = LocalPeritoSemanticColors.current
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
     val (emoji, badgeLabel, badgeColor) = when (attachmentType) {
         "P7M" -> Triple("🔐", "BUSTA CADES .P7M", Color(0xFFF5D0A9))
         "CAMERA_SCAN" -> Triple("📸", "SCANSIONE RILIEVO OCR", Color(0xFFA7F3D0))
@@ -4800,10 +3792,10 @@ fun ModernAttachmentBubbleCard(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = if (isUser) Color.White.copy(alpha = 0.14f) else DavezAlabaster,
+        color = if (isUser) onPrimary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.background,
         border = BorderStroke(
             0.8.dp,
-            if (isUser) Color.White.copy(alpha = 0.22f) else DavezStoneBorder
+            if (isUser) onPrimary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.outline
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -4818,7 +3810,7 @@ fun ModernAttachmentBubbleCard(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(RoundedCornerShape(13.dp))
-                    .background(if (isUser) Color.White.copy(alpha = 0.20f) else AppleBlueSoft),
+                    .background(if (isUser) onPrimary.copy(alpha = 0.20f) else semanticColors.brandSoft),
                 contentAlignment = Alignment.Center
             ) {
                 Text(text = emoji, fontSize = 20.sp)
@@ -4827,14 +3819,14 @@ fun ModernAttachmentBubbleCard(
                 Text(
                     text = badgeLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isUser) badgeColor else DavezBordeaux,
+                    color = if (isUser) badgeColor else MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp
                 )
                 Text(
                     text = fileName,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isUser) AppleWhite else AppleLabelPrimary,
+                    color = if (isUser) onPrimary else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -4846,19 +3838,17 @@ fun ModernAttachmentBubbleCard(
 
 @Composable
 private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
+    val context = LocalContext.current
+    val semanticColors = LocalPeritoSemanticColors.current
     val startH = event.startIso.drop(11).take(5)
     val endH = event.endIso.drop(11).take(5)
 
-    // Cartoon celebratory pop on mount
     val cardScale = remember { Animatable(0.90f) }
     LaunchedEffect(Unit) {
-        if (ValueAnimator.areAnimatorsEnabled()) {
+        if (PeritoMotionTokens.areAnimationsEnabled(context)) {
             cardScale.animateTo(
                 targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.55f,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                animationSpec = PeritoMotionTokens.snappySpring
             )
         } else {
             cardScale.snapTo(1f)
@@ -4867,8 +3857,8 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
 
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = DavezAlabaster,
-        border = BorderStroke(0.8.dp, AppleGreen.copy(alpha = 0.45f)),
+        color = MaterialTheme.colorScheme.background,
+        border = BorderStroke(0.8.dp, semanticColors.success.copy(alpha = 0.45f)),
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -4883,8 +3873,8 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
         ) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = AppleWhite,
-                border = BorderStroke(0.5.dp, DavezStoneBorder.copy(alpha = 0.5f))
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -4894,13 +3884,13 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
                     Icon(
                         imageVector = Icons.Default.Schedule,
                         contentDescription = null,
-                        tint = DavezBordeaux,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(13.dp)
                     )
                     Text(
                         text = "$startH–$endH",
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = AppleLabelPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -4913,13 +3903,13 @@ private fun AppointmentVerificationSubCard(event: CalendarEventItem) {
                 Icon(
                     imageVector = Icons.Default.NotificationsActive,
                     contentDescription = null,
-                    tint = AppleLabelSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(13.dp)
                 )
                 Text(
                     text = "3 Alert: 24h • 60m • 30m",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppleLabelSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -4942,7 +3932,7 @@ fun PeritoStudioInlineButton(
     val haptic = LocalHapticFeedback.current
     Surface(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
             onClick()
         },
         interactionSource = interactionSource,
@@ -4952,7 +3942,7 @@ fun PeritoStudioInlineButton(
         border = borderColor?.let { BorderStroke(0.6.dp, it) },
         modifier = modifier
             .heightIn(min = 44.dp)
-            .cartoonPressSquash(interactionSource, pressedScaleY = 0.93f, squashScaleX = 1.04f)
+            .emilPressScale(interactionSource, pressedScale = 0.96f)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -4986,7 +3976,11 @@ fun PeritoStudioInlineButton(
 /**
  * Converte la sintassi Markdown leggera (**grassetto** e `codice`) in AnnotatedString nativa.
  */
-fun formatPeritoMessageText(raw: String, isUser: Boolean): AnnotatedString {
+fun formatPeritoMessageText(
+    raw: String,
+    isUser: Boolean,
+    codeColor: Color = if (isUser) Color(0xFFF5D0A9) else Color(0xFF4F0B18)
+): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
         val n = raw.length
@@ -5018,7 +4012,7 @@ fun formatPeritoMessageText(raw: String, isUser: Boolean): AnnotatedString {
                         SpanStyle(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (isUser) Color(0xFFF5D0A9) else DavezBordeaux
+                            color = codeColor
                         )
                     ) {
                         append(raw.substring(i + 1, end))
@@ -5045,6 +4039,8 @@ fun ArchiveFoldersSheetContent(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
     var activeArchiveTab by rememberSaveable { mutableIntStateOf(0) }
     var docPendingDelete by remember { mutableStateOf<ArchivedDocument?>(null) }
     val filteredDocs = remember(uiState.archivedDocuments, uiState.selectedCategoryFilter) {
@@ -5057,40 +4053,41 @@ fun ArchiveFoldersSheetContent(
 
     if (docPendingDelete != null) {
         val targetDoc = docPendingDelete!!
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { docPendingDelete = null },
             title = {
                 Text(
                     text = "Elimina documento",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = DavezBordeaux
+                    color = MaterialTheme.colorScheme.primary
                 )
             },
             text = {
                 Text(
                     text = "Sei sicuro di voler eliminare definitivamente \"${targetDoc.fileName}\"? Questa operazione non può essere annullata.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppleLabelPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
                         val idToDelete = targetDoc.id
                         docPendingDelete = null
                         viewModel.deleteArchivedDocument(idToDelete)
                     }
                 ) {
-                    Text("Elimina Documento", color = AppleRed, fontWeight = FontWeight.Bold)
+                    Text("Elimina Documento", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { docPendingDelete = null }) {
-                    Text("Annulla", color = AppleLabelSecondary)
+                    Text("Annulla", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            containerColor = AppleWhite,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(20.dp)
         )
     }
@@ -5099,7 +4096,9 @@ fun ArchiveFoldersSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.88f)
-            .background(AppleWhite)
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding()
+            .imePadding()
             .padding(horizontal = 16.dp)
     ) {
         Row(
@@ -5110,14 +4109,19 @@ fun ArchiveFoldersSheetContent(
             Text(
                 text = if (activeArchiveTab == 0) "📂 Archivio 6 Cartelle" else "💼 Fascicoli & Pratiche",
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = AppleLabelPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
-            TextButton(onClick = onClose) {
-                Text("Chiudi", color = DavezBordeaux, fontWeight = FontWeight.SemiBold)
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    onClose()
+                },
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text("Chiudi", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
         }
 
-        // Selettore Sezione Archivio: Documenti vs Fascicoli
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5126,20 +4130,26 @@ fun ArchiveFoldersSheetContent(
         ) {
             FilterChip(
                 selected = activeArchiveTab == 0,
-                onClick = { activeArchiveTab = 0 },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    activeArchiveTab = 0
+                },
                 label = { Text("📂 Documenti (${uiState.archivedDocuments.size})") },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = DavezBordeaux,
-                    selectedLabelColor = AppleWhite
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
             FilterChip(
                 selected = activeArchiveTab == 1,
-                onClick = { activeArchiveTab = 1 },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    activeArchiveTab = 1
+                },
                 label = { Text("💼 Fascicoli (${uiState.fascicoli.size})") },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = DavezBordeaux,
-                    selectedLabelColor = AppleWhite
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -5156,221 +4166,200 @@ fun ArchiveFoldersSheetContent(
                     .weight(1f)
             )
         } else {
-            // Ricerca stile iOS
-        OutlinedTextField(
-            value = uiState.archiveSearchQuery,
-            onValueChange = { viewModel.setArchiveSearchQuery(it) },
-            placeholder = { Text("Cerca per cliente, CTU, condominio, fattura...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = AppleLabelSecondary) },
-            trailingIcon = {
-                if (uiState.archiveSearchQuery.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.setArchiveSearchQuery("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Pulisci")
+            OutlinedTextField(
+                value = uiState.archiveSearchQuery,
+                onValueChange = { viewModel.setArchiveSearchQuery(it) },
+                placeholder = { Text("Cerca per cliente, CTU, condominio, fattura...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                trailingIcon = {
+                    if (uiState.archiveSearchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { viewModel.setArchiveSearchQuery("") },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Pulisci")
+                        }
                     }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp)
-        )
-
-        // Filtri per le 6 Cartelle con Palette Bordeaux Coerente
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(
-                selected = uiState.selectedCategoryFilter == null,
-                onClick = { viewModel.setCategoryFilter(null) },
-                label = { Text("Tutte (${uiState.archivedDocuments.size})") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = DavezBordeaux,
-                    selectedLabelColor = AppleWhite
-                )
-            )
-            PeritoCategory.entries.forEach { cat ->
-                val count = uiState.archivedDocuments.count { it.category == cat }
-                FilterChip(
-                    selected = uiState.selectedCategoryFilter == cat,
-                    onClick = { viewModel.setCategoryFilter(cat) },
-                    label = { Text("${cat.displayTitle} ($count)") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = DavezBordeaux,
-                        selectedLabelColor = AppleWhite
-                    )
-                )
-            }
-        }
-
-        HorizontalDivider(thickness = 0.5.dp, color = AppleSecondaryGroupedBg)
-
-        if (uiState.archiveErrorMessage != null) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = AppleOrangeSoft,
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = AppleOrange)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Errore lettura archivio",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = AppleOrange
-                        )
-                        Text(
-                            text = "${uiState.archiveErrorMessage}. I file su disco sono preservati.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelPrimary
-                        )
-                    }
-                    TextButton(onClick = { viewModel.refreshAllData() }) {
-                        Text("Riprova", color = DavezBordeaux, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
+                    .padding(vertical = 8.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp)
+            )
 
-        if (filteredDocs.isEmpty()) {
-            Column(
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Folder,
-                    contentDescription = null,
-                    modifier = Modifier.size(52.dp),
-                    tint = AppleLabelTertiary
+                FilterChip(
+                    selected = uiState.selectedCategoryFilter == null,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        viewModel.setCategoryFilter(null)
+                    },
+                    label = { Text("Tutte (${uiState.archivedDocuments.size})") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Nessun documento in questa cartella",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AppleLabelPrimary
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Allega un PDF/.p7m o scatta una foto direttamente nella chat per classificarlo automaticamente.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelSecondary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = onCameraClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("📸 Scatta Foto", color = AppleWhite)
-                    }
-                    OutlinedButton(
-                        onClick = onPickDocumentClick,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("📎 Scegli File", color = DavezBordeaux)
-                    }
+                PeritoCategory.entries.forEach { cat ->
+                    val count = uiState.archivedDocuments.count { it.category == cat }
+                    FilterChip(
+                        selected = uiState.selectedCategoryFilter == cat,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            viewModel.setCategoryFilter(cat)
+                        },
+                        label = { Text("${cat.displayTitle} ($count)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(filteredDocs, key = { it.id }) { doc ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateItem(),
-                        colors = CardDefaults.cardColors(containerColor = DavezAlabaster),
-                        border = BorderStroke(0.8.dp, DavezStoneBorder),
-                        shape = RoundedCornerShape(16.dp)
+
+            HorizontalDivider(thickness = 0.5.dp, color = semanticColors.secondaryGroupedBg)
+
+            if (uiState.archiveErrorMessage != null) {
+                PeritoEmptyErrorState(
+                    icon = Icons.Default.Warning,
+                    title = "Errore lettura archivio",
+                    subtitle = "${uiState.archiveErrorMessage}. I file su disco sono preservati.",
+                    isError = true,
+                    actionLabel = "Riprova",
+                    onAction = { viewModel.refreshAllData() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                )
+            }
+
+            if (filteredDocs.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    PeritoEmptyErrorState(
+                        icon = Icons.Default.Folder,
+                        title = "Nessun documento in questa cartella",
+                        subtitle = "Allega un PDF/.p7m o scatta una foto direttamente nella chat per classificarlo automaticamente.",
+                        actionLabel = "📸 Scatta Foto",
+                        onAction = onCameraClick,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onPickDocumentClick()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.heightIn(min = 44.dp)
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "📂 ${doc.category.displayTitle}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = DavezBordeaux,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = doc.dateIso,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = AppleLabelSecondary
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = doc.fileName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppleLabelPrimary
-                            )
-                            Text(
-                                text = "👤 ${doc.cliente.replace('_', ' ')} • 🏷️ ${doc.oggetto.replace('_', ' ')}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AppleLabelSecondary
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        onClick = {
-                                            viewModel.archiveRepo.createShareOrOpenIntent(doc, asShare = false)?.let {
-                                                context.startActivity(it)
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Apri", color = AppleWhite)
-                                    }
-                                    OutlinedButton(
-                                        onClick = {
-                                            viewModel.archiveRepo.createShareOrOpenIntent(doc, asShare = true)?.let {
-                                                context.startActivity(Intent.createChooser(it, "Condividi ${doc.fileName}"))
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Condividi", color = DavezBordeaux)
-                                    }
-                                }
-                                IconButton(
-                                    onClick = { docPendingDelete = doc },
-                                    modifier = Modifier.size(44.dp)
+                        Text("📎 Scegli File", color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredDocs, key = { it.id }) { doc ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+                            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Default.DeleteOutline,
-                                        contentDescription = "Elimina",
-                                        tint = AppleRed,
-                                        modifier = Modifier.size(20.dp)
+                                    Text(
+                                        text = "📂 ${doc.category.displayTitle}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
                                     )
+                                    Text(
+                                        text = doc.dateIso,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = doc.fileName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "👤 ${doc.cliente.replace('_', ' ')} • 🏷️ ${doc.oggetto.replace('_', ' ')}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                                viewModel.archiveRepo.createShareOrOpenIntent(doc, asShare = false)?.let {
+                                                    context.startActivity(it)
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 44.dp)
+                                        ) {
+                                            Text("Apri", color = MaterialTheme.colorScheme.onPrimary)
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                                                viewModel.archiveRepo.createShareOrOpenIntent(doc, asShare = true)?.let {
+                                                    context.startActivity(Intent.createChooser(it, "Condividi ${doc.fileName}"))
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.heightIn(min = 44.dp)
+                                        ) {
+                                            Text("Condividi", color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                                            docPendingDelete = doc
+                                        },
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.DeleteOutline,
+                                            contentDescription = "Elimina",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -5380,38 +4369,40 @@ fun ArchiveFoldersSheetContent(
         }
     }
 }
-}
 
 // =============================================================================
-// COMPONENTE TENDINA ACCORDION COMPRIMIBILE (Davez Luxury & Apple HIG)
+// COMPONENTE TENDINA ACCORDION COMPRIMIBILE (Dark Mode & Motion Tokens)
 // =============================================================================
 @Composable
 fun SettingsTendinaCard(
     title: String,
     subtitle: String,
     badgeText: String? = null,
-    badgeColor: Color = AppleBlueSoft,
-    badgeTextColor: Color = DavezBordeaux,
+    badgeColor: Color? = null,
+    badgeTextColor: Color? = null,
     isExpanded: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val semanticColors = LocalPeritoSemanticColors.current
+    val resolvedBadgeColor = badgeColor ?: semanticColors.brandSoft
+    val resolvedBadgeTextColor = badgeTextColor ?: MaterialTheme.colorScheme.primary
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
+
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.78f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "tendina_chevron"
     )
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = AppleGroupedBg,
+        color = semanticColors.groupedBg,
         border = BorderStroke(
             if (isExpanded) 1.dp else 0.5.dp,
-            if (isExpanded) DavezBordeaux.copy(alpha = 0.35f) else DavezStoneBorder.copy(alpha = 0.5f)
+            if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
         ),
         shadowElevation = if (isExpanded) 1.5.dp else 0.dp,
         modifier = modifier
@@ -5424,7 +4415,6 @@ fun SettingsTendinaCard(
             )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Intestazione a Tendina Cliccabile
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -5442,13 +4432,13 @@ fun SettingsTendinaCard(
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = AppleLabelPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         if (badgeText != null) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = badgeColor
+                                color = resolvedBadgeColor
                             ) {
                                 Text(
                                     text = badgeText,
@@ -5456,7 +4446,7 @@ fun SettingsTendinaCard(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 10.sp
                                     ),
-                                    color = badgeTextColor,
+                                    color = resolvedBadgeTextColor,
                                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                                     maxLines = 1,
                                     softWrap = false
@@ -5468,23 +4458,22 @@ fun SettingsTendinaCard(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = if (isExpanded) 2 else 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // Freccia Chevron animata con rotazione fluida su GPU
                 Box(
                     modifier = Modifier
                         .size(30.dp)
                         .background(
-                            if (isExpanded) DavezBordeaux.copy(alpha = 0.12f) else AppleWhite,
+                            if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
                             CircleShape
                         )
                         .border(
                             0.5.dp,
-                            if (isExpanded) DavezBordeaux.copy(alpha = 0.3f) else DavezStoneBorder.copy(alpha = 0.6f),
+                            if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -5492,7 +4481,7 @@ fun SettingsTendinaCard(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = if (isExpanded) "Comprimi sezione" else "Espandi sezione",
-                        tint = if (isExpanded) DavezBordeaux else AppleLabelSecondary,
+                        tint = if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(18.dp)
                             .graphicsLayer { rotationZ = chevronRotation }
@@ -5500,11 +4489,10 @@ fun SettingsTendinaCard(
                 }
             }
 
-            // Corpo Dettagliato a Tendina
             if (isExpanded) {
                 HorizontalDivider(
                     thickness = 0.5.dp,
-                    color = DavezStoneBorder.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
                 Box(
@@ -5519,1651 +4507,501 @@ fun SettingsTendinaCard(
     }
 }
 
-// =============================================================================
-// FOGLIO MODALE IOS INTUITIVO: IMPOSTAZIONI RAPIDE & MODELLI IA ON-DEVICE
-// =============================================================================
 @Composable
-fun AiEngineSettingsSheetContent(
-    uiState: PeritoUiState,
-    viewModel: PeritoViewModel,
-    onRequestCalendarPerm: () -> Unit,
-    onClose: () -> Unit
-) {
-    var briefingEnabled by remember(uiState.aiConfig.morningBriefingEnabled) {
-        mutableStateOf(uiState.aiConfig.morningBriefingEnabled)
-    }
-    var briefingTime by remember(uiState.aiConfig.morningBriefingTime) {
-        mutableStateOf(uiState.aiConfig.morningBriefingTime.ifBlank { "08:30" })
-    }
-    var studioNameInput by remember(uiState.aiConfig.studioProfile.studioName) {
-        mutableStateOf(uiState.aiConfig.studioProfile.studioName)
-    }
-    var professionistaInput by remember(uiState.aiConfig.studioProfile.professionistaNome) {
-        mutableStateOf(uiState.aiConfig.studioProfile.professionistaNome)
-    }
-    var alboOrdineInput by remember(uiState.aiConfig.studioProfile.alboIscrizione) {
-        mutableStateOf(uiState.aiConfig.studioProfile.alboIscrizione)
-    }
-    var cittaInput by remember(uiState.aiConfig.studioProfile.citta) {
-        mutableStateOf(uiState.aiConfig.studioProfile.citta)
-    }
-    var recapitoInput by remember(uiState.aiConfig.studioProfile.recapito) {
-        mutableStateOf(uiState.aiConfig.studioProfile.recapito)
-    }
-    var showManifestUrlEditor by rememberSaveable { mutableStateOf(false) }
-    var editedManifestUrl by rememberSaveable(uiState.aiConfig.otaManifestUrl) {
-        mutableStateOf(uiState.aiConfig.otaManifestUrl)
-    }
-    var showCalendarAccountDialog by remember { mutableStateOf(false) }
-
-    if (showCalendarAccountDialog) {
-        SelectCalendarAccountDialog(
-            availableCalendars = uiState.availableCalendars,
-            selectedCalendarId = uiState.aiConfig.selectedCalendarId,
-            onSelectCalendar = { viewModel.selectSystemCalendar(it) },
-            onDismiss = { showCalendarAccountDialog = false }
-        )
-    }
-
-    var expandedSections by rememberSaveable { mutableStateOf(setOf<String>()) }
-    val toggleSection: (String) -> Unit = { key ->
-        expandedSections = if (expandedSections.contains(key)) expandedSections - key else expandedSections + key
-    }
-
-    var currentSubScreen by rememberSaveable { mutableStateOf("main") }
-
-    BackHandler(enabled = currentSubScreen != "main") {
-        currentSubScreen = "main"
-    }
-
-    AnimatedContent(
-        targetState = currentSubScreen,
-        transitionSpec = {
-            if (targetState == "category_formats") {
-                slideInHorizontally(
-                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                ) { width -> width } + fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
-                    slideOutHorizontally(
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                    ) { width -> -width } + fadeOut(tween(240, easing = FastOutLinearInEasing))
-            } else {
-                slideInHorizontally(
-                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                ) { width -> -width } + fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
-                    slideOutHorizontally(
-                        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                    ) { width -> width } + fadeOut(tween(240, easing = FastOutLinearInEasing))
-            }
-        },
-        label = "settings_subscreen_transition"
-    ) { screen ->
-        if (screen == "category_formats") {
-            CategoryReferenceSettingsContent(
-                config = uiState.aiConfig,
-                onUpdateFormat = { catId, format ->
-                    viewModel.updateCategoryReferenceFormat(catId, format)
-                },
-                onResetDefaults = {
-                    viewModel.resetCategoryReferenceFormats()
-                },
-                onAddCategory = { name, emoji, defaultTitle, keywords ->
-                    viewModel.addCustomCategory(name, emoji, defaultTitle, keywords)
-                },
-                onUpdateCategory = { id, name, emoji, defaultTitle, keywords ->
-                    viewModel.updateCustomCategory(id, name, emoji, defaultTitle, keywords)
-                },
-                onDeleteCategory = { id ->
-                    viewModel.deleteCustomCategory(id)
-                },
-                onBack = { currentSubScreen = "main" }
-            )
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.92f)
-                    .background(AppleWhite)
-                    .navigationBarsPadding()
-                    .imePadding()
-            ) {
-                // Header FISSO in alto con Brand PeritoAI e pulsante di chiusura Apple HIG
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f, fill = false)
-                    ) {
-                        PeritoAiBrandEmblem(size = 36.dp, showOnlineBadge = false)
-                        Column {
-                            Text(
-                                text = "Impostazioni & Modelli IA",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = AppleLabelPrimary,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "PeritoAI • Download in Background & Privacy",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = DavezBordeaux,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    Surface(
-                        onClick = onClose,
-                        shape = CircleShape,
-                        color = AppleSecondaryGroupedBg.copy(alpha = 0.85f),
-                        modifier = Modifier
-                            .size(32.dp)
-                            .semantics { contentDescription = "Chiudi impostazioni" }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Chiudi impostazioni",
-                                tint = AppleLabelPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
-
-                // Contenuto scorrevole fluido a 60fps con LazyColumn (nessun conflitto col BottomSheet grazie a sheetGesturesEnabled=false)
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // TENDINA 1: PERSONALIZZAZIONE FORMATO RIFERIMENTO CATEGORIE
-                    item(key = "tendina_category_formats") {
-                        SettingsTendinaCard(
-                            title = "🏷️ Formato Riferimento Categorie",
-                            subtitle = "Personalizza cosa mostrare nel titolo per ogni categoria nell'agenda",
-                            badgeText = "${uiState.aiConfig.categoryFormats.size} Categorie",
-                            badgeColor = AppleBlueSoft,
-                            badgeTextColor = DavezBordeaux,
-                            isExpanded = expandedSections.contains("category_formats"),
-                            onToggle = { toggleSection("category_formats") }
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = "Configura l'ordine e la visibilità delle informazioni visualizzate nel riferimento degli appuntamenti (Orario, Tipo, Soggetto, Luogo, Note).",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleLabelSecondary
-                                )
-
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = AppleWhite,
-                                    border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        PeritoEventCategory.values().take(4).forEach { cat ->
-                                            val format = uiState.aiConfig.categoryFormats[cat.id] ?: CategoryReferenceFormat()
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "${cat.emoji} ${cat.displayName}",
-                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                                    color = AppleLabelPrimary
-                                                )
-                                                val summaryParts = listOfNotNull(
-                                                    if (format.showTime) "Orario" else null,
-                                                    if (format.showSubject) "Soggetto" else null,
-                                                    if (format.showPlace) "Luogo" else null
-                                                )
-                                                Text(
-                                                    text = if (summaryParts.isEmpty()) "Solo tipo" else summaryParts.joinToString(" • "),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = DavezBordeaux,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Button(
-                                    onClick = { currentSubScreen = "category_formats" },
-                                    colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = null,
-                                        tint = AppleWhite,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        "Personalizza Regole e Anteprima Completa",
-                                        color = AppleWhite,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // TENDINA 2: PROFILO STUDIO TECNICO
-                    item(key = "tendina_studio_profile") {
-                        SettingsTendinaCard(
-                            title = "🏛️ Profilo Studio Tecnico",
-                            subtitle = "Configura l'intestazione dello studio per fascicoli, perizie e barra superiore",
-                            badgeText = if (studioNameInput.isNotBlank()) "Personalizzato" else "Predefinito",
-                            badgeColor = AppleBlueSoft,
-                            badgeTextColor = DavezBordeaux,
-                            isExpanded = expandedSections.contains("studio_profile"),
-                            onToggle = { toggleSection("studio_profile") }
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = AppleWhite,
-                                border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedTextField(
-                                        value = studioNameInput,
-                                        onValueChange = { studioNameInput = it },
-                                        label = { Text("Nome Studio Tecnico") },
-                                        placeholder = { Text("Es. Studio Tecnico Peritale") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = DavezBordeaux,
-                                            cursorColor = DavezBordeaux
-                                        )
-                                    )
-
-                                    OutlinedTextField(
-                                        value = professionistaInput,
-                                        onValueChange = { professionistaInput = it },
-                                        label = { Text("Professionista Responsabile") },
-                                        placeholder = { Text("Es. Geom. Mario Rossi") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = DavezBordeaux,
-                                            cursorColor = DavezBordeaux
-                                        )
-                                    )
-
-                                    OutlinedTextField(
-                                        value = alboOrdineInput,
-                                        onValueChange = { alboOrdineInput = it },
-                                        label = { Text("Albo / Ordine Professionale") },
-                                        placeholder = { Text("Es. Collegio Geometri Monza e Brianza") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = DavezBordeaux,
-                                            cursorColor = DavezBordeaux
-                                        )
-                                    )
-
-                                    OutlinedTextField(
-                                        value = cittaInput,
-                                        onValueChange = { cittaInput = it },
-                                        label = { Text("Città Sede Studio") },
-                                        placeholder = { Text("Es. Monza (MB)") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = DavezBordeaux,
-                                            cursorColor = DavezBordeaux
-                                        )
-                                    )
-
-                                    OutlinedTextField(
-                                        value = recapitoInput,
-                                        onValueChange = { recapitoInput = it },
-                                        label = { Text("Email / PEC / Telefono") },
-                                        placeholder = { Text("Es. studio@perizietecniche.it") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = DavezBordeaux,
-                                            cursorColor = DavezBordeaux
-                                        )
-                                    )
-
-                                    val isModified = studioNameInput != uiState.aiConfig.studioProfile.studioName ||
-                                        professionistaInput != uiState.aiConfig.studioProfile.professionistaNome ||
-                                        alboOrdineInput != uiState.aiConfig.studioProfile.alboIscrizione ||
-                                        cittaInput != uiState.aiConfig.studioProfile.citta ||
-                                        recapitoInput != uiState.aiConfig.studioProfile.recapito
-
-                                    Button(
-                                        onClick = {
-                                            viewModel.updateStudioProfile(
-                                                StudioProfile(
-                                                    studioName = studioNameInput.trim().ifBlank { "Studio Tecnico Peritale" },
-                                                    professionistaNome = professionistaInput.trim(),
-                                                    alboIscrizione = alboOrdineInput.trim(),
-                                                    citta = cittaInput.trim(),
-                                                    recapito = recapitoInput.trim()
-                                                )
-                                            )
-                                        },
-                                        enabled = isModified && studioNameInput.isNotBlank(),
-                                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("💾 Salva Intestazione Studio", color = AppleWhite, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TENDINA 3: BRIEFING MATTUTINO QUOTIDIANO
-                    item(key = "tendina_morning_briefing") {
-                        val context = LocalContext.current
-                        val (currentHour, currentMinute) = MorningBriefingWorker.parseBriefingTime(briefingTime)
-                        val openBriefingTimePicker = {
-                            val picker = android.app.TimePickerDialog(
-                                context,
-                                { _, hourOfDay, minute ->
-                                    val formatted = String.format(Locale.ROOT, "%02d:%02d", hourOfDay, minute)
-                                    briefingTime = formatted
-                                    viewModel.updateAiConfig(
-                                        uiState.aiConfig.copy(
-                                            morningBriefingEnabled = briefingEnabled,
-                                            morningBriefingTime = formatted
-                                        )
-                                    )
-                                },
-                                currentHour,
-                                currentMinute,
-                                true
-                            )
-                            picker.show()
-                        }
-
-                        SettingsTendinaCard(
-                            title = "☀️ Briefing Mattutino Quotidiano",
-                            subtitle = "Riepilogo automatico alle $briefingTime con sopralluoghi, scadenze e fascicoli",
-                            badgeText = if (briefingEnabled) "Attivo ($briefingTime)" else "Disattivato",
-                            badgeColor = if (briefingEnabled) AppleGreenSoft else AppleSecondaryGroupedBg,
-                            badgeTextColor = if (briefingEnabled) AppleGreen else AppleLabelSecondary,
-                            isExpanded = expandedSections.contains("morning_briefing"),
-                            onToggle = { toggleSection("morning_briefing") }
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = AppleWhite,
-                                border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .toggleable(
-                                                value = briefingEnabled,
-                                                role = Role.Switch,
-                                                onValueChange = {
-                                                    briefingEnabled = it
-                                                    viewModel.updateAiConfig(
-                                                        uiState.aiConfig.copy(
-                                                            morningBriefingEnabled = it,
-                                                            morningBriefingTime = briefingTime
-                                                        )
-                                                    )
-                                                }
-                                            )
-                                            .semantics { testTag = "briefing_toggle_row" }
-                                            .padding(vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Attiva Notifica ore $briefingTime",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = AppleLabelPrimary
-                                            )
-                                            Text(
-                                                text = "Riepiloga automaticamente i sopralluoghi di oggi, domani e fascicoli clienti senza dover aprire l'app",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = AppleLabelSecondary
-                                            )
-                                        }
-                                        Spacer(Modifier.width(8.dp))
-                                        Switch(
-                                            checked = briefingEnabled,
-                                            onCheckedChange = null,
-                                            colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
-                                        )
-                                    }
-                                    if (briefingEnabled) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            thickness = 0.5.dp,
-                                            color = AppleSecondaryGroupedBg
-                                        )
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column {
-                                                Text(
-                                                    text = "Orario Notifica",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = AppleLabelPrimary
-                                                )
-                                                Text(
-                                                    text = "Tocca per impostare l'orario personalizzato",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = AppleLabelSecondary
-                                                )
-                                            }
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = AppleWhite,
-                                                border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.5f)),
-                                                modifier = Modifier.clickable { openBriefingTimePicker() }
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Schedule,
-                                                        contentDescription = "Cambia orario briefing",
-                                                        tint = DavezBordeaux,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
-                                                    Text(
-                                                        text = briefingTime,
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = DavezBordeaux
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        val presetTimes = listOf("07:30", "08:00", "08:30", "09:00")
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            presetTimes.forEach { preset ->
-                                                val isSelected = briefingTime == preset
-                                                Surface(
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    color = if (isSelected) DavezBordeaux.copy(alpha = 0.12f) else AppleSecondaryGroupedBg.copy(alpha = 0.45f),
-                                                    border = BorderStroke(
-                                                        if (isSelected) 1.dp else 0.5.dp,
-                                                        if (isSelected) DavezBordeaux else AppleSecondaryGroupedBg
-                                                    ),
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clickable {
-                                                            briefingTime = preset
-                                                            viewModel.updateAiConfig(
-                                                                uiState.aiConfig.copy(
-                                                                    morningBriefingEnabled = briefingEnabled,
-                                                                    morningBriefingTime = preset
-                                                                )
-                                                            )
-                                                        }
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier.padding(vertical = 6.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            text = preset,
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                            color = if (isSelected) DavezBordeaux else AppleLabelSecondary
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = { viewModel.triggerTestMorningBriefing() },
-                                            shape = RoundedCornerShape(10.dp),
-                                            border = BorderStroke(0.8.dp, DavezBordeaux.copy(alpha = 0.5f)),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(
-                                                Icons.Default.NotificationsActive,
-                                                contentDescription = null,
-                                                tint = DavezBordeaux,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(
-                                                "Invia Notifica Briefing di Prova Subito",
-                                                color = DavezBordeaux,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TENDINA 4: CALENDARIO GOOGLE & OUTLOOK
-                    item(key = "tendina_calendar_sync") {
-                        val isCalendarSyncActive = uiState.hasCalendarPermission && uiState.aiConfig.syncSystemCalendar
-                        SettingsTendinaCard(
-                            title = "📅 Calendario Google & Outlook",
-                            subtitle = "Sincronizzazione bidirezionale col telefono e 3 promemoria automatici",
-                            badgeText = if (isCalendarSyncActive) "✅ Attivo" else "Non collegato",
-                            badgeColor = if (isCalendarSyncActive) AppleGreenSoft else AppleSecondaryGroupedBg,
-                            badgeTextColor = if (isCalendarSyncActive) AppleGreen else AppleLabelSecondary,
-                            isExpanded = expandedSections.contains("calendar_sync"),
-                            onToggle = { toggleSection("calendar_sync") }
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                // Riga Stato Sync & Pulsante Collega/Scollega
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = AppleWhite,
-                                    border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Calendario Android / Google",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = AppleLabelPrimary
-                                            )
-                                            Text(
-                                                text = when {
-                                                    isCalendarSyncActive ->
-                                                        "Sincronizzato con Google/Android Calendar (3 promemoria automatici)"
-                                                    !uiState.hasNativeCalendarPermission ->
-                                                        "Permessi non concessi • Tocca per sincronizzare col telefono"
-                                                    else ->
-                                                        "Scollegato • Modalità Agenda Locale attiva"
-                                                },
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = AppleLabelSecondary
-                                            )
-                                        }
-                                        Spacer(Modifier.width(8.dp))
-                                        if (isCalendarSyncActive) {
-                                            OutlinedButton(
-                                                onClick = { viewModel.disconnectCalendar() },
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppleRed),
-                                                border = BorderStroke(1.dp, AppleRed.copy(alpha = 0.4f)),
-                                                shape = RoundedCornerShape(10.dp),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                                modifier = Modifier.height(34.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.LinkOff,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = AppleRed
-                                                )
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("Scollega", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleRed)
-                                            }
-                                        } else {
-                                            Button(
-                                                onClick = onRequestCalendarPerm,
-                                                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                                shape = RoundedCornerShape(10.dp),
-                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                                modifier = Modifier.height(34.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Link,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(14.dp),
-                                                    tint = AppleWhite
-                                                )
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("Collega", fontSize = 12.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Selettore Account Sincronizzato
-                                if (isCalendarSyncActive) {
-                                    Surface(
-                                        onClick = { showCalendarAccountDialog = true },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = AppleWhite,
-                                        border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "🎯 Account Calendario Sincronizzato",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = AppleLabelPrimary
-                                                )
-                                                val calendarLabel = remember(uiState.aiConfig.selectedCalendarName, uiState.aiConfig.selectedCalendarAccount) {
-                                                    val name = uiState.aiConfig.selectedCalendarName
-                                                    val acc = uiState.aiConfig.selectedCalendarAccount
-                                                    when {
-                                                        name == null -> "Tutti gli account (sincronizzazione globale)"
-                                                        acc.isNullOrBlank() || acc.equals(name, ignoreCase = true) -> name
-                                                        else -> "$name ($acc)"
-                                                    }
-                                                }
-                                                Text(
-                                                    text = calendarLabel,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = DavezBordeaux,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            Spacer(Modifier.width(8.dp))
-                                            OutlinedButton(
-                                                onClick = { showCalendarAccountDialog = true },
-                                                shape = RoundedCornerShape(10.dp),
-                                                border = BorderStroke(0.8.dp, DavezStoneBorder),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                                modifier = Modifier.height(34.dp)
-                                            ) {
-                                                Text("Cambia", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppleLabelPrimary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TENDINA 5: MIRROR PC & ARCHIVIO LOCALE
-                    item(key = "tendina_pc_sync") {
-                        SettingsTendinaCard(
-                            title = "💻 Mirror PC & Archivio Locale",
-                            subtitle = "Archivio Documents/Perizie_Archivio (6 Cartelle) per sincronizzazione PC",
-                            badgeText = "📂 Mirror Attivo",
-                            badgeColor = AppleGreenSoft,
-                            badgeTextColor = AppleLabelPrimary,
-                            isExpanded = expandedSections.contains("pc_sync"),
-                            onToggle = { toggleSection("pc_sync") }
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = AppleWhite,
-                                border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "Cartella Archivio Locale:",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color = AppleLabelPrimary
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = AppleGroupedBg,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = "/storage/emulated/0/Documents/Perizie_Archivio/",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                                            color = DavezBordeaux,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "Tutti i fascicoli, verbali e allegati fotografici sono salvati qui in formato standard aperto, pronti per essere sincronizzati in tempo reale con il computer dello studio tramite Syncthing (P2P zero-cloud), Microsoft OneDrive o Dropbox/Dropsync.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppleLabelSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // TENDINA 6: MOTORE IA ON-DEVICE & MODELLI
-                    item(key = "tendina_ai_models") {
-                        SettingsTendinaCard(
-                            title = "🧠 Motore IA & Modelli On-Device",
-                            subtitle = "Download modelli GGUF e Whisper per elaborazione locale 100% confidenziale",
-                            badgeText = if (uiState.isReasoningReady) "Reasoning Attivo" else "Pronto all'Uso",
-                            badgeColor = if (uiState.isReasoningReady) AppleGreenSoft else AppleOrangeSoft,
-                            badgeTextColor = if (uiState.isReasoningReady) AppleGreen else AppleOrange,
-                            isExpanded = expandedSections.contains("ai_models"),
-                            onToggle = { toggleSection("ai_models") }
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = "Il download avviene anche in background con notifica di avanzamento nella barra di stato Android. Puoi chiudere questa finestra e continuare a usare l'app mentre scarica:",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleLabelSecondary
-                                )
-                                ModelDownloadCatalogList(
-                                    uiState = uiState,
-                                    viewModel = viewModel
-                                )
-                            }
-                        }
-                    }
-
-                    // TENDINA 7: AGGIORNAMENTI IN-APP (OTA)
-                    item(key = "tendina_ota_updates") {
-                        val context = LocalContext.current
-                        SettingsTendinaCard(
-                            title = "🔄 Aggiornamenti In-App (OTA)",
-                            subtitle = "Verifica release APK e aggiorna direttamente l'app senza passaggi manuali",
-                            badgeText = "v${uiState.currentAppVersionName} (${uiState.currentAppVersionCode})",
-                            badgeColor = DavezBordeaux.copy(alpha = 0.12f),
-                            badgeTextColor = DavezBordeaux,
-                            isExpanded = expandedSections.contains("ota_updates"),
-                            onToggle = { toggleSection("ota_updates") }
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = "Verifica la presenza di nuove release e aggiorna l'app senza dover reinstallare manualmente.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppleLabelSecondary
-                                )
-
-                                // Scheda Notifica Aggiornamento Disponibile (se presente)
-                                uiState.availableUpdate?.let { update ->
-                                    val currentCode = remember {
-                                        try {
-                                            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
-                                                context.packageManager.getPackageInfo(context.packageName, 0)
-                                            ).toInt()
-                                        } catch (_: Throwable) { 1 }
-                                    }
-                                    val isNewer = update.latestVersionCode > currentCode
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = AppleWhite,
-                                        border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = if (isNewer) "🚀 Nuova Versione: v${update.latestVersionName}" else "📦 Release Disponibile: v${update.latestVersionName}",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = DavezBordeaux
-                                                )
-                                                Text(
-                                                    text = if (isNewer) "Build ${update.latestVersionCode} (Nuova)" else "Build ${update.latestVersionCode} (Reinstalla)",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = AppleLabelSecondary
-                                                )
-                                            }
-
-                                            Text(
-                                                text = formatPeritoMessageText(
-                                                    update.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni e stabilità." },
-                                                    isUser = false
-                                                ),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = AppleLabelPrimary,
-                                                lineHeight = 18.sp
-                                            )
-
-                                            if (uiState.updateDownloadProgress != null) {
-                                                val prog = uiState.updateDownloadProgress
-                                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween
-                                                    ) {
-                                                        Text(
-                                                            text = uiState.updateStatusMessage ?: "Download in corso...",
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = AppleLabelSecondary
-                                                        )
-                                                        Text(
-                                                            text = "${(prog * 100).toInt()}%",
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = DavezBordeaux
-                                                        )
-                                                    }
-                                                    LinearProgressIndicator(
-                                                        progress = { prog },
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(4.dp)
-                                                            .clip(RoundedCornerShape(2.dp)),
-                                                        color = DavezBordeaux,
-                                                        trackColor = AppleBlueSoft
-                                                    )
-                                                }
-                                            }
-
-                                            Button(
-                                                onClick = { viewModel.startUpdateDownloadAndInstall(context) },
-                                                enabled = uiState.updateDownloadProgress == null,
-                                                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                                shape = RoundedCornerShape(10.dp),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text(
-                                                    text = if (uiState.updateDownloadProgress != null) {
-                                                        "Download in corso..."
-                                                    } else if (isNewer) {
-                                                        "Scarica e Installa v${update.latestVersionName}"
-                                                    } else {
-                                                        "Scarica e Reinstalla v${update.latestVersionName}"
-                                                    },
-                                                    color = AppleWhite,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 13.sp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Riga Switch: Controllo automatico all'avvio
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = AppleWhite,
-                                    border = BorderStroke(0.5.dp, AppleSecondaryGroupedBg),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .toggleable(
-                                            value = uiState.aiConfig.autoCheckUpdatesOnStart,
-                                            role = Role.Switch,
-                                            onValueChange = { viewModel.toggleAutoCheckUpdates(it) }
-                                        )
-                                        .semantics { testTag = "auto_check_updates_row" }
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Controllo automatico all'avvio",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = AppleLabelPrimary
-                                            )
-                                            Text(
-                                                text = "Verifica nuove versioni all'apertura dell'app",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = AppleLabelSecondary
-                                            )
-                                        }
-                                        Switch(
-                                            checked = uiState.aiConfig.autoCheckUpdatesOnStart,
-                                            onCheckedChange = null,
-                                            colors = SwitchDefaults.colors(checkedTrackColor = AppleGreen)
-                                        )
-                                    }
-                                }
-
-                                // Pulsante Verifica Manuale Aggiornamenti
-                                Button(
-                                    onClick = { viewModel.checkForUpdates(silent = false) },
-                                    enabled = !uiState.isCheckingUpdate && uiState.updateDownloadProgress == null,
-                                    colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 42.dp)
-                                ) {
-                                    if (uiState.isCheckingUpdate) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            color = AppleWhite,
-                                            strokeWidth = 2.dp
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Verifica in corso...", color = AppleWhite, fontSize = 13.sp)
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = AppleWhite
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Verifica Aggiornamenti Ora", color = AppleWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                    }
-                                }
-
-                                // Feedback messaggio di stato
-                                if (!uiState.updateStatusMessage.isNullOrBlank() && uiState.availableUpdate == null) {
-                                    Text(
-                                        text = uiState.updateStatusMessage,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = DavezBordeaux,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 4.dp)
-                                    )
-                                }
-
-                                // Configurazione URL Manifest (opzionale)
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { showManifestUrlEditor = !showManifestUrlEditor },
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "⚙️ Endpoint Manifest OTA",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AppleLabelSecondary,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = if (showManifestUrlEditor) "Nascondi" else "Configura",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = DavezBordeaux,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                if (showManifestUrlEditor) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        OutlinedTextField(
-                                            value = editedManifestUrl,
-                                            onValueChange = { editedManifestUrl = it },
-                                            label = { Text("URL file ota-update.json", fontSize = 11.sp) },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.End,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            TextButton(
-                                                onClick = {
-                                                    editedManifestUrl = OtaUpdateManager.DEFAULT_MANIFEST_URL
-                                                    viewModel.updateOtaManifestUrl(OtaUpdateManager.DEFAULT_MANIFEST_URL)
-                                                }
-                                            ) {
-                                                Text("Predefinito", fontSize = 11.sp, color = AppleLabelSecondary)
-                                            }
-                                            Spacer(Modifier.width(4.dp))
-                                            Button(
-                                                onClick = { viewModel.updateOtaManifestUrl(editedManifestUrl) },
-                                                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                                                shape = RoundedCornerShape(8.dp),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                                modifier = Modifier.height(32.dp)
-                                            ) {
-                                                Text("Salva URL", fontSize = 11.sp, color = AppleWhite, fontWeight = FontWeight.SemiBold)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    item(key = "settings_bottom_spacer") {
-                        Spacer(Modifier.height(40.dp))
-                    }
-        }
-    }
-    }
-}
-}
-
-@Composable
-fun ModelDownloadCatalogList(
-    uiState: PeritoUiState,
-    viewModel: PeritoViewModel
+fun MorningBriefingTendinaCard(
+    briefingEnabled: Boolean,
+    briefingTime: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    onBriefingEnabledChange: (Boolean) -> Unit,
+    onBriefingTimeChange: (String) -> Unit,
+    onTriggerTestBriefing: () -> Unit
 ) {
     val context = LocalContext.current
-    val progress = uiState.downloadProgress
-    val primaryModel = viewModel.modelDownloadManager.primaryReasoningModel
-    val powerfulModel = viewModel.modelDownloadManager.powerfulReasoningModel
-    val fixedModels = viewModel.modelDownloadManager.fixedTaskModels
-
-    val notifPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { }
-
-    val ensureNotificationPermAndRun: (() -> Unit) -> Unit = { action ->
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            val granted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                runCatching { notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
-            }
-        }
-        action()
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
+    val (currentHour, currentMinute) = MorningBriefingWorker.parseBriefingTime(briefingTime)
+    val openBriefingTimePicker = {
+        val picker = android.app.TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val formatted = String.format(Locale.ROOT, "%02d:%02d", hourOfDay, minute)
+                onBriefingTimeChange(formatted)
+            },
+            currentHour,
+            currentMinute,
+            true
+        )
+        picker.show()
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val missingModels = remember(uiState.downloadedModelIds, uiState.aiConfig.reasoningModelId) {
-            viewModel.getMissingModelsForActiveConfig()
-        }
-        val missingBytes = remember(missingModels) {
-            missingModels.sumOf { it.expectedBytes }
-        }
-        val missingNames = remember(missingModels) {
-            missingModels.joinToString(" + ") { it.title }
-        }
-
-        if (missingModels.isNotEmpty() && !progress.isDownloading) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(
-                    onClick = {
-                        ensureNotificationPermAndRun {
-                            viewModel.downloadAllMissingModels()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                ) {
-                    Text(
-                        text = "⬇️ Scarica Modelli Richiesti (${missingModels.size}) • ${viewModel.modelDownloadManager.formatByteSize(missingBytes)}",
-                        color = AppleWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.5.sp
-                    )
-                }
-                Text(
-                    text = "Include: $missingNames",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelSecondary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-            }
-        }
-
-        if (progress.isDownloading) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = AppleBlueSoft,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    val queueTag = if (progress.totalQueueCount > 1) {
-                        " (${progress.currentQueueIndex}/${progress.totalQueueCount})"
-                    } else ""
-                    Text(
-                        text = "⬇️ Download in Background$queueTag: ${progress.modelTitle}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = AppleBlueDark,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "🔔 Notifica Android attiva: puoi chiudere questa finestra o mettere l'app in background.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { progress.progressFraction },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = AppleBlue
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    val dlMb = String.format(Locale.ITALIAN, "%.1f", progress.downloadedBytes / (1024.0 * 1024.0))
-                    val totMb = if (progress.totalBytes > 0) {
-                        String.format(Locale.ITALIAN, "%.1f MB", progress.totalBytes / (1024.0 * 1024.0))
-                    } else "..."
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${progress.progressPercent}% ($dlMb MB / $totMb)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        TextButton(onClick = { viewModel.cancelModelDownload() }) {
-                            Text("Pausa", color = AppleRed, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-
-        progress.error?.let { err ->
-            Text(
-                text = "⚠️ $err",
-                style = MaterialTheme.typography.bodySmall,
-                color = AppleRed
-            )
-        }
-
-        // 1. MOTORE DI REASONING ON-DEVICE / LOCALE
-        Text(
-            text = "1️⃣ MOTORE DI REASONING (BASE 2B O POTENZIATO 4B)",
-            style = MaterialTheme.typography.labelSmall,
-            color = DavezBordeaux,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Puoi selezionare la versione Base 2B (ultra-veloce e leggera) oppure sostituirla con la versione Potenziata 4B per deduzioni logiche e perizie complesse.",
-            style = MaterialTheme.typography.bodySmall,
-            color = AppleLabelSecondary
-        )
-
-        // Modello Base: Qwen 3.5 2B
-        DownloadableModelCard(
-            model = primaryModel,
-            isDownloaded = uiState.downloadedModelIds.contains(primaryModel.id),
-            isActiveReasoning = uiState.aiConfig.reasoningModelId == primaryModel.id,
-            isDownloading = progress.isDownloading,
-            onDownload = {
-                ensureNotificationPermAndRun {
-                    viewModel.startModelDownload(primaryModel)
-                }
-            },
-            onDelete = { viewModel.deleteDownloadedModel(primaryModel) },
-            onSelectActive = { viewModel.selectActiveReasoningModel(primaryModel.id) }
-        )
-
-        // Modello Potenziato: Qwen 3.5 4B Instruct (con tag frob/qwen3.5-instruct:4b)
-        DownloadableModelCard(
-            model = powerfulModel,
-            isDownloaded = uiState.downloadedModelIds.contains(powerfulModel.id),
-            isActiveReasoning = uiState.aiConfig.reasoningModelId == powerfulModel.id,
-            isDownloading = progress.isDownloading,
-            onDownload = {
-                ensureNotificationPermAndRun {
-                    viewModel.startModelDownload(powerfulModel)
-                }
-            },
-            onDelete = { viewModel.deleteDownloadedModel(powerfulModel) },
-            onSelectActive = { viewModel.selectActiveReasoningModel(powerfulModel.id) }
-        )
-
-        Spacer(Modifier.height(4.dp))
-
-        // 2. TRASCRIZIONE VOCALE INTEGRATA IN-APP
-        Text(
-            text = "🎙️ TRASCRIZIONE VOCALE INTEGRATA IN-APP",
-            style = MaterialTheme.typography.labelSmall,
-            color = AppleGreen,
-            fontWeight = FontWeight.Bold
-        )
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = AppleGreenSoft.copy(alpha = 0.45f),
-            border = BorderStroke(1.2.dp, AppleGreen),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "🎙️ TRASCRIZIONE VOCALE NATIVA",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppleGreen,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = AppleWhite
-                    ) {
-                        Text(
-                            text = "0 MB • Integrato",
-                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                            color = AppleGreen,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Google Speech Service In-App",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = AppleLabelPrimary
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "Integrato direttamente nel registratore vocale: salva l'audio originale .wav della voce dell'utente e genera la trascrizione del testo in tempo reale.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelSecondary
-                )
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        // 3. MOTORE OCR & VISIONE ON-DEVICE (ML Kit Nativo)
+    SettingsTendinaCard(
+        title = "☀️ Briefing Mattutino Quotidiano",
+        subtitle = "Riepilogo automatico alle $briefingTime con sopralluoghi, scadenze e fascicoli",
+        badgeText = if (briefingEnabled) "Attivo ($briefingTime)" else "Disattivato",
+        badgeColor = if (briefingEnabled) semanticColors.successSoft else semanticColors.secondaryGroupedBg,
+        badgeTextColor = if (briefingEnabled) semanticColors.success else MaterialTheme.colorScheme.onSurfaceVariant,
+        isExpanded = isExpanded,
+        onToggle = onToggle
+    ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, DavezStoneBorder),
+            border = BorderStroke(0.5.dp, semanticColors.secondaryGroupedBg),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Text(
-                    text = "📄 OCR Documentale & Visione Foto Rilievi",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = AppleLabelPrimary
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "Google ML Kit Text Recognition integrato nativamente: zero download aggiuntivi richiesti (risparmiati oltre 2 GB di spazio), elaborazione istantanea di PDF, PEC .p7m e foto lesioni.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelSecondary
-                )
-            }
-        }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .toggleable(
+                            value = briefingEnabled,
+                            role = Role.Switch,
+                            onValueChange = {
+                                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                onBriefingEnabledChange(it)
+                            }
+                        )
+                        .semantics { testTag = "briefing_toggle_row" }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Attiva Notifica ore $briefingTime",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Riepiloga automaticamente i sopralluoghi di oggi, domani e fascicoli clienti senza dover aprire l'app",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = briefingEnabled,
+                        onCheckedChange = null,
+                        colors = SwitchDefaults.colors(checkedTrackColor = semanticColors.success)
+                    )
+                }
+                if (briefingEnabled) {
+                    HorizontalDivider(
+                        modifier = Modifier.fillMaxWidth(),
+                        thickness = 0.5.dp,
+                        color = semanticColors.secondaryGroupedBg
+                    )
 
-        if (fixedModels.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "⚡ DECISION MODEL ON-DEVICE (RIZZO FLOW)",
-                style = MaterialTheme.typography.labelSmall,
-                color = AppleLabelPrimary,
-                fontWeight = FontWeight.Bold
-            )
-            fixedModels.forEach { fixedModel ->
-                DownloadableModelCard(
-                    model = fixedModel,
-                    isDownloaded = uiState.downloadedModelIds.contains(fixedModel.id),
-                    isDownloading = progress.isDownloading,
-                    onDownload = {
-                        ensureNotificationPermAndRun {
-                            viewModel.startModelDownload(fixedModel)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Orario Notifica",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Tocca per impostare l'orario personalizzato",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    },
-                    onDelete = { viewModel.deleteDownloadedModel(fixedModel) }
-                )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .heightIn(min = 44.dp)
+                                .clickable { openBriefingTimePicker() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Schedule,
+                                    contentDescription = "Cambia orario briefing",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = briefingTime,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    val presetTimes = listOf("07:30", "08:00", "08:30", "09:00")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        presetTimes.forEach { preset ->
+                            val isSelected = briefingTime == preset
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else semanticColors.secondaryGroupedBg.copy(alpha = 0.45f),
+                                border = BorderStroke(
+                                    if (isSelected) 1.dp else 0.5.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else semanticColors.secondaryGroupedBg
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 44.dp)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                        onBriefingTimeChange(preset)
+                                    }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = preset,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onTriggerTestBriefing()
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.NotificationsActive,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Invia Notifica Briefing di Prova Subito",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DownloadableModelCard(
-    model: DownloadableAiModel,
-    isDownloaded: Boolean,
-    isActiveReasoning: Boolean = false,
-    isDownloading: Boolean = false,
-    onDownload: () -> Unit,
-    onDelete: () -> Unit,
-    onSelectActive: (() -> Unit)? = null
+fun UpdatesTendinaCard(
+    uiState: PeritoUiState,
+    isExpanded: Boolean,
+    showManifestUrlEditor: Boolean,
+    editedManifestUrl: String,
+    onToggle: () -> Unit,
+    onToggleManifestEditor: () -> Unit,
+    onEditedManifestUrlChange: (String) -> Unit,
+    onToggleAutoCheckUpdates: (Boolean) -> Unit,
+    onCheckForUpdates: () -> Unit,
+    onStartUpdateDownloadAndInstall: (android.content.Context) -> Unit,
+    onUpdateOtaManifestUrl: (String) -> Unit,
+    onResetDefaultManifestUrl: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalPeritoSemanticColors.current
 
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = when {
-            isActiveReasoning && isDownloaded -> AppleGreenSoft.copy(alpha = 0.45f)
-            isActiveReasoning -> AppleBlueSoft.copy(alpha = 0.40f)
-            isDownloaded -> AppleGreenSoft.copy(alpha = 0.25f)
-            else -> AppleWhite
-        },
-        border = BorderStroke(
-            width = if (isActiveReasoning) 1.8.dp else if (isDownloaded) 1.2.dp else 0.8.dp,
-            color = when {
-                isActiveReasoning && isDownloaded -> AppleGreen
-                isActiveReasoning -> DavezBordeaux
-                isDownloaded -> AppleGreen.copy(alpha = 0.7f)
-                else -> DavezStoneBorder
-            }
-        ),
-        modifier = Modifier.fillMaxWidth()
+    SettingsTendinaCard(
+        title = "🔄 Aggiornamenti In-App (OTA)",
+        subtitle = "Verifica release APK e aggiorna direttamente l'app senza passaggi manuali",
+        badgeText = "v${uiState.currentAppVersionName} (${uiState.currentAppVersionCode})",
+        badgeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+        badgeTextColor = MaterialTheme.colorScheme.primary,
+        isExpanded = isExpanded,
+        onToggle = onToggle
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = model.roleBadge,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (model.isPrimaryReasoning) DavezBordeaux else AppleLabelSecondary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (isActiveReasoning) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = DavezBordeaux
-                        ) {
-                            Text(
-                                text = "ATTIVO",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleWhite,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = AppleGroupedBg
-                ) {
-                    Text(
-                        text = model.sizeLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = AppleLabelPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(4.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Text(
-                text = model.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = AppleLabelPrimary
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = model.subtitle,
+                text = "Verifica la presenza di nuove release e aggiorna l'app senza dover reinstallare manualmente.",
                 style = MaterialTheme.typography.bodySmall,
-                color = AppleLabelSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // Sezione versione suggerita per Ollama / Termux / PC (es. frob/qwen3.5-instruct:4b)
-            model.suggestedOllamaTag?.let { tag ->
-                Spacer(Modifier.height(8.dp))
+            uiState.availableUpdate?.let { update ->
+                val currentCode = remember {
+                    try {
+                        androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                            context.packageManager.getPackageInfo(context.packageName, 0)
+                        ).toInt()
+                    } catch (_: Throwable) { 1 }
+                }
+                val isNewer = update.latestVersionCode > currentCode
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = AppleGroupedBg,
-                    border = BorderStroke(0.6.dp, DavezStoneBorder),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "🏷️ Versione suggerita:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary,
-                                fontSize = 10.5.sp
-                            )
-                            Text(
-                                text = tag,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                fontWeight = FontWeight.Bold,
-                                color = DavezBordeaux,
-                                fontSize = 12.sp
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("PeritoAI", tag)))
-                                }
-                                Toast.makeText(context, "Copiato: $tag", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.size(32.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copia versione",
-                                tint = DavezBordeaux,
-                                modifier = Modifier.size(16.dp)
+                            Text(
+                                text = if (isNewer) "🚀 Nuova Versione: v${update.latestVersionName}" else "📦 Release Disponibile: v${update.latestVersionName}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = if (isNewer) "Build ${update.latestVersionCode} (Nuova)" else "Build ${update.latestVersionCode} (Reinstalla)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                }
-            }
 
-            Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = formatPeritoMessageText(
+                                update.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni e stabilità." },
+                                isUser = false,
+                                codeColor = MaterialTheme.colorScheme.primary
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 18.sp
+                        )
 
-            if (model.isPrimaryReasoning) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (!isDownloaded) {
-                            Button(
-                                onClick = onDownload,
-                                enabled = !isDownloading,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = DavezBordeaux
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 44.dp)
-                            ) {
-                                Text(
-                                    text = "⬇️ Scarica (${model.sizeLabel})",
-                                    color = AppleWhite,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.5.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isActiveReasoning) AppleGreenSoft else AppleGroupedBg,
-                                border = BorderStroke(1.dp, if (isActiveReasoning) AppleGreen else DavezStoneBorder),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 44.dp)
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
+                        if (uiState.updateDownloadProgress != null) {
+                            val prog = uiState.updateDownloadProgress
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = if (isActiveReasoning) "⭐ Modello Attivo in Uso" else "✅ File GGUF Scaricato",
-                                        color = if (isActiveReasoning) AppleGreen else AppleLabelPrimary,
+                                        text = uiState.updateStatusMessage ?: "Download in corso...",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${(prog * 100).toInt()}%",
+                                        style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                            }
-                            OutlinedButton(
-                                onClick = onDelete,
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.heightIn(min = 44.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.DeleteOutline,
-                                    contentDescription = "Elimina",
-                                    tint = AppleRed,
-                                    modifier = Modifier.size(18.dp)
+                                LinearProgressIndicator(
+                                    progress = { prog },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = semanticColors.brandSoft
                                 )
                             }
                         }
-                    }
 
-                    // Tasto per selezionare come modello attivo
-                    if (!isActiveReasoning && onSelectActive != null) {
-                        OutlinedButton(
-                            onClick = onSelectActive,
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                                onStartUpdateDownloadAndInstall(context)
+                            },
+                            enabled = uiState.updateDownloadProgress == null,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, DavezBordeaux),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = DavezBordeaux
-                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 40.dp)
+                                .heightIn(min = 44.dp)
                         ) {
                             Text(
-                                text = "⚡ Imposta come Modello Predefinito",
+                                text = if (uiState.updateDownloadProgress != null) {
+                                    "Download in corso..."
+                                } else if (isNewer) {
+                                    "Scarica e Installa v${update.latestVersionName}"
+                                } else {
+                                    "Scarica e Reinstalla v${update.latestVersionName}"
+                                },
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.5.sp
-                            )
-                        }
-                    }
-                }
-            } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (!isDownloaded) {
-                        Button(
-                            onClick = onDownload,
-                            enabled = !isDownloading,
-                            colors = ButtonDefaults.buttonColors(containerColor = DavezFotografiaSlate),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 44.dp)
-                        ) {
-                            Text(
-                                text = "⬇️ Scarica (${model.sizeLabel})",
-                                color = AppleWhite,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    } else {
-                        Button(
-                            onClick = {},
-                            enabled = false,
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 44.dp)
-                        ) {
-                            Text(
-                                text = "✅ Modello Scaricato",
                                 fontSize = 13.sp
                             )
                         }
-                        OutlinedButton(
-                            onClick = onDelete,
-                            shape = RoundedCornerShape(10.dp),
+                    }
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(0.5.dp, semanticColors.secondaryGroupedBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .toggleable(
+                        value = uiState.aiConfig.autoCheckUpdatesOnStart,
+                        role = Role.Switch,
+                        onValueChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            onToggleAutoCheckUpdates(it)
+                        }
+                    )
+                    .semantics { testTag = "auto_check_updates_row" }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Controllo automatico all'avvio",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Verifica nuove versioni all'apertura dell'app",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = uiState.aiConfig.autoCheckUpdatesOnStart,
+                        onCheckedChange = null,
+                        colors = SwitchDefaults.colors(checkedTrackColor = semanticColors.success)
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    onCheckForUpdates()
+                },
+                enabled = !uiState.isCheckingUpdate && uiState.updateDownloadProgress == null,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+            ) {
+                if (uiState.isCheckingUpdate) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Verifica in corso...", color = MaterialTheme.colorScheme.onPrimary, fontSize = 13.sp)
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Verifica Aggiornamenti Ora", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+
+            if (!uiState.updateStatusMessage.isNullOrBlank() && uiState.availableUpdate == null) {
+                Text(
+                    text = uiState.updateStatusMessage,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .clickable { onToggleManifestEditor() },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "⚙️ Endpoint Manifest OTA",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (showManifestUrlEditor) "Nascondi" else "Configura",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (showManifestUrlEditor) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = editedManifestUrl,
+                        onValueChange = onEditedManifestUrlChange,
+                        label = { Text("URL file ota-update.json", fontSize = 11.sp) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { onResetDefaultManifestUrl(OtaUpdateManager.DEFAULT_MANIFEST_URL) },
                             modifier = Modifier.heightIn(min = 44.dp)
                         ) {
-                            Icon(
-                                Icons.Default.DeleteOutline,
-                                contentDescription = "Elimina",
-                                tint = AppleRed,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Text("Predefinito", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Button(
+                            onClick = { onUpdateOtaManifestUrl(editedManifestUrl) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.heightIn(min = 44.dp)
+                        ) {
+                            Text("Salva URL", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -7177,6 +5015,8 @@ fun FirstRunModelDownloadDialog(
     uiState: PeritoUiState,
     viewModel: PeritoViewModel
 ) {
+    val semanticColors = LocalPeritoSemanticColors.current
+
     Dialog(
         onDismissRequest = { viewModel.dismissFirstRunModelDialog() },
         properties = DialogProperties(
@@ -7187,7 +5027,7 @@ fun FirstRunModelDownloadDialog(
     ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = AppleWhite,
+            color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             shadowElevation = 12.dp,
             modifier = Modifier
@@ -7198,13 +5038,12 @@ fun FirstRunModelDownloadDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(AppleWhite)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
-                // Header FISSO in alto (non scrolla e non fa saltare la lista)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 10.dp, top = 16.dp, bottom = 12.dp),
+                        .padding(start = 18.dp, end = 6.dp, top = 12.dp, bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -7218,7 +5057,7 @@ fun FirstRunModelDownloadDialog(
                             Text(
                                 text = "Configurazione Modelli IA",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = AppleLabelPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -7228,23 +5067,26 @@ fun FirstRunModelDownloadDialog(
                                     else -> "Pronto all'Uso"
                                 },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (uiState.isReasoningReady) AppleGreen else DavezBordeaux,
+                                color = if (uiState.isReasoningReady) semanticColors.success else MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
-                    IconButton(onClick = { viewModel.dismissFirstRunModelDialog() }) {
+                    IconButton(
+                        onClick = { viewModel.dismissFirstRunModelDialog() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Chiudi finestra modelli",
-                            tint = AppleLabelSecondary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
 
-                HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
 
-                // Area centrale scorrevole con LazyColumn (scroll fluido a 60fps senza bug)
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -7255,13 +5097,13 @@ fun FirstRunModelDownloadDialog(
                     item(key = "dialog_info_banner") {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = AppleBlueSoft,
+                            color = semanticColors.brandSoft,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "💡 Puoi avviare il download (continuerà in background con notifica Android) oppure toccare il pulsante in basso per entrare subito nella Chat.",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppleBlueDark,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(12.dp)
                             )
@@ -7275,22 +5117,21 @@ fun FirstRunModelDownloadDialog(
                     }
                 }
 
-                HorizontalDivider(thickness = 0.5.dp, color = DavezStoneBorder)
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
 
-                // Footer FISSO in basso (sempre cliccabile anche durante il download in background!)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(AppleWhite)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Button(
                         onClick = { viewModel.dismissFirstRunModelDialog() },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when {
-                                uiState.downloadProgress.isDownloading -> DavezBordeaux
-                                uiState.isReasoningReady -> AppleGreen
-                                else -> DavezBordeaux
+                                uiState.downloadProgress.isDownloading -> MaterialTheme.colorScheme.primary
+                                uiState.isReasoningReady -> semanticColors.success
+                                else -> MaterialTheme.colorScheme.primary
                             }
                         ),
                         shape = RoundedCornerShape(12.dp),
@@ -7304,7 +5145,7 @@ fun FirstRunModelDownloadDialog(
                                 uiState.isReasoningReady -> "✅ Entra nella Chat"
                                 else -> "Continua nell'App"
                             },
-                            color = AppleWhite,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -7315,10 +5156,6 @@ fun FirstRunModelDownloadDialog(
     }
 }
 
-/**
- * Dialogo interattivo elegante Apple HIG per la modifica rapida o precisa dell'orario
- * di un appuntamento (Sopralluogo, Incontro, Udienza, ecc.).
- */
 @Composable
 fun RescheduleAppointmentDialog(
     event: CalendarEventItem,
@@ -7327,6 +5164,7 @@ fun RescheduleAppointmentDialog(
     onConfirm: (newTitle: String, newCategory: String, newStartIso: String, newEndIso: String, newNotes: String) -> Unit
 ) {
     val context = LocalContext.current
+    val semanticColors = LocalPeritoSemanticColors.current
     val isoFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss") }
 
     val initialDt = remember(event) {
@@ -7368,7 +5206,7 @@ fun RescheduleAppointmentDialog(
             },
             selectedTime.hour,
             selectedTime.minute,
-            true // 24 ore
+            true
         )
         picker.show()
     }
@@ -7396,14 +5234,14 @@ fun RescheduleAppointmentDialog(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = null,
-                    tint = DavezBordeaux,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)
                 )
                 Text(
                     text = "Modifica Impegno",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AppleLabelPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
@@ -7414,13 +5252,12 @@ fun RescheduleAppointmentDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Selezione Categoria (Chip orizzontali)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Categoria:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(
                         modifier = Modifier
@@ -7452,23 +5289,22 @@ fun RescheduleAppointmentDialog(
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = DavezBordeaux,
-                                    selectedLabelColor = AppleWhite,
-                                    containerColor = AppleSecondaryGroupedBg,
-                                    labelColor = AppleLabelPrimary
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = semanticColors.secondaryGroupedBg,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                         }
                     }
                 }
 
-                // Titolo Appuntamento (modificabile)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Titolo Impegno:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = titleText,
@@ -7476,21 +5312,20 @@ fun RescheduleAppointmentDialog(
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DavezBordeaux,
-                            unfocusedBorderColor = DavezStoneBorder,
-                            focusedLabelColor = DavezBordeaux
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                // Info Interlocutore / Luogo esistenti (se presenti)
                 val hasClient = event.cliente.isNotBlank() && event.cliente != "Cliente" && !event.cliente.equals(event.titolo, ignoreCase = true) && !event.cliente.equals(event.categoria, ignoreCase = true)
                 val hasLocation = event.luogo.isNotBlank() && event.luogo != "Da definire"
                 if (hasClient || hasLocation) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = AppleSecondaryGroupedBg,
+                        color = semanticColors.secondaryGroupedBg,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -7498,27 +5333,26 @@ fun RescheduleAppointmentDialog(
                                 Text(
                                     text = "👤 Con: ${event.cliente}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = AppleLabelSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             if (hasLocation) {
                                 Text(
                                     text = "📍 ${event.luogo}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = AppleLabelSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
 
-                // Giorno: Oggi, Domani, o Data originaria / Altro giorno
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Data:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(
                         modifier = Modifier
@@ -7545,15 +5379,14 @@ fun RescheduleAppointmentDialog(
                                 onClick = { selectedDate = date },
                                 label = { Text(label, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = DavezBordeaux,
-                                    selectedLabelColor = AppleWhite,
-                                    containerColor = AppleSecondaryGroupedBg,
-                                    labelColor = AppleLabelPrimary
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = semanticColors.secondaryGroupedBg,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                         }
 
-                        // Opzione Data Personalizzata (DatePicker nativo)
                         val isCustomDate = selectedDate != today && selectedDate != tomorrow && selectedDate != originalDate
                         FilterChip(
                             selected = isCustomDate,
@@ -7565,28 +5398,27 @@ fun RescheduleAppointmentDialog(
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = DavezBordeaux,
-                                selectedLabelColor = AppleWhite,
-                                containerColor = AppleSecondaryGroupedBg,
-                                labelColor = AppleLabelPrimary
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                containerColor = semanticColors.secondaryGroupedBg,
+                                labelColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
                 }
 
-                // Orario Digitale Grande Interattivo (Tap per aprire il TimePicker nativo)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Nuovo Orario:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Surface(
                         onClick = openTimePicker,
                         shape = RoundedCornerShape(12.dp),
-                        color = AppleWhite,
-                        border = BorderStroke(1.5.dp, DavezBordeaux.copy(alpha = 0.5f)),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -7602,17 +5434,17 @@ fun RescheduleAppointmentDialog(
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = DavezBordeaux
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = AppleBlueSoft
+                                color = semanticColors.brandSoft
                             ) {
                                 Text(
                                     text = "Cambia ✏️",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DavezBordeaux,
+                                    color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -7620,12 +5452,11 @@ fun RescheduleAppointmentDialog(
                     }
                 }
 
-                // Quick Shift Chips: -1h, -30m, +30m, +1h
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Regolazione rapida:",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -7642,14 +5473,14 @@ fun RescheduleAppointmentDialog(
                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(32.dp),
+                                    .heightIn(min = 40.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(0.8.dp, DavezStoneBorder)
+                                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline)
                             ) {
                                 Text(
                                     text = label,
                                     fontSize = 11.sp,
-                                    color = AppleLabelPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     softWrap = false
@@ -7659,27 +5490,26 @@ fun RescheduleAppointmentDialog(
                     }
                 }
 
-                // Note Personali per il Calendario (Opzionale)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Note per il Calendario:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppleLabelSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = notesText,
                         onValueChange = { notesText = it },
-                        placeholder = { Text("Nessuna nota automatica", fontSize = 12.sp, color = AppleLabelSecondary) },
+                        placeholder = { Text("Nessuna nota automatica", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         maxLines = 3,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = DavezBordeaux,
-                            unfocusedBorderColor = DavezStoneBorder,
-                            focusedLabelColor = DavezBordeaux
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary
                         ),
                         supportingText = {
-                            Text("Se vuoto, nessuna nota verrà inserita nel calendario del telefono.", fontSize = 10.5.sp, color = AppleLabelSecondary)
+                            Text("Se vuoto, nessuna nota verrà inserita nel calendario del telefono.", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -7700,18 +5530,18 @@ fun RescheduleAppointmentDialog(
                     )
                     onDismiss()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Salva Modifiche", color = AppleWhite, fontWeight = FontWeight.Bold)
+                Text("Salva Modifiche", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Annulla", color = AppleLabelSecondary)
+                Text("Annulla", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        containerColor = AppleWhite,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp)
     )
 }
@@ -7728,6 +5558,7 @@ fun AppUpdateDialog(
     onContinueWithOldVersion: () -> Unit,
     currentVersionCode: Int = 0
 ) {
+    val semanticColors = LocalPeritoSemanticColors.current
     val isDownloading = downloadProgress != null
     val isReinstall = currentVersionCode > 0 && manifest.latestVersionCode <= currentVersionCode
     val isBlocking = manifest.mandatory && !isReinstall
@@ -7743,10 +5574,10 @@ fun AppUpdateDialog(
     ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = AppleWhite,
+            color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             shadowElevation = 14.dp,
-            border = BorderStroke(0.8.dp, DavezStoneBorder),
+            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .widthIn(max = 460.dp)
@@ -7757,7 +5588,6 @@ fun AppUpdateDialog(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Header con Icona e Badge Versione
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -7771,7 +5601,7 @@ fun AppUpdateDialog(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(DavezBordeauxSoft),
+                                .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Text("🚀", fontSize = 22.sp)
@@ -7781,35 +5611,34 @@ fun AppUpdateDialog(
                                 text = if (isReinstall) "Release Disponibile" else "Aggiornamento Disponibile",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = AppleLabelPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = if (isReinstall) "Pacchetto ufficiale Assistente Perito" else "Nuova release Assistente Perito",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = DavezBordeaux.copy(alpha = 0.12f)
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Text(
                             text = "v${manifest.latestVersionName}",
                             style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                             fontWeight = FontWeight.Bold,
-                            color = DavezBordeaux,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }
 
-                // Dettagli Release & Note di Rilascio
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = DavezAlabaster,
-                    border = BorderStroke(0.6.dp, DavezStoneBorder),
+                    color = MaterialTheme.colorScheme.background,
+                    border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -7827,22 +5656,22 @@ fun AppUpdateDialog(
                                 text = "Novità di questa versione:",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = DavezBordeaux
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                         Text(
                             text = formatPeritoMessageText(
                                 manifest.releaseNotes.ifBlank { "Miglioramenti generali delle prestazioni, stabilità e correzioni di bug." },
-                                isUser = false
+                                isUser = false,
+                                codeColor = MaterialTheme.colorScheme.primary
                             ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             lineHeight = 18.sp
                         )
                     }
                 }
 
-                // Barra di Avanzamento Download (se attivo)
                 if (downloadProgress != null) {
                     val progressFraction = downloadProgress
                     val percentInt = (progressFraction * 100).toInt()
@@ -7858,7 +5687,7 @@ fun AppUpdateDialog(
                             Text(
                                 text = statusMessage ?: "Download in corso...",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
@@ -7868,7 +5697,7 @@ fun AppUpdateDialog(
                                 text = "$percentInt%",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = DavezBordeaux
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                         LinearProgressIndicator(
@@ -7877,13 +5706,12 @@ fun AppUpdateDialog(
                                 .fillMaxWidth()
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
-                            color = DavezBordeaux,
-                            trackColor = AppleBlueSoft
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = semanticColors.brandSoft
                         )
                     }
                 }
 
-                // Pulsanti Azione
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -7900,7 +5728,7 @@ fun AppUpdateDialog(
                     Button(
                         onClick = onUpdateNow,
                         enabled = !isDownloading,
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -7908,7 +5736,7 @@ fun AppUpdateDialog(
                     ) {
                         Text(
                             text = buttonLabel,
-                            color = AppleWhite,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -7918,14 +5746,14 @@ fun AppUpdateDialog(
                         OutlinedButton(
                             onClick = onContinueWithOldVersion,
                             shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(0.8.dp, DavezStoneBorder),
+                            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 44.dp)
                         ) {
                             Text(
                                 text = if (isReinstall) "Chiudi" else "Ricorda più tardi",
-                                color = AppleLabelSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
@@ -7934,7 +5762,7 @@ fun AppUpdateDialog(
                         Text(
                             text = "⚠️ Aggiornamento obbligatorio per continuare",
                             style = MaterialTheme.typography.labelSmall,
-                            color = DavezBordeaux,
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 2.dp)
                         )
@@ -7945,11 +5773,6 @@ fun AppUpdateDialog(
     }
 }
 
-/**
- * Dialog per la selezione dell'account di calendario sincronizzato.
- * Consente al perito di scegliere un singolo calendario specifico (es. Studio Tecnico)
- * oppure sincronizzare tutti gli account rilevati sul telefono.
- */
 @Composable
 fun SelectCalendarAccountDialog(
     availableCalendars: List<SystemCalendarInfo>,
@@ -7958,6 +5781,8 @@ fun SelectCalendarAccountDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val semanticColors = LocalPeritoSemanticColors.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -7968,14 +5793,14 @@ fun SelectCalendarAccountDialog(
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
                     contentDescription = null,
-                    tint = DavezBordeaux,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
                     text = "Filtro Account Calendario",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AppleLabelPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
@@ -7990,10 +5815,9 @@ fun SelectCalendarAccountDialog(
                 Text(
                     text = "Scegli da quale account visualizzare e sincronizzare gli appuntamenti (es. account dello Studio Tecnico), escludendo gli altri account personali del telefono.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Opzione 1: Tutti gli account
                 val isAllSelected = selectedCalendarId == null
                 Surface(
                     onClick = {
@@ -8001,10 +5825,10 @@ fun SelectCalendarAccountDialog(
                         onDismiss()
                     },
                     shape = RoundedCornerShape(12.dp),
-                    color = if (isAllSelected) AppleBlueSoft else AppleWhite,
+                    color = if (isAllSelected) semanticColors.brandSoft else MaterialTheme.colorScheme.surface,
                     border = BorderStroke(
                         if (isAllSelected) 1.5.dp else 0.5.dp,
-                        if (isAllSelected) DavezBordeaux else DavezStoneBorder
+                        if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -8022,12 +5846,12 @@ fun SelectCalendarAccountDialog(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                color = if (isAllSelected) DavezBordeaux else AppleLabelPrimary
+                                color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Mostra impegni da qualsiasi calendario configurato",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppleLabelSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -8036,19 +5860,18 @@ fun SelectCalendarAccountDialog(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                tint = DavezBordeaux,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                // Opzioni per ogni calendario rilevato
                 if (availableCalendars.isEmpty()) {
                     Text(
                         text = "Nessun calendario di sistema rilevato o permessi non concessi.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 } else {
@@ -8060,10 +5883,10 @@ fun SelectCalendarAccountDialog(
                                 onDismiss()
                             },
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) AppleBlueSoft else AppleWhite,
+                            color = if (isSelected) semanticColors.brandSoft else MaterialTheme.colorScheme.surface,
                             border = BorderStroke(
                                 if (isSelected) 1.5.dp else 0.5.dp,
-                                if (isSelected) DavezBordeaux else DavezStoneBorder
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -8078,7 +5901,7 @@ fun SelectCalendarAccountDialog(
                                     modifier = Modifier
                                         .size(12.dp)
                                         .clip(CircleShape)
-                                        .background(cal.color?.let { Color(it) } ?: DavezBordeaux)
+                                        .background(cal.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary)
                                 )
                                 Column(
                                     modifier = Modifier.weight(1f),
@@ -8093,7 +5916,7 @@ fun SelectCalendarAccountDialog(
                                             text = cal.name,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) DavezBordeaux else AppleLabelPrimary,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
@@ -8109,12 +5932,12 @@ fun SelectCalendarAccountDialog(
                                         if (cal.isPrimary) {
                                             Surface(
                                                 shape = RoundedCornerShape(6.dp),
-                                                color = Color(0xFFE8F5E9)
+                                                color = semanticColors.successSoft
                                             ) {
                                                 Text(
                                                     text = "Principale",
                                                     fontSize = 10.sp,
-                                                    color = Color(0xFF2E7D32),
+                                                    color = semanticColors.success,
                                                     fontWeight = FontWeight.Bold,
                                                     softWrap = false,
                                                     maxLines = 1,
@@ -8141,7 +5964,6 @@ fun SelectCalendarAccountDialog(
                                         }
                                     }
 
-                                    // Subtitle dinamico: elimina duplicazioni tra nome calendario e account
                                     val subtitle = remember(cal.name, cal.accountName, cal.accountType) {
                                         val isSame = cal.accountName.isBlank() || cal.accountName.equals(cal.name, ignoreCase = true)
                                         val isOutlookAccount = cal.accountType.contains("outlook", ignoreCase = true) ||
@@ -8163,7 +5985,7 @@ fun SelectCalendarAccountDialog(
                                     Text(
                                         text = subtitle,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = AppleLabelSecondary,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -8172,7 +5994,7 @@ fun SelectCalendarAccountDialog(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = DavezBordeaux,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -8181,11 +6003,10 @@ fun SelectCalendarAccountDialog(
                     }
                 }
 
-                // Card di collegamento rapido Microsoft Outlook / Exchange
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFFF0F6FF),
-                    border = BorderStroke(1.dp, Color(0xFFB9D7F7)),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -8217,12 +6038,12 @@ fun SelectCalendarAccountDialog(
                                     text = "Collega Microsoft Outlook",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF005A9E)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "Sincronizza impegni e sopralluoghi da Microsoft 365 / Exchange",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = AppleLabelSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -8230,7 +6051,7 @@ fun SelectCalendarAccountDialog(
                         Text(
                             text = "1. Con l'app Microsoft Outlook installata: apri Outlook > Impostazioni ⚙️ > tocca la tua email > attiva l'interruttore 'Sincronizza calendari'.\n2. Oppure aggiungi un account Exchange/Outlook nelle impostazioni di sistema del dispositivo.",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, lineHeight = 14.sp),
-                            color = AppleLabelSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Row(
@@ -8250,7 +6071,9 @@ fun SelectCalendarAccountDialog(
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0078D4)),
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 44.dp)
                                 ) {
                                     Text("Apri Outlook", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
@@ -8276,7 +6099,9 @@ fun SelectCalendarAccountDialog(
                                 border = BorderStroke(1.dp, Color(0xFF0078D4)),
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 44.dp)
                             ) {
                                 Text("Aggiungi Account", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0078D4))
                             }
@@ -8287,9 +6112,10 @@ fun SelectCalendarAccountDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Chiudi", color = DavezBordeaux, fontWeight = FontWeight.Bold)
+                Text("Chiudi", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 

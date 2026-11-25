@@ -1,9 +1,8 @@
 package com.example.assistenteperitomobile.ui
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -55,8 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,16 +66,7 @@ import com.example.assistenteperitomobile.domain.AiEngineConfig
 import com.example.assistenteperitomobile.domain.CategoryReferenceFormat
 import com.example.assistenteperitomobile.domain.PeritoCategoryDefinition
 import com.example.assistenteperitomobile.domain.PeritoEventCategory
-import com.example.assistenteperitomobile.theme.AppleBlue
-import com.example.assistenteperitomobile.theme.AppleBlueSoft
-import com.example.assistenteperitomobile.theme.AppleLabelPrimary
-import com.example.assistenteperitomobile.theme.AppleLabelSecondary
-import com.example.assistenteperitomobile.theme.AppleLabelTertiary
-import com.example.assistenteperitomobile.theme.AppleWhite
-import com.example.assistenteperitomobile.theme.DavezAlabaster
-import com.example.assistenteperitomobile.theme.DavezBordeaux
-import com.example.assistenteperitomobile.theme.DavezStoneBorder
-import com.example.assistenteperitomobile.theme.DavezTravertine
+import com.example.assistenteperitomobile.theme.LocalPeritoSemanticColors
 import java.util.Locale
 
 /**
@@ -92,6 +84,8 @@ fun CategoryReferenceSettingsContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val semantic = LocalPeritoSemanticColors.current
+    val haptic = LocalHapticFeedback.current
     var expandedCategoryId by remember { mutableStateOf<String?>(PeritoEventCategory.UNIONCASA.id) }
     var isCreatingCategory by remember { mutableStateOf(false) }
     var categoryToEdit by remember { mutableStateOf<PeritoCategoryDefinition?>(null) }
@@ -104,9 +98,9 @@ fun CategoryReferenceSettingsContent(
     ) {
         // Top Bar stile Davez / Apple HIG
         Surface(
-            color = DavezAlabaster,
+            color = MaterialTheme.colorScheme.background,
             shadowElevation = 0.5.dp,
-            border = BorderStroke(0.5.dp, DavezTravertine)
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Row(
                 modifier = Modifier
@@ -115,13 +109,16 @@ fun CategoryReferenceSettingsContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = onBack,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        onBack()
+                    },
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Torna alle Impostazioni",
-                        tint = DavezBordeaux
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -134,26 +131,26 @@ fun CategoryReferenceSettingsContent(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.2).sp
                         ),
-                        color = AppleLabelPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Gestisci categorie e formato dei titoli in agenda",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppleLabelTertiary
+                        color = semantic.labelTertiary
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = DavezBordeaux.copy(alpha = 0.08f),
-                    border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.2f))
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Text(
                         text = "🏷️ Riferimenti",
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = DavezBordeaux
+                            color = MaterialTheme.colorScheme.primary
                         )
                     )
                 }
@@ -166,13 +163,13 @@ fun CategoryReferenceSettingsContent(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                .border(BorderStroke(0.5.dp, DavezTravertine), RoundedCornerShape(12.dp))
+                .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(12.dp))
                 .padding(12.dp)
         ) {
             Text(
                 text = "Tocca una categoria per espanderla e configurare gli elementi del titolo. Puoi aggiungere nuove categorie personalizzate con parole chiave dedicate che l'IA riconoscerà nei messaggi vocali e scritti.",
                 style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                color = AppleLabelPrimary.copy(alpha = 0.85f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
             )
         }
 
@@ -187,10 +184,13 @@ fun CategoryReferenceSettingsContent(
             // Pulsante Aggiungi Nuova Categoria
             item {
                 Surface(
-                    onClick = { isCreatingCategory = true },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        isCreatingCategory = true
+                    },
                     shape = RoundedCornerShape(14.dp),
-                    color = DavezBordeaux.copy(alpha = 0.06f),
-                    border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.25f)),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 4.dp)
@@ -205,7 +205,7 @@ fun CategoryReferenceSettingsContent(
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
-                            tint = DavezBordeaux,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -213,7 +213,7 @@ fun CategoryReferenceSettingsContent(
                             text = "+ Nuova Categoria Personalizzata",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = DavezBordeaux
+                                color = MaterialTheme.colorScheme.primary
                             )
                         )
                     }
@@ -247,14 +247,17 @@ fun CategoryReferenceSettingsContent(
             item {
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(
-                    onClick = onResetDefaults,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                        onResetDefaults()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 24.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = DavezBordeaux
+                        contentColor = MaterialTheme.colorScheme.primary
                     ),
-                    border = BorderStroke(1.dp, DavezBordeaux.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(
@@ -309,7 +312,7 @@ fun CategoryReferenceSettingsContent(
                         text = "Elimina Categoria",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = AppleLabelPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -318,30 +321,34 @@ fun CategoryReferenceSettingsContent(
                 Text(
                     text = "Sei sicuro di voler eliminare la categoria '${categoryToDelete?.displayName}'? Questa operazione rimuoverà la categoria e le sue impostazioni di formato.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppleLabelPrimary.copy(alpha = 0.85f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                 )
             },
             confirmButton = {
                 Button(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
                         categoryToDelete?.let { target ->
                             onDeleteCategory?.invoke(target.id)
                         }
                         categoryToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Elimina Categoria", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Elimina Categoria", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onError)
                 }
             },
             dismissButton = {
                 OutlinedButton(
-                    onClick = { categoryToDelete = null },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        categoryToDelete = null
+                    },
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(0.5.dp, DavezTravertine)
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
-                    Text("Annulla", color = AppleLabelPrimary)
+                    Text("Annulla", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
             shape = RoundedCornerShape(16.dp),
@@ -359,6 +366,8 @@ fun AddEditCategoryDialog(
     onDismiss: () -> Unit,
     onSave: (name: String, emoji: String, defaultTitle: String, keywords: List<String>) -> Unit
 ) {
+    val semantic = LocalPeritoSemanticColors.current
+    val haptic = LocalHapticFeedback.current
     var name by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.displayName ?: "") }
     var emoji by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.emoji ?: "⚡") }
     var defaultTitle by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.defaultPrefix ?: "") }
@@ -379,7 +388,7 @@ fun AddEditCategoryDialog(
                     text = if (isEditing) "Modifica Categoria" else "Nuova Categoria",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = AppleLabelPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 )
             }
@@ -397,7 +406,7 @@ fun AddEditCategoryDialog(
                     else
                         "Crea una nuova categoria per la tua agenda. L'assistente IA la userà automaticamente per categorizzare e formattare gli appuntamenti quando riconosce le parole chiave.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelTertiary,
+                    color = semantic.labelTertiary,
                     lineHeight = 17.sp
                 )
 
@@ -459,6 +468,7 @@ fun AddEditCategoryDialog(
             Button(
                 onClick = {
                     if (isValid) {
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                         val kws = keywordsStr.split(",")
                             .map { it.trim().lowercase(Locale.ITALIAN) }
                             .filter { it.isNotBlank() }
@@ -467,8 +477,8 @@ fun AddEditCategoryDialog(
                 },
                 enabled = isValid,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = DavezBordeaux,
-                    disabledContainerColor = DavezBordeaux.copy(alpha = 0.35f)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
                 ),
                 shape = RoundedCornerShape(10.dp)
             ) {
@@ -477,14 +487,17 @@ fun AddEditCategoryDialog(
         },
         dismissButton = {
             OutlinedButton(
-                onClick = onDismiss,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    onDismiss()
+                },
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(0.5.dp, DavezTravertine)
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Text("Annulla", color = AppleLabelPrimary)
+                Text("Annulla", color = MaterialTheme.colorScheme.onSurface)
             }
         },
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(16.dp)
     )
 }
@@ -504,12 +517,14 @@ fun CategoryAccordionCard(
     onDeleteCategory: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val semantic = LocalPeritoSemanticColors.current
+    val haptic = LocalHapticFeedback.current
+    val animationsEnabled = remember(context) { PeritoMotionTokens.areAnimationsEnabled(context) }
+
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.78f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = if (animationsEnabled) PeritoMotionTokens.snappySpring else snap(),
         label = "chevronRotation"
     )
 
@@ -518,19 +533,22 @@ fun CategoryAccordionCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(
             if (isExpanded) 1.dp else 0.5.dp,
-            if (isExpanded) DavezBordeaux.copy(alpha = 0.4f) else DavezTravertine
+            if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isExpanded) 2.dp else 0.5.dp),
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+            .animateContentSize(animationSpec = if (animationsEnabled) PeritoMotionTokens.contentSizeSpring else snap())
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Intestazione Card cliccabile per espandere/collassare
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onToggleExpand() }
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        onToggleExpand()
+                    }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -538,7 +556,7 @@ fun CategoryAccordionCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(DavezBordeaux.copy(alpha = 0.08f), CircleShape),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = category.emoji, fontSize = 18.sp)
@@ -553,7 +571,7 @@ fun CategoryAccordionCard(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.1).sp
                         ),
-                        color = AppleLabelPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     // Pillole riassuntive dei campi attivi nello stato compresso
@@ -574,26 +592,32 @@ fun CategoryAccordionCard(
 
                 // Icone Azione: Modifica & Elimina
                 IconButton(
-                    onClick = { onEditCategory?.invoke() },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        onEditCategory?.invoke()
+                    },
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Modifica categoria",
-                        tint = DavezBordeaux.copy(alpha = 0.75f),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                         modifier = Modifier.size(16.dp)
                     )
                 }
 
                 if (!category.isSystem) {
                     IconButton(
-                        onClick = { onDeleteCategory?.invoke() },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onDeleteCategory?.invoke()
+                        },
                         modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = "Elimina categoria",
-                            tint = Color(0xFFD32F2F).copy(alpha = 0.8f),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
                             modifier = Modifier.size(17.dp)
                         )
                     }
@@ -609,7 +633,7 @@ fun CategoryAccordionCard(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = if (isExpanded) "Comprimi" else "Espandi",
-                        tint = AppleLabelTertiary
+                        tint = semantic.labelTertiary
                     )
                 }
             }
@@ -625,7 +649,7 @@ fun CategoryAccordionCard(
                         Text(
                             text = "Parole chiave IA: ${category.keywords.joinToString(", ")}",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.5.sp),
-                            color = AppleLabelTertiary
+                            color = semantic.labelTertiary
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                     }
@@ -633,7 +657,7 @@ fun CategoryAccordionCard(
                     Text(
                         text = "Elementi da includere nel titolo:",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = AppleLabelTertiary
+                        color = semantic.labelTertiary
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -682,7 +706,7 @@ fun CategoryAccordionCard(
                         Text(
                             text = "Preset:",
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppleLabelTertiary
+                            color = semantic.labelTertiary
                         )
 
                         PresetButton(label = "Tutti") {
@@ -758,13 +782,17 @@ private fun ToggleFieldChip(
     checked: Boolean,
     onToggle: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Surface(
-        onClick = onToggle,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            onToggle()
+        },
         shape = RoundedCornerShape(20.dp),
-        color = if (checked) DavezBordeaux else Color.White,
+        color = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
-            if (checked) DavezBordeaux else DavezTravertine
+            if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
         ),
         shadowElevation = if (checked) 1.dp else 0.dp
     ) {
@@ -777,7 +805,7 @@ private fun ToggleFieldChip(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(13.dp)
                 )
             }
@@ -787,7 +815,7 @@ private fun ToggleFieldChip(
                     fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
                     fontSize = 11.5.sp
                 ),
-                color = if (checked) Color.White else AppleLabelPrimary
+                color = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -801,18 +829,22 @@ private fun PresetButton(
     label: String,
     onClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            onClick()
+        },
         shape = RoundedCornerShape(6.dp),
-        color = DavezTravertine.copy(alpha = 0.5f),
-        border = BorderStroke(0.5.dp, DavezTravertine)
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.SemiBold,
-                color = AppleLabelPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
         )
     }
@@ -826,15 +858,16 @@ private fun FormatMiniBadge(
     label: String,
     isMuted: Boolean = false
 ) {
+    val semantic = LocalPeritoSemanticColors.current
     Surface(
         shape = RoundedCornerShape(4.dp),
-        color = if (isMuted) Color.LightGray.copy(alpha = 0.3f) else DavezBordeaux.copy(alpha = 0.08f)
+        color = if (isMuted) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             style = MaterialTheme.typography.labelSmall.copy(
-                color = if (isMuted) AppleLabelTertiary else DavezBordeaux,
+                color = if (isMuted) semantic.labelTertiary else MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
         )
@@ -886,12 +919,13 @@ private fun CategoryLivePreviewBox(
         notes = sampleNotes
     )
 
+    val semantic = LocalPeritoSemanticColors.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.background)
-            .border(BorderStroke(0.5.dp, DavezStoneBorder), RoundedCornerShape(12.dp))
+            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
             .padding(10.dp)
     ) {
         Row(
@@ -902,18 +936,18 @@ private fun CategoryLivePreviewBox(
             Text(
                 text = "Anteprima in Agenda:",
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = DavezBordeaux
+                color = MaterialTheme.colorScheme.primary
             )
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = DavezBordeaux.copy(alpha = 0.08f),
-                border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.22f))
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f))
             ) {
                 Text(
                     text = "${category.emoji} ${category.displayName}",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.SemiBold,
-                        color = DavezBordeaux
+                        color = MaterialTheme.colorScheme.primary
                     ),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
@@ -929,7 +963,7 @@ private fun CategoryLivePreviewBox(
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.1).sp
             ),
-            color = AppleLabelPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -940,7 +974,7 @@ private fun CategoryLivePreviewBox(
         Text(
             text = "📍 $samplePlace • 🕒 10:30 - 11:30",
             style = MaterialTheme.typography.labelSmall,
-            color = AppleLabelTertiary,
+            color = semantic.labelTertiary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

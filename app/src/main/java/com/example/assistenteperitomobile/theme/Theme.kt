@@ -5,7 +5,46 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+
+@Immutable
+data class PeritoSemanticColors(
+    val success: Color,
+    val successSoft: Color,
+    val warning: Color,
+    val warningSoft: Color,
+    val groupedBg: Color,
+    val secondaryGroupedBg: Color,
+    val labelTertiary: Color,
+    val brandSoft: Color
+)
+
+private val LightPeritoSemanticColors = PeritoSemanticColors(
+    success = AppleGreen,
+    successSoft = AppleGreenSoft,
+    warning = AppleOrange,
+    warningSoft = AppleOrangeSoft,
+    groupedBg = AppleGroupedBg,
+    secondaryGroupedBg = AppleSecondaryGroupedBg,
+    labelTertiary = AppleLabelTertiary,
+    brandSoft = AppleBlueSoft
+)
+
+private val DarkPeritoSemanticColors = PeritoSemanticColors(
+    success = Color(0xFF4ADE80),
+    successSoft = Color(0xFF1B4D2E),
+    warning = Color(0xFFFBBF24),
+    warningSoft = Color(0xFF422A08),
+    groupedBg = Color(0xFF221F1E),
+    secondaryGroupedBg = Color(0xFF383331),
+    labelTertiary = Color(0xFF9C908C),
+    brandSoft = Color(0xFF5C1523)
+)
+
+val LocalPeritoSemanticColors = staticCompositionLocalOf { LightPeritoSemanticColors }
 
 private val DavezAppleLightColorScheme = lightColorScheme(
     primary = DavezBordeaux,
@@ -77,9 +116,12 @@ fun AssistentePeritoMobileTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DavezAppleDarkColorScheme else DavezAppleLightColorScheme
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val semanticColors = if (darkTheme) DarkPeritoSemanticColors else LightPeritoSemanticColors
+    CompositionLocalProvider(LocalPeritoSemanticColors provides semanticColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

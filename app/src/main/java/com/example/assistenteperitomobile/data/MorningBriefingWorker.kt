@@ -21,7 +21,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 class MorningBriefingWorker(
@@ -58,20 +58,22 @@ class MorningBriefingWorker(
             return getBriefingConfigFromDir(context.filesDir)
         }
 
-        internal fun getBriefingConfigFromDir(filesDir: File): Pair<Boolean, String> {
+        private fun loadAiConfigFromDir(filesDir: File): AiEngineConfig {
             val file = File(filesDir, CONFIG_FILE_NAME)
             val legacyFile = File(filesDir, LEGACY_CONFIG_FILE_NAME)
             val targetFile = when {
                 file.exists() -> file
                 legacyFile.exists() -> legacyFile
-                else -> return Pair(true, "08:30")
+                else -> return AiEngineConfig()
             }
-            return try {
-                val cfg = json.decodeFromString<AiEngineConfig>(targetFile.readText())
-                Pair(cfg.morningBriefingEnabled, cfg.morningBriefingTime.ifBlank { "08:30" })
-            } catch (_: Throwable) {
-                Pair(true, "08:30")
-            }
+            return runCatching {
+                json.decodeFromString<AiEngineConfig>(targetFile.readText())
+            }.getOrElse { AiEngineConfig() }
+        }
+
+        internal fun getBriefingConfigFromDir(filesDir: File): Pair<Boolean, String> {
+            val cfg = loadAiConfigFromDir(filesDir)
+            return Pair(cfg.morningBriefingEnabled, cfg.morningBriefingTime.ifBlank { "08:30" })
         }
 
         fun isBriefingEnabled(context: Context): Boolean = getBriefingConfig(context).first
@@ -79,12 +81,16 @@ class MorningBriefingWorker(
         fun getBriefingTime(context: Context): String = getBriefingConfig(context).second
 
         suspend fun sendBriefingNotification(context: Context): Result {
-            val (enabled, timeStr) = getBriefingConfig(context)
-            if (!enabled) {
+            val cfg = loadAiConfigFromDir(context.filesDir)
+            if (!cfg.morningBriefingEnabled) {
                 return Result.success()
             }
+            val timeStr = cfg.morningBriefingTime.ifBlank { "08:30" }
 
-            val calRepo = CalendarRepository(context)
+            val calRepo = CalendarRepository(context).apply {
+                isSyncEnabled = cfg.syncSystemCalendar
+                selectedCalendarId = cfg.selectedCalendarId
+            }
             val today = LocalDate.now()
             val todayEvents = calRepo.getEventsForDate(today)
             val tomorrowEvents = calRepo.getEventsForDate(today.plusDays(1))
@@ -183,8 +189,8 @@ class MorningBriefingWorker(
             }
 
             val (hour, minute) = parseBriefingTime(timeStr)
-            val now = LocalDateTime.now()
-            var nextBriefing = now.withHour(hour).withMinute(minute).withSecond(0)
+            val now = ZonedDateTime.now()
+            var nextBriefing = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
             if (!now.isBefore(nextBriefing)) {
                 nextBriefing = nextBriefing.plusDays(1)
             }

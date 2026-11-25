@@ -1,5 +1,6 @@
 package com.example.assistenteperitomobile.data
 
+import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -39,8 +40,17 @@ data class ProcessedDocumentPayload(
 
 class DocumentProcessor(private val context: Context) {
 
-    private val recognizer by lazy {
+    private val recognizerDelegate = lazy {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+
+    private val recognizer
+        get() = recognizerDelegate.value
+
+    fun close() {
+        if (recognizerDelegate.isInitialized()) {
+            runCatching { recognizerDelegate.value.close() }
+        }
     }
 
     /**
@@ -73,7 +83,14 @@ class DocumentProcessor(private val context: Context) {
      */
     suspend fun processUri(uri: Uri, originalNameHint: String? = null): ProcessedDocumentPayload =
         withContext(Dispatchers.IO) {
-            val rawName = originalNameHint ?: queryDisplayName(uri) ?: "documento_${System.currentTimeMillis()}.pdf"
+            if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
+                throw SecurityException("Schema URI non consentito: ${uri.scheme}")
+            }
+            if (uri.authority == "${context.packageName}.fileprovider") {
+                throw SecurityException("Accesso diretto al FileProvider interno non consentito")
+            }
+            val safeHint = originalNameHint?.let { sanitizeDisplayName(it) }
+            val rawName = safeHint ?: queryDisplayName(uri) ?: "documento_${System.currentTimeMillis()}.pdf"
             val declaredSize = queryFileSize(uri)
             if (declaredSize != null && declaredSize > MAX_DOCUMENT_SIZE_BYTES) {
                 throw DocumentTooLargeException(declaredSize, MAX_DOCUMENT_SIZE_BYTES)
@@ -95,12 +112,13 @@ class DocumentProcessor(private val context: Context) {
             var workingName = rawName
             var wasP7m = false
 
-            // 1. Sbustamento .p7m CAdES (anche annidato .pdf.p7m.p7m)
-            if (lowerName.endsWith(".p7m") || containsPdfHeaderInsideEnvelope(rawBytes)) {
+            // 1. Sbustamento .p7m CAdES (solo se estensione .p7m o busta ASN.1 SEQUENCE 0x30)
+            val isAsn1Sequence = rawBytes.isNotEmpty() && rawBytes[0] == 0x30.toByte()
+            if (lowerName.endsWith(".p7m") || (isAsn1Sequence && containsPdfHeaderInsideEnvelope(rawBytes))) {
                 val unwrapped = unwrapP7mBytes(rawBytes, rawName)
                 workingBytes = unwrapped.first
                 workingName = unwrapped.second
-                wasP7m = lowerName.endsWith(".p7m")
+                wasP7m = lowerName.endsWith(".p7m") || isAsn1Sequence
             }
 
             // 2. Estrazione testo (OCR ML Kit per PDF o Immagini)
@@ -130,6 +148,8 @@ class DocumentProcessor(private val context: Context) {
             val image = InputImage.fromBitmap(bitmap, 0)
             val result = recognizer.process(image).await()
             result.text
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Throwable) {
             ""
         }
@@ -137,11 +157,30 @@ class DocumentProcessor(private val context: Context) {
 
     /**
      * Sbustamento nativo in puro Kotlin delle buste crittografiche CAdES (.p7m) di PEC e Tribunale.
-     * Cerca l'header %PDF- e il footer %%EOF rimuovendo i chunk ASN.1 DER se presenti.
+     * Estrae il payload OCTET STRING da ASN.1 DER/BER ContentInfo -> SignedData -> encapContentInfo,
+     * con fallback alla ricerca %PDF-..%%EOF per buste parziali.
      */
     fun unwrapP7mBytes(rawBytes: ByteArray, originalFileName: String): Pair<ByteArray, String> {
         val cleanName = originalFileName.replace(Regex("""(\.p7m)+$""", RegexOption.IGNORE_CASE), "")
             .ifBlank { "atto_estratto.pdf" }
+
+        var candidate = rawBytes
+        var extractedFromAsn1 = false
+        for (depth in 0 until 3) {
+            if (candidate.isEmpty() || candidate[0] != 0x30.toByte()) break
+            val inner = extractCmsOctetStringPayload(candidate) ?: break
+            if (inner.isEmpty()) break
+            candidate = inner
+            extractedFromAsn1 = true
+        }
+        if (extractedFromAsn1) {
+            val finalName = if (isPdfBytes(candidate) && !cleanName.lowercase().endsWith(".pdf")) {
+                "$cleanName.pdf"
+            } else {
+                cleanName
+            }
+            return candidate to finalName
+        }
 
         val pdfHeader = "%PDF-".toByteArray(Charsets.US_ASCII)
         val pdfFooter = "%%EOF".toByteArray(Charsets.US_ASCII)
@@ -160,6 +199,113 @@ class DocumentProcessor(private val context: Context) {
         }
 
         return rawBytes to cleanName
+    }
+
+    private data class Asn1Header(
+        val tag: Int,
+        val contentStart: Int,
+        val contentEnd: Int,
+        val isIndefinite: Boolean
+    )
+
+    private fun readAsn1Header(data: ByteArray, offset: Int, limit: Int): Asn1Header? {
+        if (offset < 0 || offset >= limit) return null
+        var pos = offset
+        val firstTag = data[pos++].toInt() and 0xFF
+        if ((firstTag and 0x1F) == 0x1F) {
+            while (pos < limit) {
+                val b = data[pos++].toInt() and 0xFF
+                if ((b and 0x80) == 0) break
+            }
+        }
+        if (pos >= limit) return null
+        val lenByte = data[pos++].toInt() and 0xFF
+        if (lenByte < 0x80) {
+            val end = pos + lenByte
+            if (end > limit) return null
+            return Asn1Header(firstTag, pos, end, false)
+        }
+        if (lenByte == 0x80) {
+            return Asn1Header(firstTag, pos, limit, true)
+        }
+        val numOctets = lenByte and 0x7F
+        if (numOctets !in 1..4 || pos + numOctets > limit) return null
+        var len = 0L
+        for (i in 0 until numOctets) {
+            len = (len shl 8) or (data[pos++].toInt() and 0xFF).toLong()
+        }
+        if (len < 0L || pos + len > limit) return null
+        return Asn1Header(firstTag, pos, (pos + len).toInt(), false)
+    }
+
+    private fun skipAsn1Element(data: ByteArray, offset: Int, limit: Int): Int? {
+        val hdr = readAsn1Header(data, offset, limit) ?: return null
+        if (!hdr.isIndefinite) return hdr.contentEnd
+        var pos = hdr.contentStart
+        while (pos + 1 < limit) {
+            if (data[pos].toInt() == 0 && data[pos + 1].toInt() == 0) {
+                return pos + 2
+            }
+            pos = skipAsn1Element(data, pos, limit) ?: return null
+        }
+        return null
+    }
+
+    private fun collectOctetStringBytes(data: ByteArray, offset: Int, limit: Int, out: ByteArrayOutputStream): Boolean {
+        val hdr = readAsn1Header(data, offset, limit) ?: return false
+        return when (hdr.tag) {
+            0x04 -> {
+                if (hdr.isIndefinite) return false
+                out.write(data, hdr.contentStart, hdr.contentEnd - hdr.contentStart)
+                true
+            }
+            0x24 -> {
+                var pos = hdr.contentStart
+                val end = hdr.contentEnd
+                while (pos < end) {
+                    if (hdr.isIndefinite && pos + 1 < end && data[pos].toInt() == 0 && data[pos + 1].toInt() == 0) {
+                        return true
+                    }
+                    val child = readAsn1Header(data, pos, end) ?: return false
+                    if (!collectOctetStringBytes(data, pos, end, out)) return false
+                    pos = if (child.isIndefinite) (skipAsn1Element(data, pos, end) ?: return false) else child.contentEnd
+                }
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun extractCmsOctetStringPayload(der: ByteArray): ByteArray? {
+        val contentInfo = readAsn1Header(der, 0, der.size) ?: return null
+        if (contentInfo.tag != 0x30) return null
+        val afterOid = skipAsn1Element(der, contentInfo.contentStart, contentInfo.contentEnd) ?: return null
+        val contentWrapper = readAsn1Header(der, afterOid, contentInfo.contentEnd) ?: return null
+        if (contentWrapper.tag != 0xA0) return null
+
+        val signedData = readAsn1Header(der, contentWrapper.contentStart, contentWrapper.contentEnd) ?: return null
+        if (signedData.tag != 0x30) return null
+
+        // SignedData: version (0x02), digestAlgorithms (0x31), encapContentInfo (0x30)
+        var pos = skipAsn1Element(der, signedData.contentStart, signedData.contentEnd) ?: return null
+        pos = skipAsn1Element(der, pos, signedData.contentEnd) ?: return null
+        val encapContentInfo = readAsn1Header(der, pos, signedData.contentEnd) ?: return null
+        if (encapContentInfo.tag != 0x30) return null
+
+        val afterContentType = skipAsn1Element(der, encapContentInfo.contentStart, encapContentInfo.contentEnd) ?: return null
+        if (afterContentType >= encapContentInfo.contentEnd) return null
+        if (encapContentInfo.isIndefinite && afterContentType + 1 < encapContentInfo.contentEnd &&
+            der[afterContentType].toInt() == 0 && der[afterContentType + 1].toInt() == 0
+        ) {
+            return null
+        }
+        val eContentWrapper = readAsn1Header(der, afterContentType, encapContentInfo.contentEnd) ?: return null
+        if (eContentWrapper.tag != 0xA0) return null
+
+        val out = ByteArrayOutputStream()
+        return if (collectOctetStringBytes(der, eContentWrapper.contentStart, eContentWrapper.contentEnd, out)) {
+            out.toByteArray()
+        } else null
     }
 
     private suspend fun extractTextFromPdfBytes(pdfBytes: ByteArray): String {
@@ -202,6 +348,8 @@ class DocumentProcessor(private val context: Context) {
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Throwable) {
         } finally {
             tempFile.delete()
@@ -268,11 +416,17 @@ class DocumentProcessor(private val context: Context) {
         return opts.outWidth > 0 && opts.outHeight > 0
     }
 
+    private fun sanitizeDisplayName(name: String): String? {
+        val base = File(name).name
+        val safe = base.replace(Regex("""[^A-Za-z0-9._\-\s()]"""), "_").trim()
+        return safe.takeIf { it.isNotBlank() && it != "." && it != ".." }?.take(120)
+    }
+
     private fun queryDisplayName(uri: Uri): String? {
         return try {
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx)?.let { sanitizeDisplayName(it) } else null
             }
         } catch (_: Throwable) {
             null

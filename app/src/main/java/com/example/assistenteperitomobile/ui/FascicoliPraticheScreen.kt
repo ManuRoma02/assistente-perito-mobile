@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -59,8 +60,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -72,17 +74,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.assistenteperitomobile.domain.ArchivedDocument
 import com.example.assistenteperitomobile.domain.Fascicolo
 import com.example.assistenteperitomobile.domain.FascicoloStato
-import com.example.assistenteperitomobile.theme.AppleBlueDark
-import com.example.assistenteperitomobile.theme.AppleBlueSoft
-import com.example.assistenteperitomobile.theme.AppleSecondaryGroupedBg
-import com.example.assistenteperitomobile.theme.AppleGreen
-import com.example.assistenteperitomobile.theme.AppleLabelPrimary
-import com.example.assistenteperitomobile.theme.AppleLabelSecondary
-import com.example.assistenteperitomobile.theme.AppleRed
-import com.example.assistenteperitomobile.theme.AppleWhite
-import com.example.assistenteperitomobile.theme.DavezAlabaster
-import com.example.assistenteperitomobile.theme.DavezBordeaux
-import com.example.assistenteperitomobile.theme.DavezStoneBorder
+import com.example.assistenteperitomobile.theme.LocalPeritoSemanticColors
 
 /**
  * Schermata di Gestione Fascicoli / Pratiche per il Perito Tecnico.
@@ -98,6 +90,7 @@ fun FascicoliPraticheScreen(
     showHeader: Boolean = true
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var selectedFilter by rememberSaveable { mutableStateOf<FascicoloStato?>(null) }
     var showNewFascicoloDialog by rememberSaveable { mutableStateOf(false) }
     var expandedFascicoloId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -113,12 +106,12 @@ fun FascicoliPraticheScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DavezAlabaster)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Intestazione & Pulsante Crea Fascicolo
         Surface(
-            color = AppleWhite,
-            border = BorderStroke(0.5.dp, DavezStoneBorder),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -141,31 +134,34 @@ fun FascicoliPraticheScreen(
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = AppleLabelPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "${uiState.fascicoli.size} commesse registrate nello studio",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = AppleLabelSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
                         Button(
-                            onClick = { showNewFascicoloDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                showNewFascicoloDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = null,
-                                tint = AppleWhite,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 "Nuovo Fascicolo",
-                                color = AppleWhite,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.5.sp
                             )
@@ -180,26 +176,29 @@ fun FascicoliPraticheScreen(
                         Text(
                             text = "${uiState.fascicoli.size} commesse registrate",
                             style = MaterialTheme.typography.labelMedium,
-                            color = AppleLabelSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f)
                         )
 
                         Button(
-                            onClick = { showNewFascicoloDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                showNewFascicoloDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = null,
-                                tint = AppleWhite,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
                                 "Nuovo Fascicolo",
-                                color = AppleWhite,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
@@ -218,22 +217,28 @@ fun FascicoliPraticheScreen(
                 ) {
                     FilterChip(
                         selected = selectedFilter == null,
-                        onClick = { selectedFilter = null },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            selectedFilter = null
+                        },
                         label = { Text("Tutti (${uiState.fascicoli.size})", fontSize = 11.5.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = DavezBordeaux,
-                            selectedLabelColor = AppleWhite
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                         )
                     )
                     FascicoloStato.entries.forEach { stato ->
                         val count = uiState.fascicoli.count { it.stato == stato }
                         FilterChip(
                             selected = selectedFilter == stato,
-                            onClick = { selectedFilter = if (selectedFilter == stato) null else stato },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                selectedFilter = if (selectedFilter == stato) null else stato
+                            },
                             label = { Text("${stato.label} ($count)", fontSize = 11.5.sp) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = DavezBordeaux,
-                                selectedLabelColor = AppleWhite
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             )
                         )
                     }
@@ -243,45 +248,19 @@ fun FascicoliPraticheScreen(
 
         // Lista Fascicoli
         if (filteredList.isEmpty()) {
-            Box(
+            PeritoEmptyErrorState(
+                icon = Icons.Default.Folder,
+                title = "Nessun fascicolo trovato",
+                subtitle = "Crea una nuova pratica per iniziare.",
+                actionLabel = "Crea Fascicolo",
+                onAction = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    showNewFascicoloDialog = true
+                },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.Folder,
-                        contentDescription = null,
-                        tint = AppleLabelSecondary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(54.dp)
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = "Nessun fascicolo trovato",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = AppleLabelPrimary
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "Crea una nuova pratica per iniziare.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppleLabelSecondary
-                    )
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        onClick = { showNewFascicoloDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("empty_state_create_fascicolo_btn")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = AppleWhite, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Crea Fascicolo", color = AppleWhite, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+                    .testTag("empty_state_create_fascicolo_btn")
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -354,15 +333,23 @@ fun FascicoloCard(
     onOpenDoc: (ArchivedDocument) -> Unit,
     onShareDoc: (ArchivedDocument) -> Unit
 ) {
+    val semantic = LocalPeritoSemanticColors.current
+    val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+
     Surface(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            onCardClick()
+        },
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(16.dp),
-        color = AppleWhite,
-        border = BorderStroke(0.6.dp, DavezStoneBorder),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline),
         shadowElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onCardClick() }
+            .emilPressScale(interactionSource)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header Fascicolo: Codice + Pill Stato
@@ -373,14 +360,14 @@ fun FascicoloCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = AppleBlueSoft,
-                    border = BorderStroke(0.5.dp, DavezBordeaux.copy(alpha = 0.2f))
+                    color = semantic.brandSoft,
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Text(
                         text = fascicolo.codice,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = DavezBordeaux,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
@@ -388,11 +375,14 @@ fun FascicoloCard(
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = when (fascicolo.stato) {
-                        FascicoloStato.IN_CORSO -> DavezBordeaux.copy(alpha = 0.12f)
-                        FascicoloStato.APERTO -> AppleBlueSoft
-                        FascicoloStato.CHIUSO -> AppleSecondaryGroupedBg
+                        FascicoloStato.IN_CORSO -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        FascicoloStato.APERTO -> semantic.brandSoft
+                        FascicoloStato.CHIUSO -> semantic.secondaryGroupedBg
                     },
-                    modifier = Modifier.clickable { onToggleStato() }
+                    modifier = Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        onToggleStato()
+                    }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -405,9 +395,9 @@ fun FascicoloCard(
                                 .clip(CircleShape)
                                 .background(
                                     when (fascicolo.stato) {
-                                        FascicoloStato.IN_CORSO -> DavezBordeaux
-                                        FascicoloStato.APERTO -> AppleBlueDark
-                                        FascicoloStato.CHIUSO -> AppleLabelSecondary
+                                        FascicoloStato.IN_CORSO -> MaterialTheme.colorScheme.primary
+                                        FascicoloStato.APERTO -> MaterialTheme.colorScheme.primary
+                                        FascicoloStato.CHIUSO -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
                                 )
                         )
@@ -415,9 +405,9 @@ fun FascicoloCard(
                             text = fascicolo.stato.label,
                             style = MaterialTheme.typography.labelSmall,
                             color = when (fascicolo.stato) {
-                                FascicoloStato.IN_CORSO -> DavezBordeaux
-                                FascicoloStato.APERTO -> AppleBlueDark
-                                FascicoloStato.CHIUSO -> AppleLabelSecondary
+                                FascicoloStato.IN_CORSO -> MaterialTheme.colorScheme.primary
+                                FascicoloStato.APERTO -> MaterialTheme.colorScheme.primary
+                                FascicoloStato.CHIUSO -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             fontWeight = FontWeight.Bold
                         )
@@ -433,7 +423,7 @@ fun FascicoloCard(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = AppleLabelPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(Modifier.height(6.dp))
@@ -443,14 +433,14 @@ fun FascicoloCard(
                 Icon(
                     Icons.Default.Person,
                     contentDescription = null,
-                    tint = AppleLabelSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = "Cliente: ${fascicolo.cliente}" + if (fascicolo.controparte.isNotBlank()) " • Controparte: ${fascicolo.controparte}" else "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppleLabelSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -462,14 +452,14 @@ fun FascicoloCard(
                     Icon(
                         Icons.Default.LocationOn,
                         contentDescription = null,
-                        tint = AppleRed,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = fascicolo.indirizzo,
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppleLabelSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -487,14 +477,14 @@ fun FascicoloCard(
                 Text(
                     text = "📎 ${documents.size} file archiviati",
                     style = MaterialTheme.typography.labelSmall,
-                    color = DavezBordeaux,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
 
                 Text(
                     text = if (isExpanded) "Comprimi ▲" else "Dettagli & File ▼",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppleLabelSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -509,13 +499,13 @@ fun FascicoloCard(
                     if (fascicolo.note.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = DavezAlabaster,
+                            color = MaterialTheme.colorScheme.background,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "📝 Note: ${fascicolo.note}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = AppleLabelPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(8.dp)
                             )
                         }
@@ -528,8 +518,11 @@ fun FascicoloCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = onAddPhoto,
-                            colors = ButtonDefaults.buttonColors(containerColor = DavezBordeaux),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onAddPhoto()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                             modifier = Modifier.weight(1f)
@@ -540,15 +533,18 @@ fun FascicoloCard(
                         }
 
                         OutlinedButton(
-                            onClick = onAttachDoc,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                onAttachDoc()
+                            },
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(0.8.dp, DavezBordeaux),
+                            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Description, contentDescription = null, tint = DavezBordeaux, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Allega File", color = DavezBordeaux, fontSize = 11.5.sp)
+                            Text("Allega File", color = MaterialTheme.colorScheme.primary, fontSize = 11.5.sp)
                         }
                     }
 
@@ -558,14 +554,14 @@ fun FascicoloCard(
                         Text(
                             text = "Nessun documento collegato.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppleLabelSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
                         Text(
                             text = "Documenti del Fascicolo:",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = AppleLabelPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(6.dp))
 
@@ -584,14 +580,14 @@ fun FascicoloCard(
                                     Icon(
                                         Icons.Default.Description,
                                         contentDescription = null,
-                                        tint = DavezBordeaux,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = doc.fileName,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = AppleLabelPrimary,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -599,19 +595,25 @@ fun FascicoloCard(
 
                                 Row {
                                     IconButton(
-                                        onClick = { onOpenDoc(doc) },
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            onOpenDoc(doc)
+                                        },
                                         modifier = Modifier.size(44.dp)
                                     ) {
-                                        Text("Apri", fontSize = 11.sp, color = DavezBordeaux, fontWeight = FontWeight.Bold)
+                                        Text("Apri", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                     }
                                     IconButton(
-                                        onClick = { onShareDoc(doc) },
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            onShareDoc(doc)
+                                        },
                                         modifier = Modifier.size(44.dp)
                                     ) {
                                         Icon(
                                             Icons.Default.Share,
                                             contentDescription = "Condividi",
-                                            tint = AppleLabelSecondary,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -630,6 +632,7 @@ fun NewFascicoloDialog(
     onDismiss: () -> Unit,
     onConfirm: (codice: String, titolo: String, cliente: String, controparte: String, indirizzo: String, note: String) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var codice by rememberSaveable { mutableStateOf("PRAT-${System.currentTimeMillis().toString().takeLast(4)}") }
     var titolo by rememberSaveable { mutableStateOf("") }
     var cliente by rememberSaveable { mutableStateOf("") }
@@ -643,7 +646,7 @@ fun NewFascicoloDialog(
     ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = AppleWhite,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .widthIn(max = 520.dp)
@@ -665,10 +668,16 @@ fun NewFascicoloDialog(
                         text = "Nuovo Fascicolo / Pratica",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = AppleLabelPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Chiudi", tint = AppleLabelSecondary)
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onDismiss()
+                        },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Chiudi", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -679,7 +688,7 @@ fun NewFascicoloDialog(
                     onValueChange = { codice = it },
                     label = { Text("Codice Pratica (es. CTU-2026-01)") },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DavezBordeaux),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -690,7 +699,7 @@ fun NewFascicoloDialog(
                     onValueChange = { titolo = it },
                     label = { Text("Oggetto / Titolo Perizia *") },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DavezBordeaux),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -701,7 +710,7 @@ fun NewFascicoloDialog(
                     onValueChange = { cliente = it },
                     label = { Text("Cliente / Committente / Tribunale *") },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DavezBordeaux),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -712,7 +721,7 @@ fun NewFascicoloDialog(
                     onValueChange = { controparte = it },
                     label = { Text("Controparte / Compagnia (opzionale)") },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DavezBordeaux),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -723,7 +732,7 @@ fun NewFascicoloDialog(
                     onValueChange = { indirizzo = it },
                     label = { Text("Luogo / Indirizzo Rilievo o Perizia (opzionale)") },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DavezBordeaux),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -734,7 +743,7 @@ fun NewFascicoloDialog(
                     onValueChange = { note = it },
                     label = { Text("Note / Memo periziali") },
                     maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = DavezBordeaux),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -746,12 +755,13 @@ fun NewFascicoloDialog(
                 Button(
                     onClick = {
                         if (titolo.isNotBlank() && cliente.isNotBlank()) {
+                            haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                             onConfirm(codice, titolo, cliente, controparte, indirizzo, note)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = DavezBordeaux,
-                        disabledContainerColor = DavezBordeaux.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                     ),
                     shape = RoundedCornerShape(12.dp),
                     enabled = titolo.isNotBlank() && cliente.isNotBlank(),
@@ -762,7 +772,7 @@ fun NewFascicoloDialog(
                 ) {
                     Text(
                         "Crea Fascicolo",
-                        color = AppleWhite,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
@@ -771,13 +781,16 @@ fun NewFascicoloDialog(
                 Spacer(Modifier.height(6.dp))
 
                 TextButton(
-                    onClick = onDismiss,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        onDismiss()
+                    },
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(44.dp)
                 ) {
-                    Text("Annulla", color = AppleLabelSecondary, fontWeight = FontWeight.SemiBold)
+                    Text("Annulla", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
